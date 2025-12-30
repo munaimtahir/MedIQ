@@ -25,10 +25,14 @@ def client():
         # Import here to ensure environment variable is set before app initialization
         # Clear any cached imports
         import sys
-        if "main" in sys.modules:
-            del sys.modules["main"]
-        if "database" in sys.modules:
-            del sys.modules["database"]
+        modules_to_clear = ["main", "database", "models", "seed"]
+        for mod in modules_to_clear:
+            if mod in sys.modules:
+                del sys.modules[mod]
+        
+        from database import Base, engine
+        # Ensure tables are created
+        Base.metadata.create_all(bind=engine)
         
         from main import app
         yield TestClient(app)
