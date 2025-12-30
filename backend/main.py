@@ -30,7 +30,7 @@ def check_and_seed():
     # Skip seeding in test environment
     if os.getenv("ENV") == "test" or os.getenv("SKIP_SEED") == "true":
         return
-    
+
     db = SessionLocal()
     try:
         user_count = db.query(User).count()
