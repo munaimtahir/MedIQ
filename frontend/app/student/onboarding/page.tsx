@@ -28,7 +28,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Welcome! Let's get started</CardTitle>
+          <CardTitle>Welcome! Let&apos;s get started</CardTitle>
           <CardDescription>Select your year and primary block</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

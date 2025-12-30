@@ -2,6 +2,7 @@
 API endpoint tests.
 """
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,7 +13,7 @@ def client():
     # Use in-memory SQLite for tests to avoid database connection issues
     original_db_url = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-    
+
     try:
         # Import here to ensure environment variable is set before app initialization
         from main import app

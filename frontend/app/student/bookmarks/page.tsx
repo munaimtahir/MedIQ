@@ -14,7 +14,7 @@ export default function BookmarksPage() {
       <Card>
         <CardHeader>
           <CardTitle>Saved Questions</CardTitle>
-          <CardDescription>Questions you've bookmarked</CardDescription>
+          <CardDescription>Questions you&apos;ve bookmarked</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">

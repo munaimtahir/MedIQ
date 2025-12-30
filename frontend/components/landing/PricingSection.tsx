@@ -17,7 +17,7 @@ export function PricingSection() {
             Simple, transparent pricing
           </h2>
           <p className="text-lg text-slate-600">
-            Start free, upgrade when you're ready
+            Start free, upgrade when you&apos;re ready
           </p>
         </div>
 
