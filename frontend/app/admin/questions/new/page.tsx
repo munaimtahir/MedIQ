@@ -1,27 +1,33 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { adminAPI, syllabusAPI } from '@/lib/api';
-import { Theme } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { adminAPI, syllabusAPI } from "@/lib/api";
+import { Theme } from "@/lib/api";
 
 export default function NewQuestionPage() {
   const router = useRouter();
   const [themes, setThemes] = useState<Theme[]>([]);
   const [formData, setFormData] = useState({
-    theme_id: '',
-    question_text: '',
-    options: ['', '', '', '', ''],
-    correct_option_index: '',
-    explanation: '',
-    tags: '',
-    difficulty: '',
+    theme_id: "",
+    question_text: "",
+    options: ["", "", "", "", ""],
+    correct_option_index: "",
+    explanation: "",
+    tags: "",
+    difficulty: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +46,10 @@ export default function NewQuestionPage() {
     setLoading(true);
 
     try {
-      const tags = formData.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = formData.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
       await adminAPI.createQuestion({
         theme_id: Number(formData.theme_id),
         question_text: formData.question_text,
@@ -50,20 +59,22 @@ export default function NewQuestionPage() {
         tags: tags.length > 0 ? tags : undefined,
         difficulty: formData.difficulty || undefined,
       });
-      router.push('/admin/questions');
+      router.push("/admin/questions");
     } catch (error: any) {
-      console.error('Failed to create question:', error);
-      alert(error.message || 'Failed to create question');
+      console.error("Failed to create question:", error);
+      alert(error.message || "Failed to create question");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <div>
-        <Button variant="ghost" onClick={() => router.back()}>← Back</Button>
-        <h1 className="text-3xl font-bold mt-4">Create New Question</h1>
+        <Button variant="ghost" onClick={() => router.back()}>
+          ← Back
+        </Button>
+        <h1 className="mt-4 text-3xl font-bold">Create New Question</h1>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -75,7 +86,10 @@ export default function NewQuestionPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="theme">Theme *</Label>
-              <Select value={formData.theme_id} onValueChange={(v) => setFormData({ ...formData, theme_id: v })}>
+              <Select
+                value={formData.theme_id}
+                onValueChange={(v) => setFormData({ ...formData, theme_id: v })}
+              >
                 <SelectTrigger id="theme">
                   <SelectValue placeholder="Select a theme" />
                 </SelectTrigger>
@@ -175,7 +189,7 @@ export default function NewQuestionPage() {
 
             <div className="flex gap-4">
               <Button type="submit" disabled={loading}>
-                {loading ? 'Creating...' : 'Create Question'}
+                {loading ? "Creating..." : "Create Question"}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>
                 Cancel
@@ -187,4 +201,3 @@ export default function NewQuestionPage() {
     </div>
   );
 }
-

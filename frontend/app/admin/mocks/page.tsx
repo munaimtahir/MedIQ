@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileText } from "lucide-react";
 
 export default function MocksPage() {
   return (
@@ -17,8 +17,8 @@ export default function MocksPage() {
           <CardDescription>Create and manage mock exam sets</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <div className="py-8 text-center text-muted-foreground">
+            <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>No mock exams configured</p>
           </div>
         </CardContent>
@@ -26,4 +26,3 @@ export default function MocksPage() {
     </div>
   );
 }
-

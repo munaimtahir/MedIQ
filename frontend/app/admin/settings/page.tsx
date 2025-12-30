@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useUserStore } from '@/store/userStore';
-import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useUserStore } from "@/store/userStore";
+import { useRouter } from "next/navigation";
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -13,11 +13,11 @@ export default function AdminSettingsPage() {
 
   const handleLogout = () => {
     clearUser();
-    router.push('/');
+    router.push("/");
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Admin settings and preferences</p>
@@ -31,7 +31,7 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="userId">User ID</Label>
-            <Input id="userId" value={userId || ''} disabled />
+            <Input id="userId" value={userId || ""} disabled />
           </div>
           <Button variant="destructive" onClick={handleLogout}>
             Logout
@@ -51,4 +51,3 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
-

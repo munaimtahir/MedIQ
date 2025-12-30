@@ -12,6 +12,7 @@ class User(Base):
     role = Column(String, nullable=False)  # "student" or "admin"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class Block(Base):
     __tablename__ = "blocks"
 
@@ -21,6 +22,7 @@ class Block(Base):
     description = Column(Text)
 
     themes = relationship("Theme", back_populates="block")
+
 
 class Theme(Base):
     __tablename__ = "themes"
@@ -32,6 +34,7 @@ class Theme(Base):
 
     block = relationship("Block", back_populates="themes")
     questions = relationship("Question", back_populates="theme")
+
 
 class Question(Base):
     __tablename__ = "questions"
@@ -50,6 +53,7 @@ class Question(Base):
 
     theme = relationship("Theme", back_populates="questions")
 
+
 class AttemptSession(Base):
     __tablename__ = "attempt_sessions"
 
@@ -64,6 +68,7 @@ class AttemptSession(Base):
 
     answers = relationship("AttemptAnswer", back_populates="session")
 
+
 class AttemptAnswer(Base):
     __tablename__ = "attempt_answers"
 
@@ -76,4 +81,3 @@ class AttemptAnswer(Base):
     answered_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("AttemptSession", back_populates="answers")
-

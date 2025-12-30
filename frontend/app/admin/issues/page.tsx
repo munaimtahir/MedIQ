@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 
 export default function IssuesPage() {
   return (
@@ -17,8 +17,8 @@ export default function IssuesPage() {
           <CardDescription>User-reported problems</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <div className="py-8 text-center text-muted-foreground">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>No issues reported</p>
           </div>
         </CardContent>
@@ -26,4 +26,3 @@ export default function IssuesPage() {
     </div>
   );
 }
-

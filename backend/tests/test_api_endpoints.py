@@ -1,6 +1,7 @@
 """
 API endpoint tests.
 """
+
 import os
 import tempfile
 
@@ -25,16 +26,19 @@ def client():
         # Import here to ensure environment variable is set before app initialization
         # Clear any cached imports
         import sys
+
         modules_to_clear = ["main", "database", "models", "seed"]
         for mod in modules_to_clear:
             if mod in sys.modules:
                 del sys.modules[mod]
 
         from database import Base, engine
+
         # Ensure tables are created
         Base.metadata.create_all(bind=engine)
 
         from main import app
+
         yield TestClient(app)
     finally:
         # Clean up
@@ -99,4 +103,3 @@ def test_questions_endpoint_with_limit(client):
     assert response.status_code == 200
     assert isinstance(response.json(), list)
     assert len(response.json()) <= 10
-

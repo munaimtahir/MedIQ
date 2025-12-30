@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, validator
 
 # ============ SYLLABUS SCHEMAS ============
 
+
 class BlockResponse(BaseModel):
     id: str
     name: str
@@ -12,6 +13,7 @@ class BlockResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class ThemeResponse(BaseModel):
     id: int
@@ -22,7 +24,9 @@ class ThemeResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # ============ QUESTION SCHEMAS ============
+
 
 class QuestionResponse(BaseModel):
     id: int
@@ -40,6 +44,7 @@ class QuestionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class QuestionCreate(BaseModel):
     theme_id: int
     question_text: str
@@ -49,17 +54,18 @@ class QuestionCreate(BaseModel):
     tags: list[str] | None = None
     difficulty: str | None = None
 
-    @validator('options')
+    @validator("options")
     def validate_options(cls, v):
         if len(v) != 5:
-            raise ValueError('Must have exactly 5 options')
+            raise ValueError("Must have exactly 5 options")
         return v
 
-    @validator('correct_option_index')
+    @validator("correct_option_index")
     def validate_correct_index(cls, v, values):
-        if 'options' in values and v >= len(values['options']):
-            raise ValueError('correct_option_index must be within options range')
+        if "options" in values and v >= len(values["options"]):
+            raise ValueError("correct_option_index must be within options range")
         return v
+
 
 class QuestionUpdate(BaseModel):
     theme_id: int | None = None
@@ -71,13 +77,16 @@ class QuestionUpdate(BaseModel):
     difficulty: str | None = None
     is_published: bool | None = None
 
+
 # ============ SESSION SCHEMAS ============
+
 
 class SessionCreate(BaseModel):
     theme_id: int | None = None
     block_id: str | None = None
     question_count: int | None = Field(30, ge=1, le=100)
     time_limit_minutes: int | None = Field(60, ge=1)
+
 
 class SessionResponse(BaseModel):
     id: int
@@ -92,10 +101,12 @@ class SessionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class AnswerSubmit(BaseModel):
     question_id: int
     selected_option_index: int = Field(..., ge=0, le=4)
     is_marked_for_review: bool = False
+
 
 class ReviewResponse(BaseModel):
     session_id: int
@@ -104,4 +115,3 @@ class ReviewResponse(BaseModel):
     incorrect_count: int
     score_percentage: float
     questions: list[dict]
-

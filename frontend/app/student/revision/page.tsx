@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 
 export default function RevisionPage() {
   return (
@@ -18,8 +18,8 @@ export default function RevisionPage() {
           <CardDescription>Review your completed practice sessions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <RotateCcw className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <div className="py-8 text-center text-muted-foreground">
+            <RotateCcw className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>No past sessions yet. Complete a practice session to see it here.</p>
           </div>
         </CardContent>
@@ -31,7 +31,7 @@ export default function RevisionPage() {
           <CardDescription>Questions you got wrong</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="py-8 text-center text-muted-foreground">
             <p>No mistakes to review yet.</p>
           </div>
         </CardContent>
@@ -39,4 +39,3 @@ export default function RevisionPage() {
     </div>
   );
 }
-

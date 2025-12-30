@@ -89,6 +89,55 @@ npm run dev
 └── docs/              # Architecture documentation
 ```
 
+## Code Formatting
+
+This project uses automated formatting tools to maintain consistent code style.
+
+### Format All Code
+
+```bash
+# Linux/Mac
+./infra/scripts/format-all.sh
+
+# Windows PowerShell
+.\infra\scripts\format-all.ps1
+```
+
+### Check Formatting (CI)
+
+```bash
+# Linux/Mac
+./infra/scripts/format-check.sh
+
+# Windows PowerShell
+.\infra\scripts\format-check.ps1
+```
+
+### Individual Services
+
+**Frontend:**
+```bash
+cd frontend
+npm run format          # Format code
+npm run format:check    # Check formatting
+npm run lint            # Run ESLint
+npm run typecheck       # TypeScript check
+```
+
+**Backend:**
+```bash
+cd backend
+black .                 # Format code
+ruff check .            # Lint code
+ruff check . --fix      # Auto-fix linting issues
+pytest -v               # Run tests
+```
+
+### Tools Used
+
+- **Frontend**: Prettier (with Tailwind plugin) + ESLint
+- **Backend**: Black (formatting) + Ruff (linting)
+
 ## Next Steps
 
 See `docs/architecture.md` for detailed architecture and `docs/api-contracts.md` for API specifications.

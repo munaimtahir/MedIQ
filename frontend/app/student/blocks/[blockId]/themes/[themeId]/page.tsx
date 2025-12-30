@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { studentAPI, syllabusAPI } from '@/lib/api';
-import { Question, Theme } from '@/lib/api';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { studentAPI, syllabusAPI } from "@/lib/api";
+import { Question, Theme } from "@/lib/api";
 
 export default function ThemeDetailPage() {
   const params = useParams();
@@ -17,8 +17,8 @@ export default function ThemeDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      syllabusAPI.getThemes().then(themes => themes.find(t => t.id === themeId)),
-      studentAPI.getQuestions(themeId)
+      syllabusAPI.getThemes().then((themes) => themes.find((t) => t.id === themeId)),
+      studentAPI.getQuestions(themeId),
     ])
       .then(([foundTheme, qs]) => {
         setTheme(foundTheme || null);
@@ -37,16 +37,18 @@ export default function ThemeDetailPage() {
       });
       router.push(`/student/session/${session.id}`);
     } catch (error) {
-      console.error('Failed to create session:', error);
-      alert('Failed to start practice session');
+      console.error("Failed to create session:", error);
+      alert("Failed to start practice session");
     }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <Button variant="ghost" onClick={() => router.back()}>← Back</Button>
-        <h1 className="text-3xl font-bold mt-4">{theme?.name || 'Theme'}</h1>
+        <Button variant="ghost" onClick={() => router.back()}>
+          ← Back
+        </Button>
+        <h1 className="mt-4 text-3xl font-bold">{theme?.name || "Theme"}</h1>
         <p className="text-muted-foreground">{theme?.description}</p>
       </div>
 
@@ -60,7 +62,7 @@ export default function ThemeDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground mb-2">
+                <p className="mb-2 text-sm text-muted-foreground">
                   {questions.length} questions available
                 </p>
                 <Button onClick={handleStartPractice} size="lg" className="w-full">
@@ -71,7 +73,7 @@ export default function ThemeDetailPage() {
           </Card>
 
           <div>
-            <h2 className="text-2xl font-semibold mb-4">Sample Questions</h2>
+            <h2 className="mb-4 text-2xl font-semibold">Sample Questions</h2>
             <div className="space-y-4">
               {questions.slice(0, 3).map((q) => (
                 <Card key={q.id}>
@@ -79,7 +81,7 @@ export default function ThemeDetailPage() {
                     <CardTitle className="text-base">{q.question_text}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
                       {q.options.map((opt, idx) => (
                         <li key={idx}>{opt}</li>
                       ))}
@@ -94,4 +96,3 @@ export default function ThemeDetailPage() {
     </div>
   );
 }
-

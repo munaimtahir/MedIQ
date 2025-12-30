@@ -1,27 +1,25 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Check } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function PricingSection() {
   const router = useRouter();
 
   return (
-    <section id="pricing" className="py-24 bg-slate-50">
+    <section id="pricing" className="bg-slate-50 py-24">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+        <div className="mb-16 text-center">
+          <h2 className="mb-4 text-3xl font-bold text-slate-900 sm:text-4xl">
             Simple, transparent pricing
           </h2>
-          <p className="text-lg text-slate-600">
-            Start free, upgrade when you&apos;re ready
-          </p>
+          <p className="text-lg text-slate-600">Start free, upgrade when you&apos;re ready</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2">
           {/* Free Plan */}
           <Card className="border-slate-200 bg-white">
             <CardHeader>
@@ -47,19 +45,15 @@ export function PricingSection() {
                   <span className="text-slate-700">Progress tracking</span>
                 </li>
               </ul>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => router.push('/login')}
-              >
+              <Button variant="outline" className="w-full" onClick={() => router.push("/login")}>
                 Get Started
               </Button>
             </CardContent>
           </Card>
 
           {/* Pro Plan */}
-          <Card className="border-primary bg-white relative">
-            <div className="absolute top-4 right-4">
+          <Card className="relative border-primary bg-white">
+            <div className="absolute right-4 top-4">
               <Badge className="bg-primary text-white">Coming Soon</Badge>
             </div>
             <CardHeader>
@@ -89,10 +83,7 @@ export function PricingSection() {
                   <span className="text-slate-700">Adaptive learning</span>
                 </li>
               </ul>
-              <Button
-                className="w-full bg-primary hover:bg-primary/90"
-                disabled
-              >
+              <Button className="w-full bg-primary hover:bg-primary/90" disabled>
                 Coming Soon
               </Button>
             </CardContent>
@@ -102,4 +93,3 @@ export function PricingSection() {
     </section>
   );
 }
-

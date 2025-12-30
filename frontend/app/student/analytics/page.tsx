@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, TrendingUp, Target, Clock } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart3, TrendingUp, Target, Clock } from "lucide-react";
 
 export default function AnalyticsPage() {
   // Placeholder analytics - in production, fetch real data
@@ -64,7 +64,7 @@ export default function AnalyticsPage() {
           <CardDescription>Score trends over time</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
+          <div className="flex h-64 items-center justify-center text-muted-foreground">
             <p>Chart placeholder - D3.js integration pending</p>
           </div>
         </CardContent>
@@ -72,4 +72,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-

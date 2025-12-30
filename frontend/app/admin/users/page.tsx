@@ -1,15 +1,22 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default function UsersPage() {
   // Placeholder - in production, fetch from API
   const demoUsers = [
-    { id: 'student-1', role: 'student', created_at: '2024-01-01' },
-    { id: 'admin-1', role: 'admin', created_at: '2024-01-01' },
+    { id: "student-1", role: "student", created_at: "2024-01-01" },
+    { id: "admin-1", role: "admin", created_at: "2024-01-01" },
   ];
 
   return (
@@ -38,7 +45,7 @@ export default function UsersPage() {
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.id}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
                       {user.role}
                     </Badge>
                   </TableCell>
@@ -52,4 +59,3 @@ export default function UsersPage() {
     </div>
   );
 }
-

@@ -2,6 +2,36 @@
 
 This directory contains utility scripts for infrastructure management and operations.
 
+## Formatting Scripts
+
+### `format-all.sh` / `format-all.ps1`
+Formats all code in the repository:
+- Frontend: Runs Prettier
+- Backend: Runs Black
+
+**Usage:**
+```bash
+# Linux/Mac
+./infra/scripts/format-all.sh
+
+# Windows PowerShell
+.\infra\scripts\format-all.ps1
+```
+
+### `format-check.sh` / `format-check.ps1`
+Checks formatting across the repository without making changes:
+- Frontend: Runs Prettier check
+- Backend: Runs Black check + Ruff lint
+
+**Usage:**
+```bash
+# Linux/Mac
+./infra/scripts/format-check.sh
+
+# Windows PowerShell
+.\infra\scripts\format-check.ps1
+```
+
 ## Planned Scripts
 
 ### Database
@@ -18,10 +48,6 @@ This directory contains utility scripts for infrastructure management and operat
 ### Monitoring
 - `logs.sh` - Centralized log aggregation
 - `metrics.sh` - Metrics collection utilities
-
-## Status
-
-🚧 **Placeholder** - Scripts will be added as operational needs arise.
 
 ## Guidelines
 

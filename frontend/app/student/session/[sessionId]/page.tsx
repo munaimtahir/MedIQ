@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { studentAPI } from '@/lib/api';
-import { Session, Question } from '@/lib/api';
-import { Clock, CheckCircle2, XCircle, Flag } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { studentAPI } from "@/lib/api";
+import { Session, Question } from "@/lib/api";
+import { Clock, CheckCircle2, XCircle, Flag } from "lucide-react";
 
 export default function TestPlayerPage() {
   const params = useParams();
@@ -25,16 +25,16 @@ export default function TestPlayerPage() {
   useEffect(() => {
     Promise.all([
       studentAPI.getSession(sessionId),
-      studentAPI.getQuestions(undefined, undefined, 100)
+      studentAPI.getQuestions(undefined, undefined, 100),
     ])
       .then(([sess, qs]) => {
         setSession(sess);
         // Filter questions to only those in session
-        const sessionQuestions = qs.filter(q => sess.question_ids.includes(q.id));
+        const sessionQuestions = qs.filter((q) => sess.question_ids.includes(q.id));
         setQuestions(sessionQuestions);
         // Load existing answers
         const existingAnswers: Record<number, { option: number; marked: boolean }> = {};
-        sessionQuestions.forEach(q => {
+        sessionQuestions.forEach((q) => {
           existingAnswers[q.id] = { option: -1, marked: false };
         });
         setAnswers(existingAnswers);
@@ -91,7 +91,7 @@ export default function TestPlayerPage() {
         is_marked_for_review: markedForReview,
       });
     } catch (error) {
-      console.error('Failed to save answer:', error);
+      console.error("Failed to save answer:", error);
     }
   };
 
@@ -118,21 +118,21 @@ export default function TestPlayerPage() {
   };
 
   const handleSubmit = async () => {
-    if (!confirm('Are you sure you want to submit? This cannot be undone.')) return;
+    if (!confirm("Are you sure you want to submit? This cannot be undone.")) return;
 
     try {
       await studentAPI.submitSession(sessionId);
       router.push(`/student/session/${sessionId}/review`);
     } catch (error) {
-      console.error('Failed to submit session:', error);
-      alert('Failed to submit session');
+      console.error("Failed to submit session:", error);
+      alert("Failed to submit session");
     }
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   if (loading) {
@@ -143,7 +143,7 @@ export default function TestPlayerPage() {
     return <div>No questions found</div>;
   }
 
-  const answeredCount = Object.values(answers).filter(a => a.option !== -1).length;
+  const answeredCount = Object.values(answers).filter((a) => a.option !== -1).length;
 
   return (
     <div className="space-y-6">
@@ -171,7 +171,7 @@ export default function TestPlayerPage() {
                 <CardTitle>Question {currentIndex + 1}</CardTitle>
                 {markedForReview && (
                   <Badge variant="outline">
-                    <Flag className="h-3 w-3 mr-1" />
+                    <Flag className="mr-1 h-3 w-3" />
                     Marked for Review
                   </Badge>
                 )}
@@ -184,19 +184,25 @@ export default function TestPlayerPage() {
                   <button
                     key={idx}
                     onClick={() => handleOptionSelect(idx)}
-                    className={`w-full text-left p-4 rounded-md border-2 transition-colors ${
+                    className={`w-full rounded-md border-2 p-4 text-left transition-colors ${
                       selectedOption === idx
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50"
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        selectedOption === idx ? 'border-primary bg-primary' : 'border-gray-300'
-                      }`}>
-                        {selectedOption === idx && <div className="w-2 h-2 rounded-full bg-white" />}
+                      <div
+                        className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
+                          selectedOption === idx ? "border-primary bg-primary" : "border-gray-300"
+                        }`}
+                      >
+                        {selectedOption === idx && (
+                          <div className="h-2 w-2 rounded-full bg-white" />
+                        )}
                       </div>
-                      <span>{String.fromCharCode(65 + idx)}. {option}</span>
+                      <span>
+                        {String.fromCharCode(65 + idx)}. {option}
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -205,10 +211,10 @@ export default function TestPlayerPage() {
                 <Button
                   variant="outline"
                   onClick={handleMarkForReview}
-                  className={markedForReview ? 'bg-yellow-100' : ''}
+                  className={markedForReview ? "bg-yellow-100" : ""}
                 >
-                  <Flag className="h-4 w-4 mr-2" />
-                  {markedForReview ? 'Unmark' : 'Mark'} for Review
+                  <Flag className="mr-2 h-4 w-4" />
+                  {markedForReview ? "Unmark" : "Mark"} for Review
                 </Button>
               </div>
             </CardContent>
@@ -250,14 +256,14 @@ export default function TestPlayerPage() {
                         setSelectedOption(ans?.option !== -1 ? ans.option : null);
                         setMarkedForReview(ans?.marked || false);
                       }}
-                      className={`w-8 h-8 rounded text-xs font-semibold ${
+                      className={`h-8 w-8 rounded text-xs font-semibold ${
                         isCurrent
-                          ? 'bg-primary text-primary-foreground'
+                          ? "bg-primary text-primary-foreground"
                           : isAnswered
-                          ? isMarked
-                            ? 'bg-yellow-500 text-white'
-                            : 'bg-green-500 text-white'
-                          : 'bg-muted'
+                            ? isMarked
+                              ? "bg-yellow-500 text-white"
+                              : "bg-green-500 text-white"
+                            : "bg-muted"
                       }`}
                     >
                       {idx + 1}
@@ -272,4 +278,3 @@ export default function TestPlayerPage() {
     </div>
   );
 }
-

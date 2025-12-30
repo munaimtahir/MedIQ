@@ -1,18 +1,24 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { syllabusAPI } from '@/lib/api';
-import { Block } from '@/lib/api';
-import { useEffect } from 'react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { syllabusAPI } from "@/lib/api";
+import { Block } from "@/lib/api";
+import { useEffect } from "react";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [selectedYear, setSelectedYear] = useState<number>(1);
-  const [selectedBlock, setSelectedBlock] = useState<string>('');
+  const [selectedBlock, setSelectedBlock] = useState<string>("");
   const [blocks, setBlocks] = useState<Block[]>([]);
 
   useEffect(() => {
@@ -21,11 +27,11 @@ export default function OnboardingPage() {
 
   const handleComplete = () => {
     // In a real app, save preferences
-    router.push('/student/dashboard');
+    router.push("/student/dashboard");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome! Let&apos;s get started</CardTitle>
@@ -34,7 +40,10 @@ export default function OnboardingPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Year</label>
-            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
+            <Select
+              value={selectedYear.toString()}
+              onValueChange={(v) => setSelectedYear(Number(v))}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -69,4 +78,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-

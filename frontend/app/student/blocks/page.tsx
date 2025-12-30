@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { syllabusAPI } from '@/lib/api';
-import { Block } from '@/lib/api';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { syllabusAPI } from "@/lib/api";
+import { Block } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function BlocksPage() {
   const router = useRouter();
@@ -16,7 +22,8 @@ export default function BlocksPage() {
 
   useEffect(() => {
     setLoading(true);
-    syllabusAPI.getBlocks(selectedYear)
+    syllabusAPI
+      .getBlocks(selectedYear)
       .then(setBlocks)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -45,9 +52,11 @@ export default function BlocksPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {blocks.map((block) => (
-            <Card key={block.id} className="hover:shadow-lg transition-shadow">
+            <Card key={block.id} className="transition-shadow hover:shadow-lg">
               <CardHeader>
-                <CardTitle>Block {block.id}: {block.name}</CardTitle>
+                <CardTitle>
+                  Block {block.id}: {block.name}
+                </CardTitle>
                 <CardDescription>{block.description}</CardDescription>
               </CardHeader>
               <CardContent>
@@ -65,4 +74,3 @@ export default function BlocksPage() {
     </div>
   );
 }
-

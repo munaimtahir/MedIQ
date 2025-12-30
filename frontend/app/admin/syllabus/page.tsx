@@ -1,12 +1,25 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { syllabusAPI } from '@/lib/api';
-import { Block, Theme } from '@/lib/api';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { syllabusAPI } from "@/lib/api";
+import { Block, Theme } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function SyllabusPage() {
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -16,10 +29,7 @@ export default function SyllabusPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      syllabusAPI.getBlocks(selectedYear),
-      syllabusAPI.getThemes()
-    ])
+    Promise.all([syllabusAPI.getBlocks(selectedYear), syllabusAPI.getThemes()])
       .then(([blks, thms]) => {
         setBlocks(blks);
         setThemes(thms);
@@ -87,9 +97,9 @@ export default function SyllabusPage() {
             {loading ? (
               <p>Loading...</p>
             ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="max-h-96 space-y-2 overflow-y-auto">
                 {themes.map((theme) => (
-                  <div key={theme.id} className="p-2 border rounded">
+                  <div key={theme.id} className="rounded border p-2">
                     <p className="font-medium">{theme.name}</p>
                     <p className="text-sm text-muted-foreground">Block {theme.block_id}</p>
                   </div>
@@ -102,4 +112,3 @@ export default function SyllabusPage() {
     </div>
   );
 }
-

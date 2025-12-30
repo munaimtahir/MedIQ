@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bookmark } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bookmark } from "lucide-react";
 
 export default function BookmarksPage() {
   return (
@@ -17,8 +17,8 @@ export default function BookmarksPage() {
           <CardDescription>Questions you&apos;ve bookmarked</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <Bookmark className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <div className="py-8 text-center text-muted-foreground">
+            <Bookmark className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>No bookmarks yet. Mark questions during practice to save them here.</p>
           </div>
         </CardContent>
@@ -26,4 +26,3 @@ export default function BookmarksPage() {
     </div>
   );
 }
-

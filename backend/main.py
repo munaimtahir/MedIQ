@@ -25,6 +25,7 @@ load_dotenv()
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+
 # Auto-seed if database is empty (skip in test mode)
 def check_and_seed():
     # Skip seeding in test environment
@@ -43,6 +44,7 @@ def check_and_seed():
     finally:
         db.close()
 
+
 check_and_seed()
 
 app = FastAPI(title="Medical Exam Platform API", version="1.0.0")
@@ -57,6 +59,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Dependency
 def get_db():
     db = SessionLocal()
@@ -65,11 +68,13 @@ def get_db():
     finally:
         db.close()
 
+
 def get_user_id(x_user_id: str | None = Header(None, alias="X-User-Id")) -> str:
     """Temporary auth: extract user ID from header"""
     if not x_user_id:
         raise HTTPException(status_code=401, detail="X-User-Id header required")
     return x_user_id
+
 
 def get_user(db: Session, user_id: str) -> User:
     """Get user by ID"""
@@ -78,13 +83,16 @@ def get_user(db: Session, user_id: str) -> User:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+
 # Seed endpoint (for development)
 @app.post("/seed")
 def seed():
     seed_database()
     return {"message": "Database seeded successfully"}
 
+
 # ============ SYLLABUS ENDPOINTS ============
+
 
 @app.get("/blocks", response_model=list[BlockResponse])
 def get_blocks(year: int | None = None, db: Session = Depends(get_db)):
@@ -94,6 +102,7 @@ def get_blocks(year: int | None = None, db: Session = Depends(get_db)):
         query = query.filter(Block.year == year)
     return query.all()
 
+
 @app.get("/themes", response_model=list[ThemeResponse])
 def get_themes(block_id: str | None = None, db: Session = Depends(get_db)):
     """Get themes, optionally filtered by block_id"""
@@ -102,7 +111,9 @@ def get_themes(block_id: str | None = None, db: Session = Depends(get_db)):
         query = query.filter(Theme.block_id == block_id)
     return query.all()
 
+
 # ============ ADMIN QUESTION ENDPOINTS ============
+
 
 @app.get("/admin/questions", response_model=list[QuestionResponse])
 def list_questions(
@@ -110,7 +121,7 @@ def list_questions(
     limit: int = 100,
     published: bool | None = None,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
     """List questions (admin only)"""
     user = get_user(db, user_id)
@@ -122,11 +133,10 @@ def list_questions(
         query = query.filter(Question.is_published == published)
     return query.offset(skip).limit(limit).all()
 
+
 @app.post("/admin/questions", response_model=QuestionResponse)
 def create_question(
-    question: QuestionCreate,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    question: QuestionCreate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Create a new question (admin only)"""
     user = get_user(db, user_id)
@@ -139,11 +149,10 @@ def create_question(
     db.refresh(db_question)
     return db_question
 
+
 @app.get("/admin/questions/{question_id}", response_model=QuestionResponse)
 def get_question(
-    question_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    question_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Get a question by ID (admin only)"""
     user = get_user(db, user_id)
@@ -155,12 +164,13 @@ def get_question(
         raise HTTPException(status_code=404, detail="Question not found")
     return question
 
+
 @app.put("/admin/questions/{question_id}", response_model=QuestionResponse)
 def update_question(
     question_id: int,
     question: QuestionUpdate,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
     """Update a question (admin only)"""
     user = get_user(db, user_id)
@@ -179,11 +189,10 @@ def update_question(
     db.refresh(db_question)
     return db_question
 
+
 @app.post("/admin/questions/{question_id}/publish")
 def publish_question(
-    question_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    question_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Publish a question (admin only)"""
     user = get_user(db, user_id)
@@ -202,11 +211,10 @@ def publish_question(
     db.commit()
     return {"message": "Question published", "question_id": question_id}
 
+
 @app.post("/admin/questions/{question_id}/unpublish")
 def unpublish_question(
-    question_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    question_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Unpublish a question (admin only)"""
     user = get_user(db, user_id)
@@ -221,14 +229,16 @@ def unpublish_question(
     db.commit()
     return {"message": "Question unpublished", "question_id": question_id}
 
+
 # ============ STUDENT PRACTICE ENDPOINTS ============
+
 
 @app.get("/questions", response_model=list[QuestionResponse])
 def get_published_questions(
     theme_id: int | None = None,
     block_id: str | None = None,
     limit: int = 50,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get published questions (student access)"""
     query = db.query(Question).filter(Question.is_published)
@@ -240,11 +250,10 @@ def get_published_questions(
 
     return query.limit(limit).all()
 
+
 @app.post("/sessions", response_model=SessionResponse)
 def create_session(
-    session_data: SessionCreate,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    session_data: SessionCreate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Create a practice session"""
     user = get_user(db, user_id)
@@ -266,7 +275,7 @@ def create_session(
     session = AttemptSession(
         user_id=user_id,
         question_count=len(questions),
-        time_limit_minutes=session_data.time_limit_minutes or 60
+        time_limit_minutes=session_data.time_limit_minutes or 60,
     )
     db.add(session)
     db.commit()
@@ -278,33 +287,35 @@ def create_session(
 
     return session
 
+
 @app.get("/sessions/{session_id}", response_model=SessionResponse)
 def get_session(
-    session_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    session_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Get a session by ID"""
-    session = db.query(AttemptSession).filter(
-        AttemptSession.id == session_id,
-        AttemptSession.user_id == user_id
-    ).first()
+    session = (
+        db.query(AttemptSession)
+        .filter(AttemptSession.id == session_id, AttemptSession.user_id == user_id)
+        .first()
+    )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
 
 @app.post("/sessions/{session_id}/answer")
 def submit_answer(
     session_id: int,
     answer: AnswerSubmit,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    user_id: str = Depends(get_user_id),
 ):
     """Submit an answer for a question in a session"""
-    session = db.query(AttemptSession).filter(
-        AttemptSession.id == session_id,
-        AttemptSession.user_id == user_id
-    ).first()
+    session = (
+        db.query(AttemptSession)
+        .filter(AttemptSession.id == session_id, AttemptSession.user_id == user_id)
+        .first()
+    )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -316,10 +327,13 @@ def submit_answer(
         raise HTTPException(status_code=404, detail="Question not found")
 
     # Check if answer already exists
-    existing = db.query(AttemptAnswer).filter(
-        AttemptAnswer.session_id == session_id,
-        AttemptAnswer.question_id == answer.question_id
-    ).first()
+    existing = (
+        db.query(AttemptAnswer)
+        .filter(
+            AttemptAnswer.session_id == session_id, AttemptAnswer.question_id == answer.question_id
+        )
+        .first()
+    )
 
     is_correct = answer.selected_option_index == question.correct_option_index
 
@@ -333,24 +347,24 @@ def submit_answer(
             question_id=answer.question_id,
             selected_option_index=answer.selected_option_index,
             is_correct=is_correct,
-            is_marked_for_review=answer.is_marked_for_review
+            is_marked_for_review=answer.is_marked_for_review,
         )
         db.add(attempt_answer)
 
     db.commit()
     return {"message": "Answer submitted", "is_correct": is_correct}
 
+
 @app.post("/sessions/{session_id}/submit")
 def submit_session(
-    session_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    session_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Submit a session (finalize)"""
-    session = db.query(AttemptSession).filter(
-        AttemptSession.id == session_id,
-        AttemptSession.user_id == user_id
-    ).first()
+    session = (
+        db.query(AttemptSession)
+        .filter(AttemptSession.id == session_id, AttemptSession.user_id == user_id)
+        .first()
+    )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -369,20 +383,20 @@ def submit_session(
         "message": "Session submitted",
         "score": correct_count,
         "total": total_count,
-        "percentage": round((correct_count / total_count * 100) if total_count > 0 else 0, 2)
+        "percentage": round((correct_count / total_count * 100) if total_count > 0 else 0, 2),
     }
+
 
 @app.get("/sessions/{session_id}/review", response_model=ReviewResponse)
 def get_session_review(
-    session_id: int,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_user_id)
+    session_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
     """Get review data for a submitted session"""
-    session = db.query(AttemptSession).filter(
-        AttemptSession.id == session_id,
-        AttemptSession.user_id == user_id
-    ).first()
+    session = (
+        db.query(AttemptSession)
+        .filter(AttemptSession.id == session_id, AttemptSession.user_id == user_id)
+        .first()
+    )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -394,16 +408,18 @@ def get_session_review(
     review_data = []
     for answer in answers:
         question = db.query(Question).filter(Question.id == answer.question_id).first()
-        review_data.append({
-            "question_id": question.id,
-            "question_text": question.question_text,
-            "options": question.options,
-            "correct_option_index": question.correct_option_index,
-            "selected_option_index": answer.selected_option_index,
-            "is_correct": answer.is_correct,
-            "explanation": question.explanation,
-            "is_marked_for_review": answer.is_marked_for_review
-        })
+        review_data.append(
+            {
+                "question_id": question.id,
+                "question_text": question.question_text,
+                "options": question.options,
+                "correct_option_index": question.correct_option_index,
+                "selected_option_index": answer.selected_option_index,
+                "is_correct": answer.is_correct,
+                "explanation": question.explanation,
+                "is_marked_for_review": answer.is_marked_for_review,
+            }
+        )
 
     correct_count = sum(1 for a in answers if a.is_correct)
 
@@ -415,10 +431,10 @@ def get_session_review(
         "score_percentage": round(
             (correct_count / len(review_data) * 100) if review_data else 0, 2
         ),
-        "questions": review_data
+        "questions": review_data,
     }
+
 
 @app.get("/")
 def root():
     return {"message": "Medical Exam Platform API", "version": "1.0.0"}
-

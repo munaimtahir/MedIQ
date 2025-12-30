@@ -7,10 +7,11 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://examplatform:examplatform@localhost:5432/examplatform")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://examplatform:examplatform@localhost:5432/examplatform"
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
-

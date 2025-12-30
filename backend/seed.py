@@ -1,4 +1,3 @@
-
 from database import SessionLocal
 from models import Block, Question, Theme, User
 
@@ -51,12 +50,58 @@ def seed_database():
 
         # Create themes for each block
         theme_names = {
-            "A": ["Cardiovascular System", "Respiratory System", "Digestive System", "Nervous System", "Musculoskeletal System", "Endocrine System", "Reproductive System", "Urinary System"],
-            "B": ["Proteins", "Enzymes", "Metabolism", "Nucleic Acids", "Lipids", "Carbohydrates", "Vitamins", "Minerals"],
-            "C": ["Cardiac Function", "Respiratory Function", "Renal Function", "Gastrointestinal Function", "Endocrine Function", "Nervous Function"],
-            "D": ["Inflammation", "Neoplasia", "Cardiovascular Pathology", "Respiratory Pathology", "Gastrointestinal Pathology", "Renal Pathology"],
-            "E": ["Cardiovascular Drugs", "Antimicrobials", "Analgesics", "Antihypertensives", "Antidiabetics", "Psychotropic Drugs"],
-            "F": ["Bacteria", "Viruses", "Fungi", "Parasites", "Antimicrobial Resistance", "Infection Control"],
+            "A": [
+                "Cardiovascular System",
+                "Respiratory System",
+                "Digestive System",
+                "Nervous System",
+                "Musculoskeletal System",
+                "Endocrine System",
+                "Reproductive System",
+                "Urinary System",
+            ],
+            "B": [
+                "Proteins",
+                "Enzymes",
+                "Metabolism",
+                "Nucleic Acids",
+                "Lipids",
+                "Carbohydrates",
+                "Vitamins",
+                "Minerals",
+            ],
+            "C": [
+                "Cardiac Function",
+                "Respiratory Function",
+                "Renal Function",
+                "Gastrointestinal Function",
+                "Endocrine Function",
+                "Nervous Function",
+            ],
+            "D": [
+                "Inflammation",
+                "Neoplasia",
+                "Cardiovascular Pathology",
+                "Respiratory Pathology",
+                "Gastrointestinal Pathology",
+                "Renal Pathology",
+            ],
+            "E": [
+                "Cardiovascular Drugs",
+                "Antimicrobials",
+                "Analgesics",
+                "Antihypertensives",
+                "Antidiabetics",
+                "Psychotropic Drugs",
+            ],
+            "F": [
+                "Bacteria",
+                "Viruses",
+                "Fungi",
+                "Parasites",
+                "Antimicrobial Resistance",
+                "Infection Control",
+            ],
         }
 
         themes = []
@@ -64,7 +109,9 @@ def seed_database():
             block = db.query(Block).filter(Block.id == block_id).first()
             if block:
                 for theme_name in theme_names.get(block_id, [])[:6]:  # Limit to 6 themes per block
-                    theme = Theme(block_id=block_id, name=theme_name, description=f"Theme: {theme_name}")
+                    theme = Theme(
+                        block_id=block_id, name=theme_name, description=f"Theme: {theme_name}"
+                    )
                     db.add(theme)
                     themes.append(theme)
 
@@ -79,26 +126,20 @@ def seed_database():
                     "Filtering waste products",
                     "Producing hormones",
                     "Digesting food",
-                    "Storing energy"
+                    "Storing energy",
                 ],
                 "correct_option_index": 0,
                 "explanation": "The heart's primary function is to pump blood throughout the body via the circulatory system.",
                 "tags": ["cardiovascular", "anatomy", "physiology"],
-                "difficulty": "easy"
+                "difficulty": "easy",
             },
             {
                 "question_text": "What is the normal pH range of human blood?",
-                "options": [
-                    "6.8 - 7.0",
-                    "7.0 - 7.2",
-                    "7.35 - 7.45",
-                    "7.5 - 7.8",
-                    "8.0 - 8.5"
-                ],
+                "options": ["6.8 - 7.0", "7.0 - 7.2", "7.35 - 7.45", "7.5 - 7.8", "8.0 - 8.5"],
                 "correct_option_index": 2,
                 "explanation": "Human blood maintains a pH between 7.35 and 7.45, which is slightly alkaline.",
                 "tags": ["biochemistry", "physiology", "acid-base"],
-                "difficulty": "medium"
+                "difficulty": "medium",
             },
             {
                 "question_text": "Which enzyme is responsible for converting angiotensin I to angiotensin II?",
@@ -107,12 +148,12 @@ def seed_database():
                     "ACE (Angiotensin Converting Enzyme)",
                     "Aldosterone",
                     "ADH",
-                    "ANP"
+                    "ANP",
                 ],
                 "correct_option_index": 1,
                 "explanation": "ACE (Angiotensin Converting Enzyme) converts angiotensin I to the active angiotensin II.",
                 "tags": ["pharmacology", "cardiovascular", "renin-angiotensin"],
-                "difficulty": "hard"
+                "difficulty": "hard",
             },
             {
                 "question_text": "What is the most common cause of community-acquired pneumonia?",
@@ -121,12 +162,12 @@ def seed_database():
                     "Escherichia coli",
                     "Staphylococcus aureus",
                     "Pseudomonas aeruginosa",
-                    "Klebsiella pneumoniae"
+                    "Klebsiella pneumoniae",
                 ],
                 "correct_option_index": 0,
                 "explanation": "Streptococcus pneumoniae is the most common bacterial cause of community-acquired pneumonia.",
                 "tags": ["microbiology", "respiratory", "infectious-disease"],
-                "difficulty": "medium"
+                "difficulty": "medium",
             },
             {
                 "question_text": "Which of the following is a characteristic feature of malignant tumors?",
@@ -135,12 +176,12 @@ def seed_database():
                     "Slow growth rate",
                     "Metastasis",
                     "Encapsulation",
-                    "Differentiated cells"
+                    "Differentiated cells",
                 ],
                 "correct_option_index": 2,
                 "explanation": "Metastasis, the spread of cancer cells to distant sites, is a key characteristic of malignant tumors.",
                 "tags": ["pathology", "oncology", "neoplasia"],
-                "difficulty": "medium"
+                "difficulty": "medium",
             },
         ]
 
@@ -148,31 +189,19 @@ def seed_database():
         additional_questions = [
             {
                 "question_text": "The primary site of gas exchange in the lungs is:",
-                "options": [
-                    "Trachea",
-                    "Bronchi",
-                    "Alveoli",
-                    "Bronchioles",
-                    "Pleura"
-                ],
+                "options": ["Trachea", "Bronchi", "Alveoli", "Bronchioles", "Pleura"],
                 "correct_option_index": 2,
                 "explanation": "Alveoli are the tiny air sacs where gas exchange occurs between air and blood.",
                 "tags": ["respiratory", "anatomy", "physiology"],
-                "difficulty": "easy"
+                "difficulty": "easy",
             },
             {
                 "question_text": "Which vitamin deficiency causes scurvy?",
-                "options": [
-                    "Vitamin A",
-                    "Vitamin B12",
-                    "Vitamin C",
-                    "Vitamin D",
-                    "Vitamin K"
-                ],
+                "options": ["Vitamin A", "Vitamin B12", "Vitamin C", "Vitamin D", "Vitamin K"],
                 "correct_option_index": 2,
                 "explanation": "Scurvy is caused by a deficiency of vitamin C (ascorbic acid).",
                 "tags": ["biochemistry", "nutrition", "vitamins"],
-                "difficulty": "easy"
+                "difficulty": "easy",
             },
             {
                 "question_text": "The glomerular filtration rate (GFR) is primarily regulated by:",
@@ -181,12 +210,12 @@ def seed_database():
                     "Aldosterone",
                     "Renin-angiotensin system",
                     "ANP",
-                    "Parathyroid hormone"
+                    "Parathyroid hormone",
                 ],
                 "correct_option_index": 2,
                 "explanation": "The renin-angiotensin system plays a key role in regulating GFR and renal blood flow.",
                 "tags": ["renal", "physiology", "pharmacology"],
-                "difficulty": "hard"
+                "difficulty": "hard",
             },
         ]
 
@@ -209,13 +238,15 @@ def seed_database():
                 explanation=q_data["explanation"],
                 tags=q_data["tags"],
                 difficulty=q_data["difficulty"],
-                is_published=True  # Publish all seeded questions
+                is_published=True,  # Publish all seeded questions
             )
             db.add(question)
             question_count += 1
 
         db.commit()
-        print(f"Seeded database with {len(all_blocks)} blocks, {len(themes)} themes, and {question_count} questions")
+        print(
+            f"Seeded database with {len(all_blocks)} blocks, {len(themes)} themes, and {question_count} questions"
+        )
 
     except Exception as e:
         db.rollback()
@@ -224,6 +255,6 @@ def seed_database():
     finally:
         db.close()
 
+
 if __name__ == "__main__":
     seed_database()
-

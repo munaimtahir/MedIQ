@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { syllabusAPI } from '@/lib/api';
-import { Block } from '@/lib/api';
-import { useRouter } from 'next/navigation';
-import { BookOpen, TrendingUp, Clock, Target } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { syllabusAPI } from "@/lib/api";
+import { Block } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { BookOpen, TrendingUp, Clock, Target } from "lucide-react";
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -14,7 +14,8 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    syllabusAPI.getBlocks(1)
+    syllabusAPI
+      .getBlocks(1)
       .then(setBlocks)
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -74,13 +75,13 @@ export default function StudentDashboard() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Year 1 Blocks</h2>
+        <h2 className="mb-4 text-2xl font-semibold">Year 1 Blocks</h2>
         {loading ? (
           <p>Loading blocks...</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {blocks.map((block) => (
-              <Card key={block.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+              <Card key={block.id} className="cursor-pointer transition-shadow hover:shadow-lg">
                 <CardHeader>
                   <CardTitle>{block.name}</CardTitle>
                   <CardDescription>{block.description}</CardDescription>
@@ -105,7 +106,7 @@ export default function StudentDashboard() {
           <CardDescription>Start a practice session</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => router.push('/student/practice/build')} size="lg">
+          <Button onClick={() => router.push("/student/practice/build")} size="lg">
             Start Practice Session
           </Button>
         </CardContent>
@@ -113,4 +114,3 @@ export default function StudentDashboard() {
     </div>
   );
 }
-

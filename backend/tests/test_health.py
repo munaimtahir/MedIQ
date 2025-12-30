@@ -1,6 +1,7 @@
 """
 Health check tests for the API.
 """
+
 import os
 import tempfile
 
@@ -25,16 +26,19 @@ def client():
         # Import here to ensure environment variable is set before app initialization
         # Clear any cached imports
         import sys
+
         modules_to_clear = ["main", "database", "models", "seed"]
         for mod in modules_to_clear:
             if mod in sys.modules:
                 del sys.modules[mod]
 
         from database import Base, engine
+
         # Ensure tables are created
         Base.metadata.create_all(bind=engine)
 
         from main import app
+
         yield TestClient(app)
     finally:
         # Clean up
@@ -67,4 +71,3 @@ def test_root_endpoint(client):
     assert "version" in data
     assert data["message"] == "Medical Exam Platform API"
     assert data["version"] == "1.0.0"
-

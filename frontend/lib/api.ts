@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface Block {
   id: string;
@@ -64,10 +64,10 @@ export interface ReviewData {
 }
 
 function getHeaders(): HeadersInit {
-  const userId = typeof window !== 'undefined' ? localStorage.getItem('userId') : null;
+  const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
   return {
-    'Content-Type': 'application/json',
-    ...(userId && { 'X-User-Id': userId }),
+    "Content-Type": "application/json",
+    ...(userId && { "X-User-Id": userId }),
   };
 }
 
@@ -81,7 +81,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }));
     throw new Error(error.detail || `HTTP error! status: ${response.status}`);
   }
 
@@ -91,11 +91,11 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 // Syllabus APIs
 export const syllabusAPI = {
   getBlocks: (year?: number): Promise<Block[]> => {
-    const params = year ? `?year=${year}` : '';
+    const params = year ? `?year=${year}` : "";
     return fetchAPI<Block[]>(`/blocks${params}`);
   },
   getThemes: (blockId?: string): Promise<Theme[]> => {
-    const params = blockId ? `?block_id=${blockId}` : '';
+    const params = blockId ? `?block_id=${blockId}` : "";
     return fetchAPI<Theme[]>(`/themes${params}`);
   },
 };
@@ -113,23 +113,25 @@ export const adminAPI = {
   getQuestion: (id: number): Promise<Question> => {
     return fetchAPI<Question>(`/admin/questions/${id}`);
   },
-  createQuestion: (question: Omit<Question, 'id' | 'created_at' | 'updated_at' | 'is_published'>): Promise<Question> => {
-    return fetchAPI<Question>('/admin/questions', {
-      method: 'POST',
+  createQuestion: (
+    question: Omit<Question, "id" | "created_at" | "updated_at" | "is_published">,
+  ): Promise<Question> => {
+    return fetchAPI<Question>("/admin/questions", {
+      method: "POST",
       body: JSON.stringify(question),
     });
   },
   updateQuestion: (id: number, question: Partial<Question>): Promise<Question> => {
     return fetchAPI<Question>(`/admin/questions/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(question),
     });
   },
   publishQuestion: (id: number): Promise<void> => {
-    return fetchAPI(`/admin/questions/${id}/publish`, { method: 'POST' });
+    return fetchAPI(`/admin/questions/${id}/publish`, { method: "POST" });
   },
   unpublishQuestion: (id: number): Promise<void> => {
-    return fetchAPI(`/admin/questions/${id}/unpublish`, { method: 'POST' });
+    return fetchAPI(`/admin/questions/${id}/unpublish`, { method: "POST" });
   },
 };
 
@@ -143,28 +145,37 @@ export const studentAPI = {
     });
     return fetchAPI<Question[]>(`/questions?${params}`);
   },
-  createSession: (data: { theme_id?: number; block_id?: string; question_count?: number; time_limit_minutes?: number }): Promise<Session> => {
-    return fetchAPI<Session>('/sessions', {
-      method: 'POST',
+  createSession: (data: {
+    theme_id?: number;
+    block_id?: string;
+    question_count?: number;
+    time_limit_minutes?: number;
+  }): Promise<Session> => {
+    return fetchAPI<Session>("/sessions", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   },
   getSession: (id: number): Promise<Session> => {
     return fetchAPI<Session>(`/sessions/${id}`);
   },
-  submitAnswer: (sessionId: number, answer: AnswerSubmit): Promise<{ message: string; is_correct: boolean }> => {
+  submitAnswer: (
+    sessionId: number,
+    answer: AnswerSubmit,
+  ): Promise<{ message: string; is_correct: boolean }> => {
     return fetchAPI(`/sessions/${sessionId}/answer`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(answer),
     });
   },
-  submitSession: (sessionId: number): Promise<{ message: string; score: number; total: number; percentage: number }> => {
+  submitSession: (
+    sessionId: number,
+  ): Promise<{ message: string; score: number; total: number; percentage: number }> => {
     return fetchAPI(`/sessions/${sessionId}/submit`, {
-      method: 'POST',
+      method: "POST",
     });
   },
   getReview: (sessionId: number): Promise<ReviewData> => {
     return fetchAPI<ReviewData>(`/sessions/${sessionId}/review`);
   },
 };
-
