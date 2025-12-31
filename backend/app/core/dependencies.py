@@ -31,7 +31,7 @@ def get_current_user(
         scheme, token = authorization.split()
         if scheme.lower() != "bearer":
             raise ValueError("Invalid authorization scheme")
-      except ValueError:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format. Expected: Bearer <token>",
@@ -42,7 +42,7 @@ def get_current_user(
         payload = verify_access_token(token)
         user_id = UUID(payload["sub"])
         role = payload["role"]
-      except Exception as e:
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid or expired token: {str(e)}",
