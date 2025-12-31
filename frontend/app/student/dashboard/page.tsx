@@ -7,17 +7,26 @@ import { syllabusAPI } from "@/lib/api";
 import { Block } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { BookOpen, TrendingUp, Clock, Target } from "lucide-react";
+import { SkeletonCardGrid } from "@/components/status/SkeletonCardGrid";
+import { EmptyState } from "@/components/status/EmptyState";
+import { ErrorState } from "@/components/status/ErrorState";
 
 export default function StudentDashboard() {
   const router = useRouter();
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     syllabusAPI
       .getBlocks(1)
       .then(setBlocks)
-      .catch(console.error)
+      .catch((err) => {
+        console.error("Failed to load blocks:", err);
+        setError(err instanceof Error ? err : new Error("Failed to load blocks"));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -77,7 +86,34 @@ export default function StudentDashboard() {
       <div>
         <h2 className="mb-4 text-2xl font-semibold">Year 1 Blocks</h2>
         {loading ? (
-          <p>Loading blocks...</p>
+          <SkeletonCardGrid cards={3} />
+        ) : error ? (
+          <ErrorState
+            variant="card"
+            title="Failed to load blocks"
+            description={error.message || "An error occurred while loading blocks."}
+            actionLabel="Retry"
+            onAction={() => {
+              setError(null);
+              setLoading(true);
+              syllabusAPI
+                .getBlocks(1)
+                .then(setBlocks)
+                .catch((err) => {
+                  setError(err instanceof Error ? err : new Error("Failed to load blocks"));
+                })
+                .finally(() => setLoading(false));
+            }}
+          />
+        ) : blocks.length === 0 ? (
+          <EmptyState
+            variant="card"
+            title="No activity yet"
+            description="Start practicing to see your progress and available blocks."
+            icon={<BookOpen className="h-8 w-8 text-slate-400" />}
+            actionLabel="Start Practice"
+            onAction={() => router.push("/student/practice/build")}
+          />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {blocks.map((block) => (

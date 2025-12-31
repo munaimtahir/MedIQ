@@ -1,5 +1,5 @@
-from database import SessionLocal
-from models import Block, Question, Theme, User
+from app.db.session import SessionLocal
+from app.models import Block, Question, Theme, User
 
 
 def seed_database():

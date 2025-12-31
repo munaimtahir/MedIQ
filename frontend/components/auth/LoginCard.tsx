@@ -2,43 +2,31 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useUserStore } from "@/store/userStore";
+import { useRouter, useSearchParams } from "next/navigation";
+import { authClient, type User } from "@/lib/authClient";
+import { notify } from "@/lib/notify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff } from "lucide-react";
-
-// Demo credentials for testing
-const DEMO_CREDENTIALS = {
-  student: {
-    email: "student@demo.com",
-    password: "demo123",
-    userId: "student-1",
-    role: "student" as const,
-  },
-  admin: {
-    email: "admin@demo.com",
-    password: "demo123",
-    userId: "admin-1",
-    role: "admin" as const,
-  },
-};
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export function LoginCard() {
   const router = useRouter();
-  const setUser = useUserStore((state) => state.setUser);
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
     if (!email.trim()) {
-      newErrors.email = "Email or phone is required";
+      newErrors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = "Please enter a valid email";
     }
     if (!password) {
       newErrors.password = "Password is required";
@@ -47,32 +35,74 @@ export function LoginCard() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // Check for demo credentials
-      const normalizedEmail = email.trim().toLowerCase();
+    if (!validate()) return;
 
-      if (
-        normalizedEmail === DEMO_CREDENTIALS.student.email &&
-        password === DEMO_CREDENTIALS.student.password
-      ) {
-        setUser(DEMO_CREDENTIALS.student.userId, DEMO_CREDENTIALS.student.role);
-        router.push("/student/dashboard");
+    setLoading(true);
+    setErrors({});
+
+    try {
+      const result = await authClient.login({ email: email.trim(), password });
+
+      if (result.error) {
+        // Handle specific error codes
+        if (result.error.code === "RATE_LIMITED") {
+          const retryAfter = (result.error.details as { retry_after_seconds?: number })?.retry_after_seconds;
+          setErrors({
+            general: `Too many login attempts. Please try again in ${retryAfter || "a few"} seconds.`,
+          });
+        } else if (result.error.code === "ACCOUNT_LOCKED") {
+          const lockExpires = (result.error.details as { lock_expires_in?: number })?.lock_expires_in;
+          setErrors({
+            general: `Account temporarily locked. Please try again in ${lockExpires || "a few"} minutes.`,
+          });
+        } else {
+          setErrors({ general: result.error.message || "Invalid email or password" });
+        }
+        notify.error("Login failed", result.error.message || "Invalid email or password");
         return;
       }
 
-      if (
-        normalizedEmail === DEMO_CREDENTIALS.admin.email &&
-        password === DEMO_CREDENTIALS.admin.password
-      ) {
-        setUser(DEMO_CREDENTIALS.admin.userId, DEMO_CREDENTIALS.admin.role);
-        router.push("/admin");
+      if (result.mfa_required) {
+        // Handle MFA - redirect to MFA page (to be implemented)
+        notify.info("MFA Required", "Please complete multi-factor authentication");
+        // TODO: Redirect to MFA page with mfa_token
         return;
       }
 
-      // TODO: Backend integration for real authentication
-      setErrors({ email: "Invalid email or password" });
+      if (result.data?.user) {
+        const user = result.data.user as User;
+        notify.success("Welcome back", "You're logged in.");
+
+        // Get full user details to check onboarding
+        const meResult = await authClient.me();
+        if (meResult.data?.user) {
+          const fullUser = meResult.data.user as User;
+          // Redirect based on onboarding status
+          const redirect = searchParams.get("redirect");
+          if (redirect) {
+            router.push(redirect);
+          } else if (!fullUser.onboarding_completed) {
+            router.push("/student/onboarding");
+          } else {
+            // Redirect based on role
+            if (user.role === "ADMIN" || user.role === "REVIEWER") {
+              router.push("/admin");
+            } else {
+              router.push("/student/dashboard");
+            }
+          }
+        } else {
+          // Fallback redirect
+          router.push("/student/dashboard");
+        }
+      }
+    } catch (error: any) {
+      setErrors({ general: error.message || "An error occurred. Please try again." });
+      notify.error("Login failed", error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -137,11 +167,25 @@ export function LoginCard() {
             </Link>
           </div>
 
+          {errors.general && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+              {errors.general}
+            </div>
+          )}
+
           <Button
             type="submit"
-            className="w-full bg-primary font-semibold text-white hover:bg-primary/90"
+            disabled={loading}
+            className="w-full bg-primary font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
           >
-            Log in
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Logging in...
+              </>
+            ) : (
+              "Log in"
+            )}
           </Button>
         </form>
 
@@ -153,17 +197,6 @@ export function LoginCard() {
               <Link href="/signup" className="font-medium text-primary hover:underline">
                 Create an account
               </Link>
-            </div>
-            <div className="border-t border-slate-200 pt-2 text-center">
-              <p className="mb-2 text-xs font-semibold text-slate-500">Demo Test Credentials:</p>
-              <div className="space-y-1 text-xs text-slate-600">
-                <p>
-                  <strong>Student:</strong> student@demo.com / demo123
-                </p>
-                <p>
-                  <strong>Admin:</strong> admin@demo.com / demo123
-                </p>
-              </div>
             </div>
           </div>
         </div>

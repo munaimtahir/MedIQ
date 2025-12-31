@@ -2,13 +2,17 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { authClient, type User } from "@/lib/authClient";
+import { notify } from "@/lib/notify";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export function SignupCard() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -17,11 +21,13 @@ export function SignupCard() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
+    general?: string;
   }>({});
 
   const validate = () => {
@@ -55,12 +61,58 @@ export function SignupCard() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // TODO: Backend integration
-      console.log("Signup attempt:", formData);
-      alert("Not connected yet (backend coming next)");
+    if (!validate()) {
+      notify.error("Signup failed", "Please check your information and try again.");
+      return;
+    }
+
+    setLoading(true);
+    setErrors({});
+
+    try {
+      const result = await authClient.signup({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+      });
+
+      if (result.error) {
+        if (result.error.code === "CONFLICT") {
+          setErrors({ email: "An account with this email already exists" });
+        } else if (result.error.code === "RATE_LIMITED") {
+          setErrors({ general: "Too many signup attempts. Please try again later." });
+        } else {
+          setErrors({ general: result.error.message || "Signup failed. Please try again." });
+        }
+        notify.error("Signup failed", result.error.message || "Please try again.");
+        return;
+      }
+
+      if (result.data?.user) {
+        const user = result.data.user as User;
+        notify.success("Account created", "Welcome! Let's set up your profile.");
+
+        // Get full user details
+        const meResult = await authClient.me();
+        if (meResult.data?.user) {
+          const fullUser = meResult.data.user as User;
+          // Redirect to onboarding if not completed
+          if (!fullUser.onboarding_completed) {
+            router.push("/student/onboarding");
+          } else {
+            router.push("/student/dashboard");
+          }
+        } else {
+          router.push("/student/onboarding");
+        }
+      }
+    } catch (error: any) {
+      setErrors({ general: error.message || "An error occurred. Please try again." });
+      notify.error("Signup failed", error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,11 +220,25 @@ export function SignupCard() {
             .
           </p>
 
+          {errors.general && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+              {errors.general}
+            </div>
+          )}
+
           <Button
             type="submit"
-            className="w-full bg-primary font-semibold text-white hover:bg-primary/90"
+            disabled={loading}
+            className="w-full bg-primary font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
           >
-            Create account
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              "Create account"
+            )}
           </Button>
         </form>
 

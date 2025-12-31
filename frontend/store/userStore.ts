@@ -1,30 +1,37 @@
 import { create } from "zustand";
+import { authClient, type User } from "@/lib/authClient";
 
 interface UserState {
-  userId: string | null;
-  role: "student" | "admin" | null;
-  setUser: (userId: string, role: "student" | "admin") => void;
+  user: User | null;
+  loading: boolean;
+  setUser: (user: User) => void;
   clearUser: () => void;
+  fetchUser: () => Promise<void>;
 }
 
-export const useUserStore = create<UserState>((set) => ({
-  userId: typeof window !== "undefined" ? localStorage.getItem("userId") : null,
-  role:
-    typeof window !== "undefined"
-      ? (localStorage.getItem("role") as "student" | "admin" | null)
-      : null,
-  setUser: (userId: string, role: "student" | "admin") => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("userId", userId);
-      localStorage.setItem("role", role);
-    }
-    set({ userId, role });
+export const useUserStore = create<UserState>((set, get) => ({
+  user: null,
+  loading: false,
+  setUser: (user: User) => {
+    set({ user });
   },
   clearUser: () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("userId");
-      localStorage.removeItem("role");
+    set({ user: null });
+  },
+  fetchUser: async () => {
+    if (get().loading) return;
+    set({ loading: true });
+    try {
+      const result = await authClient.me();
+      if (result.data?.user) {
+        set({ user: result.data.user });
+      } else if (result.error) {
+        set({ user: null });
+      }
+    } catch (error) {
+      set({ user: null });
+    } finally {
+      set({ loading: false });
     }
-    set({ userId: null, role: null });
   },
 }));

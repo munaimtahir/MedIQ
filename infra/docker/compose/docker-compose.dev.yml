@@ -21,16 +21,17 @@ services:
   redis:
     image: redis:7-alpine
     container_name: exam_platform_redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
+    # No public port - internal network only for security
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - exam_platform_network
 
@@ -93,15 +94,14 @@ services:
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-change_me}
       - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://elasticsearch:9200}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ENV=${ENV:-development}
+      - ENV=${ENV:-dev}
+      - PROJECT_NAME=${PROJECT_NAME:-Medical Exam Platform API}
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     volumes:
       - ../../../backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - exam_platform_network
 
@@ -116,6 +116,12 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/v1}
       - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Exam Prep Platform}
       - NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV:-development}
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - ACCESS_COOKIE_MAXAGE_SECONDS=${ACCESS_COOKIE_MAXAGE_SECONDS:-900}
+      - REFRESH_COOKIE_MAXAGE_SECONDS=${REFRESH_COOKIE_MAXAGE_SECONDS:-1209600}
     depends_on:
       - backend
     volumes:

@@ -22,21 +22,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SkeletonTable } from "@/components/status/SkeletonTable";
+import { EmptyState } from "@/components/status/EmptyState";
+import { ErrorState } from "@/components/status/ErrorState";
+import { FileQuestion } from "lucide-react";
 
 export default function QuestionsPage() {
   const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filter, setFilter] = useState<"all" | "published" | "unpublished">("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const published = filter === "all" ? undefined : filter === "published";
       const qs = await adminAPI.listQuestions(0, 100, published);
       setQuestions(qs);
-    } catch (error) {
-      console.error("Failed to load questions:", error);
+    } catch (err) {
+      console.error("Failed to load questions:", err);
+      setError(err instanceof Error ? err : new Error("Failed to load questions"));
     } finally {
       setLoading(false);
     }
@@ -91,11 +98,30 @@ export default function QuestionsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Question List</CardTitle>
-          <CardDescription>{questions.length} questions found</CardDescription>
+          <CardDescription>
+            {!loading && !error && `${questions.length} questions found`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p>Loading questions...</p>
+            <SkeletonTable rows={6} cols={5} />
+          ) : error ? (
+            <ErrorState
+              variant="card"
+              title="Failed to load questions"
+              description={error.message || "An error occurred while loading questions."}
+              actionLabel="Retry"
+              onAction={loadQuestions}
+            />
+          ) : questions.length === 0 ? (
+            <EmptyState
+              variant="card"
+              title="No questions yet"
+              description="Get started by creating your first question."
+              icon={<FileQuestion className="h-8 w-8 text-slate-400" />}
+              actionLabel="Create New Question"
+              onAction={() => router.push("/admin/questions/new")}
+            />
           ) : (
             <Table>
               <TableHeader>

@@ -49,8 +49,8 @@ check_and_seed()
 
 app = FastAPI(title="Medical Exam Platform API", version="1.0.0")
 
-# CORS
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# CORS - Allow both ports 3000 and 3001 for Next.js dev server
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

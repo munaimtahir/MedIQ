@@ -1,4 +1,8 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Support both NEXT_PUBLIC_API_BASE_URL (preferred) and NEXT_PUBLIC_API_URL (legacy)
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000";
 
 export interface Block {
   id: string;
@@ -64,28 +68,21 @@ export interface ReviewData {
 }
 
 function getHeaders(): HeadersInit {
-  const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
   return {
     "Content-Type": "application/json",
-    ...(userId && { "X-User-Id": userId }),
   };
 }
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  // Use fetcher wrapper for automatic token refresh
+  const { default: fetcher } = await import("./fetcher");
+  return fetcher<T>(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       ...getHeaders(),
       ...options?.headers,
     },
   });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: "Unknown error" }));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 // Syllabus APIs
