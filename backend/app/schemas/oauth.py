@@ -1,6 +1,10 @@
 """OAuth schemas."""
 
+from typing import Any
+
 from pydantic import BaseModel
+
+from app.schemas.auth import TokensResponse, UserResponse
 
 
 class OAuthLinkConfirmRequest(BaseModel):
@@ -16,3 +20,19 @@ class OAuthLinkConfirmResponse(BaseModel):
 
     status: str = "ok"
     message: str = "Account linked successfully"
+
+
+class OAuthExchangeRequest(BaseModel):
+    """Request to exchange an OAuth code for tokens."""
+
+    code: str
+
+
+class OAuthExchangeResponse(BaseModel):
+    """Response from OAuth token exchange."""
+
+    user: UserResponse | None = None
+    tokens: TokensResponse | None = None
+    mfa_required: bool = False
+    mfa_token: str | None = None
+    method: str | None = None

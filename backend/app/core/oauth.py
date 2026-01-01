@@ -27,6 +27,19 @@ class OAuthProviderAdapter:
     def __init__(self, provider: OAuthProvider):
         self.provider = provider
 
+    def _validate_redirect_uri(self, redirect_uri: str | None) -> str | None:
+        """Validate redirect URI against allowed list."""
+        if not redirect_uri:
+            return None
+        # Check against allowed redirect URIs if configured
+        allowed_str = settings.OAUTH_ALLOWED_REDIRECT_URIS
+        if allowed_str:
+            allowed = [uri.strip() for uri in allowed_str.split(",")]
+            if redirect_uri not in allowed:
+                logger.warning(f"Redirect URI not in allowed list: {redirect_uri}")
+                return None
+        return redirect_uri
+
     def get_authorize_url(self, state: str, nonce: str, redirect_uri: str) -> str:
         """Generate authorization URL."""
         raise NotImplementedError
@@ -47,7 +60,7 @@ class OAuthProviderAdapter:
         """Exchange authorization code for tokens."""
         raise NotImplementedError
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str) -> dict[str, Any]:
+    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
         """Validate and decode id_token."""
         raise NotImplementedError
 
@@ -89,54 +102,63 @@ class GoogleOAuthAdapter(OAuthProviderAdapter):
     async def exchange_code_for_tokens(self, code: str, redirect_uri: str) -> dict[str, Any]:
         """Exchange code for tokens."""
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.get_token_endpoint(),
-                data={
-                    "code": code,
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "redirect_uri": redirect_uri or self.redirect_uri,
-                    "grant_type": "authorization_code",
-                },
-            )
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.post(
+                    self.get_token_endpoint(),
+                    data={
+                        "code": code,
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "redirect_uri": redirect_uri or self.redirect_uri,
+                        "grant_type": "authorization_code",
+                    },
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Google token exchange failed", extra={"status_code": e.response.status_code, "response_body": e.response.text[:500]})
+                raise
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str) -> dict[str, Any]:
+    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
         """Validate Google id_token."""
-        from jose import jwk
-
-        # Get JWKS
-        jwks = await self._get_jwks()
-        # Decode header to get key ID
-        unverified_header = jwt.get_unverified_header(id_token)
-        kid = unverified_header.get("kid")
-
-        # Find the key
-        key = None
-        for jwk_key in jwks.get("keys", []):
-            if jwk_key.get("kid") == kid:
-                key = jwk.construct(jwk_key)
-                break
-
-        if not key:
-            raise ValueError("Key not found in JWKS")
-
-        # Decode and verify
         try:
+            # Get JWKS
+            jwks = await self._get_jwks()
+            # Decode header to get key ID
+            unverified_header = jwt.get_unverified_header(id_token)
+            kid = unverified_header.get("kid")
+
+            # Find the key
+            rsa_key = None
+            for jwk_key in jwks.get("keys", []):
+                if jwk_key.get("kid") == kid:
+                    rsa_key = jwk_key
+                    break
+
+            if not rsa_key:
+                raise ValueError(f"Key not found in JWKS for kid: {kid}")
+
+            # Decode and verify using the raw JWK
+            # Pass access_token for at_hash claim verification
             payload = jwt.decode(
                 id_token,
-                key,
+                rsa_key,
                 algorithms=["RS256"],
                 audience=client_id,
                 issuer=self.get_issuer(),
+                access_token=access_token,
             )
             # Verify nonce
             if payload.get("nonce") != nonce:
+                logger.error(f"Nonce mismatch: expected {nonce}, got {payload.get('nonce')}")
                 raise ValueError("Nonce mismatch")
             return payload
         except JWTError as e:
+            logger.error("Google id_token JWT validation failed", extra={"error": str(e), "error_type": type(e).__name__})
             raise ValueError(f"Invalid id_token: {e}") from e
+        except Exception as e:
+            logger.error("Google id_token validation error", extra={"error": str(e), "error_type": type(e).__name__})
+            raise
 
     async def _get_jwks(self) -> dict:
         """Get JWKS (cached with TTL)."""
@@ -170,7 +192,7 @@ class MicrosoftOAuthAdapter(OAuthProviderAdapter):
         self.client_id = settings.OAUTH_MICROSOFT_CLIENT_ID
         self.client_secret = settings.OAUTH_MICROSOFT_CLIENT_SECRET
         self.redirect_uri = settings.OAUTH_MICROSOFT_REDIRECT_URI
-        self.tenant = "common"  # Can be made configurable
+        self.tenant = settings.OAUTH_MICROSOFT_TENANT or "common"
 
     def get_authorize_url(self, state: str, nonce: str, redirect_uri: str | None = None) -> str:
         """Generate Microsoft authorization URL."""
@@ -199,59 +221,72 @@ class MicrosoftOAuthAdapter(OAuthProviderAdapter):
     async def exchange_code_for_tokens(self, code: str, redirect_uri: str) -> dict[str, Any]:
         """Exchange code for tokens."""
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.get_token_endpoint(),
-                data={
-                    "code": code,
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "redirect_uri": redirect_uri or self.redirect_uri,
-                    "grant_type": "authorization_code",
-                },
-            )
-            response.raise_for_status()
-            return response.json()
+            try:
+                # Log what we're sending (mask secret for security)
+                secret_masked = f"{self.client_secret[:8]}...{self.client_secret[-4:]}" if self.client_secret and len(self.client_secret) > 12 else "***"
+                logger.info(f"Microsoft token exchange: client_id={self.client_id}, secret_len={len(self.client_secret or '')}, secret_preview={secret_masked}, tenant={self.tenant}")
+                
+                response = await client.post(
+                    self.get_token_endpoint(),
+                    data={
+                        "code": code,
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "redirect_uri": redirect_uri or self.redirect_uri,
+                        "grant_type": "authorization_code",
+                    },
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Microsoft token exchange failed", extra={"status_code": e.response.status_code, "response_body": e.response.text[:500]})
+                raise
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str) -> dict[str, Any]:
+    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
         """Validate Microsoft id_token."""
-        from jose import jwk
-
-        # Get JWKS
-        jwks = await self._get_jwks()
-        # Decode header to get key ID
-        unverified_header = jwt.get_unverified_header(id_token)
-        kid = unverified_header.get("kid")
-
-        # Find the key
-        key = None
-        for jwk_key in jwks.get("keys", []):
-            if jwk_key.get("kid") == kid:
-                key = jwk.construct(jwk_key)
-                break
-
-        if not key:
-            raise ValueError("Key not found in JWKS")
-
-        # Decode and verify
         try:
+            # Get JWKS
+            jwks = await self._get_jwks()
+            # Decode header to get key ID
+            unverified_header = jwt.get_unverified_header(id_token)
+            kid = unverified_header.get("kid")
+
+            # Find the key
+            rsa_key = None
+            for jwk_key in jwks.get("keys", []):
+                if jwk_key.get("kid") == kid:
+                    rsa_key = jwk_key
+                    break
+
+            if not rsa_key:
+                raise ValueError(f"Key not found in JWKS for kid: {kid}")
+
+            # Decode and verify using the raw JWK
+            # Pass access_token for at_hash claim verification if present
             payload = jwt.decode(
                 id_token,
-                key,
+                rsa_key,
                 algorithms=["RS256"],
                 audience=client_id,
                 # Microsoft issuer can vary by tenant, so we check prefix
                 options={"verify_iss": False},  # We'll verify manually
+                access_token=access_token,
             )
             # Verify issuer pattern
             issuer = payload.get("iss", "")
             if not issuer.startswith("https://login.microsoftonline.com/"):
-                raise ValueError("Invalid issuer")
+                raise ValueError(f"Invalid issuer: {issuer}")
             # Verify nonce
             if payload.get("nonce") != nonce:
+                logger.error(f"Nonce mismatch: expected {nonce}, got {payload.get('nonce')}")
                 raise ValueError("Nonce mismatch")
             return payload
         except JWTError as e:
+            logger.error("Microsoft id_token JWT validation failed", extra={"error": str(e), "error_type": type(e).__name__})
             raise ValueError(f"Invalid id_token: {e}") from e
+        except Exception as e:
+            logger.error("Microsoft id_token validation error", extra={"error": str(e), "error_type": type(e).__name__})
+            raise
 
     async def _get_jwks(self) -> dict:
         """Get JWKS (cached with TTL)."""
@@ -363,5 +398,54 @@ def get_oauth_link_token(link_token: str) -> dict[str, Any] | None:
     data = redis_client.get(key)
     if data:
         redis_client.delete(key)  # One-time use
+        return json.loads(data)
+    return None
+
+
+def store_oauth_tokens(
+    user_data: dict[str, Any],
+    tokens: dict[str, Any],
+    mfa_required: bool = False,
+    mfa_token: str | None = None,
+    mfa_method: str | None = None,
+) -> str:
+    """
+    Store OAuth tokens temporarily in Redis for frontend exchange.
+    Returns a short-lived code that the frontend can exchange for the tokens.
+    """
+    redis_client = get_redis_client()
+    if not redis_client:
+        raise ValueError("Redis not available for OAuth token storage")
+
+    code = secrets.token_urlsafe(32)
+    data = {
+        "user": user_data,
+        "tokens": tokens,
+        "mfa_required": mfa_required,
+        "mfa_token": mfa_token,
+        "mfa_method": mfa_method,
+        "created_at": str(datetime.now(UTC)),
+    }
+    redis_client.setex(
+        f"oauth:token_code:{code}",
+        settings.OAUTH_TOKEN_CODE_TTL,
+        json.dumps(data),
+    )
+    return code
+
+
+def get_oauth_tokens(code: str) -> dict[str, Any] | None:
+    """
+    Get and delete OAuth tokens from Redis (one-time use).
+    Returns the stored token data or None if code is invalid/expired.
+    """
+    redis_client = get_redis_client()
+    if not redis_client:
+        return None
+
+    key = f"oauth:token_code:{code}"
+    data = redis_client.get(key)
+    if data:
+        redis_client.delete(key)  # One-time use - delete immediately
         return json.loads(data)
     return None

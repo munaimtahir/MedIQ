@@ -12,9 +12,11 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@radix-ui/react-checkbox": "^1.1.4",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-radio-group": "^1.2.3",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.1.0",
@@ -32,6 +34,10 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.9.3",
     "zustand": "^5.0.9"
+  },
+  "overrides": {
+    "glob": "^11.0.0",
+    "cross-spawn": "^7.0.6"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

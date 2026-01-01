@@ -62,13 +62,18 @@ class Settings(BaseSettings):
     OAUTH_MICROSOFT_CLIENT_ID: str | None = Field(default=None)
     OAUTH_MICROSOFT_CLIENT_SECRET: str | None = Field(default=None)
     OAUTH_MICROSOFT_REDIRECT_URI: str | None = Field(default=None)
+    OAUTH_MICROSOFT_TENANT: str = Field(default="common")  # Azure AD tenant
     OAUTH_STATE_TTL: int = Field(default=600)  # 10 minutes
     OAUTH_NONCE_TTL: int = Field(default=600)  # 10 minutes
     OAUTH_LINK_TTL: int = Field(default=600)  # 10 minutes for link tokens
+    OAUTH_TOKEN_CODE_TTL: int = Field(default=60)  # 60 seconds for OAuth token exchange codes
     JWKS_CACHE_TTL_SECONDS: int = Field(default=3600)  # 1 hour
     OAUTH_ALLOWED_REDIRECT_URIS: str | None = Field(
         default=None
     )  # Comma-separated list of allowed redirect URIs
+
+    # Frontend URL for OAuth redirects
+    FRONTEND_URL: str = Field(default="http://localhost:3000")
 
     # MFA
     MFA_ENCRYPTION_KEY: str | None = Field(default=None)  # Fernet key for encrypting TOTP secrets

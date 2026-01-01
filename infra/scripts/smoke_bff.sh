@@ -1,22 +1,56 @@
 #!/bin/bash
 # Smoke tests for Next.js BFF (Backend for Frontend)
+# Supports both localhost (from host) and Docker service names (from container)
 
 set -e
 
-FRONTEND_URL="${FRONTEND_URL:-http://localhost:3000}"
+# Detect if running in Docker
+if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    IN_DOCKER=true
+    DEFAULT_FRONTEND_URL="http://frontend:3000"
+    DEFAULT_BACKEND_URL="http://backend:8000"
+else
+    IN_DOCKER=false
+    DEFAULT_FRONTEND_URL="http://localhost:3000"
+    DEFAULT_BACKEND_URL="http://localhost:8000"
+fi
+
+FRONTEND_URL="${FRONTEND_URL:-$DEFAULT_FRONTEND_URL}"
+BACKEND_URL="${BACKEND_URL:-$DEFAULT_BACKEND_URL}"
+MAX_RETRIES=3
+RETRY_DELAY=2
+
+# Helper: wait for service with retry
+wait_for_service() {
+    local url=$1
+    local name=$2
+    local max_wait=${3:-60}
+    local elapsed=0
+    
+    echo "Waiting for $name at $url..."
+    while [ $elapsed -lt $max_wait ]; do
+        if curl -sf "$url" -o /dev/null 2>/dev/null; then
+            echo "  ✓ $name is ready"
+            return 0
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+        echo "  ... waiting ($elapsed/${max_wait}s)"
+    done
+    echo "  ✗ $name not ready after ${max_wait}s"
+    return 1
+}
 
 echo "=== BFF Smoke Tests ==="
+echo "Running in Docker: $IN_DOCKER"
 echo "Frontend URL: $FRONTEND_URL"
+echo "Backend URL: $BACKEND_URL"
 echo ""
 
-# Test frontend is running
-echo "1. Testing frontend is accessible..."
-if curl -sf "$FRONTEND_URL" > /dev/null; then
-    echo "✓ Frontend is accessible"
-else
-    echo "✗ Frontend is not accessible"
-    exit 1
-fi
+# Wait for services to be ready
+wait_for_service "$BACKEND_URL/v1/health" "Backend" 30 || exit 1
+wait_for_service "$FRONTEND_URL" "Frontend" 60 || exit 1
+echo ""
 
 # Test BFF signup
 echo ""

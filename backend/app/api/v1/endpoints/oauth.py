@@ -14,8 +14,10 @@ from app.core.oauth import (
     generate_oauth_state,
     get_oauth_link_token,
     get_oauth_state,
+    get_oauth_tokens,
     get_provider_adapter,
     store_oauth_state,
+    store_oauth_tokens,
 )
 from app.core.security import create_access_token, create_refresh_token, hash_token
 from app.core.security_logging import log_security_event
@@ -24,9 +26,45 @@ from app.models.auth import RefreshToken
 from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginResponse, TokensResponse, UserResponse
-from app.schemas.oauth import OAuthLinkConfirmRequest, OAuthLinkConfirmResponse
+from app.schemas.oauth import OAuthExchangeRequest, OAuthExchangeResponse, OAuthLinkConfirmRequest, OAuthLinkConfirmResponse
 
 router = APIRouter(tags=["OAuth"])
+
+
+def _build_frontend_redirect(
+    path: str = "/api/auth/oauth/callback",
+    code: str | None = None,
+    error: str | None = None,
+    provider: str | None = None,
+    link_required: bool = False,
+    link_token: str | None = None,
+    email: str | None = None,
+) -> str:
+    """Build a redirect URL to the frontend."""
+    from urllib.parse import urlencode
+
+    base_url = settings.FRONTEND_URL.rstrip("/")
+    params = {}
+
+    if code:
+        params["code"] = code
+    if error:
+        params["error"] = error
+        path = "/login"  # Errors redirect to login page
+    if provider:
+        params["provider"] = provider
+    if link_required:
+        params["link_required"] = "true"
+        path = "/login"
+    if link_token:
+        params["link_token"] = link_token
+    if email:
+        params["email"] = email
+
+    url = f"{base_url}{path}"
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    return url
 
 
 def _create_tokens_for_user(user: User, db: Session) -> TokensResponse:
@@ -104,9 +142,8 @@ async def oauth_start(
 
 @router.get(
     "/{provider}/callback",
-    response_model=LoginResponse,
     summary="OAuth callback",
-    description="Handle OAuth callback and sign in or link account.",
+    description="Handle OAuth callback - validates tokens and redirects to frontend with exchange code.",
 )
 async def oauth_callback(
     provider: str,
@@ -114,8 +151,8 @@ async def oauth_callback(
     code: str = Query(...),
     state: str = Query(...),
     db: Session = Depends(get_db),
-) -> LoginResponse:
-    """Handle OAuth callback."""
+) -> RedirectResponse:
+    """Handle OAuth callback - redirects to frontend with an exchange code."""
     # Verify state
     state_data = get_oauth_state(state)
     if not state_data:
@@ -126,11 +163,7 @@ async def oauth_callback(
             reason_code="OAUTH_STATE_INVALID",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="OAUTH_STATE_INVALID",
-            message="Invalid or expired state",
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider))
 
     stored_provider = state_data["provider"]
     nonce = state_data["nonce"]
@@ -143,15 +176,11 @@ async def oauth_callback(
             reason_code="OAUTH_STATE_INVALID",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="OAUTH_STATE_INVALID",
-            message="Provider mismatch",
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider))
 
     try:
         adapter = get_provider_adapter(provider)
-    except ValueError as e:
+    except ValueError:
         log_security_event(
             request,
             event_type="oauth_callback_failed",
@@ -159,11 +188,7 @@ async def oauth_callback(
             reason_code="VALIDATION_ERROR",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="VALIDATION_ERROR",
-            message=str(e),
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="VALIDATION_ERROR", provider=provider))
 
     # Exchange code for tokens
     try:
@@ -179,18 +204,15 @@ async def oauth_callback(
             reason_code="OAUTH_TOKEN_EXCHANGE_FAILED",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="OAUTH_TOKEN_EXCHANGE_FAILED",
-            message="Failed to exchange authorization code",
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_TOKEN_EXCHANGE_FAILED", provider=provider))
 
     # Validate id_token
     try:
         client_id = adapter.client_id if hasattr(adapter, "client_id") else None
         if not client_id:
             raise ValueError("Client ID not configured")
-        id_token_payload = await adapter.validate_id_token(id_token, nonce, client_id)
+        access_token = token_response.get("access_token")
+        id_token_payload = await adapter.validate_id_token(id_token, nonce, client_id, access_token)
     except Exception:
         log_security_event(
             request,
@@ -199,11 +221,7 @@ async def oauth_callback(
             reason_code="OAUTH_ID_TOKEN_INVALID",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="OAUTH_ID_TOKEN_INVALID",
-            message="Invalid id_token",
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider))
 
     # Extract identity
     provider_subject = id_token_payload.get("sub")
@@ -219,11 +237,7 @@ async def oauth_callback(
             reason_code="OAUTH_ID_TOKEN_INVALID",
             provider=provider,
         )
-        raise_app_error(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            code="OAUTH_ID_TOKEN_INVALID",
-            message="Missing subject in id_token",
-        )
+        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider))
 
     provider_enum = OAuthProvider(provider.upper())
 
@@ -249,11 +263,7 @@ async def oauth_callback(
                 provider=provider,
                 user_id=str(user.id) if user else None,
             )
-            raise_app_error(
-                status_code=status.HTTP_403_FORBIDDEN,
-                code="FORBIDDEN",
-                message="User account is inactive",
-            )
+            return RedirectResponse(url=_build_frontend_redirect(error="ACCOUNT_INACTIVE", provider=provider))
 
         # Check MFA
         from app.core.mfa import create_mfa_token
@@ -270,11 +280,15 @@ async def oauth_callback(
                 user_id=str(user.id),
                 provider=provider,
             )
-            return LoginResponse(
+            # Store MFA info and redirect
+            exchange_code = store_oauth_tokens(
+                user_data=UserResponse.model_validate(user).model_dump(mode="json"),
+                tokens={},  # No tokens yet - need MFA verification
                 mfa_required=True,
                 mfa_token=mfa_token,
-                method="totp",
+                mfa_method="totp",
             )
+            return RedirectResponse(url=_build_frontend_redirect(code=exchange_code))
 
         # Update last login
         user.last_login_at = datetime.now(UTC)
@@ -292,10 +306,12 @@ async def oauth_callback(
             provider=provider,
         )
 
-        return LoginResponse(
-            user=UserResponse.model_validate(user),
-            tokens=tokens,
+        # Store tokens and redirect
+        exchange_code = store_oauth_tokens(
+            user_data=UserResponse.model_validate(user).model_dump(mode="json"),
+            tokens=tokens.model_dump(mode="json"),
         )
+        return RedirectResponse(url=_build_frontend_redirect(code=exchange_code))
 
     # New identity - check for email collision
     if email and email_verified:
@@ -311,16 +327,12 @@ async def oauth_callback(
                 reason_code="OAUTH_LINK_REQUIRED",
                 provider=provider,
             )
-            raise_app_error(
-                status_code=status.HTTP_409_CONFLICT,
-                code="OAUTH_LINK_REQUIRED",
-                message="An account with this email exists. Please link accounts.",
-                details={
-                    "link_token": link_token,
-                    "provider": provider,
-                    "email": email,
-                },
-            )
+            return RedirectResponse(url=_build_frontend_redirect(
+                link_required=True,
+                link_token=link_token,
+                provider=provider,
+                email=email,
+            ))
 
     # Create new user and identity
     user = User(
@@ -353,11 +365,14 @@ async def oauth_callback(
 
     if mfa_totp:
         mfa_token = create_mfa_token(str(user.id))
-        return LoginResponse(
+        exchange_code = store_oauth_tokens(
+            user_data=UserResponse.model_validate(user).model_dump(mode="json"),
+            tokens={},
             mfa_required=True,
             mfa_token=mfa_token,
-            method="totp",
+            mfa_method="totp",
         )
+        return RedirectResponse(url=_build_frontend_redirect(code=exchange_code))
 
     # Create tokens
     tokens = _create_tokens_for_user(user, db)
@@ -371,9 +386,57 @@ async def oauth_callback(
         provider=provider,
     )
 
-    return LoginResponse(
-        user=UserResponse.model_validate(user),
-        tokens=tokens,
+    # Store tokens and redirect
+    exchange_code = store_oauth_tokens(
+        user_data=UserResponse.model_validate(user).model_dump(mode="json"),
+        tokens=tokens.model_dump(mode="json"),
+    )
+    return RedirectResponse(url=_build_frontend_redirect(code=exchange_code))
+
+
+@router.post(
+    "/exchange",
+    response_model=OAuthExchangeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Exchange OAuth code for tokens",
+    description="Exchange a short-lived OAuth code for user data and tokens. Called by frontend BFF.",
+)
+async def oauth_exchange(
+    request_data: OAuthExchangeRequest,
+    request: Request,
+) -> OAuthExchangeResponse:
+    """Exchange OAuth code for tokens (one-time use)."""
+    token_data = get_oauth_tokens(request_data.code)
+
+    if not token_data:
+        log_security_event(
+            request,
+            event_type="oauth_exchange_failed",
+            outcome="deny",
+            reason_code="OAUTH_CODE_INVALID",
+        )
+        raise_app_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="OAUTH_CODE_INVALID",
+            message="Invalid or expired OAuth code",
+        )
+
+    log_security_event(
+        request,
+        event_type="oauth_exchange_success",
+        outcome="allow",
+    )
+
+    # Build response
+    user_data = token_data.get("user")
+    tokens_data = token_data.get("tokens")
+
+    return OAuthExchangeResponse(
+        user=UserResponse.model_validate(user_data) if user_data else None,
+        tokens=TokensResponse.model_validate(tokens_data) if tokens_data and tokens_data.get("access_token") else None,
+        mfa_required=token_data.get("mfa_required", False),
+        mfa_token=token_data.get("mfa_token"),
+        method=token_data.get("mfa_method"),
     )
 
 

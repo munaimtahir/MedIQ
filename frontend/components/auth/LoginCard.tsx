@@ -86,7 +86,7 @@ function LoginCardContent() {
           if (redirect) {
             router.push(redirect);
           } else if (!fullUser.onboarding_completed) {
-            router.push("/student/onboarding");
+            router.push("/onboarding");
           } else {
             // Redirect based on role
             if (user.role === "ADMIN" || user.role === "REVIEWER") {

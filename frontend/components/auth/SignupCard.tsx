@@ -100,12 +100,12 @@ export function SignupCard() {
           const fullUser = meResult.data.user as User;
           // Redirect to onboarding if not completed
           if (!fullUser.onboarding_completed) {
-            router.push("/student/onboarding");
+            router.push("/onboarding");
           } else {
             router.push("/student/dashboard");
           }
         } else {
-          router.push("/student/onboarding");
+          router.push("/onboarding");
         }
       }
     } catch (error: any) {

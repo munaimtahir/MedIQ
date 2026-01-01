@@ -85,9 +85,13 @@ export async function getUser(): Promise<User | null> {
  *
  * @param opts - Options object
  * @param opts.redirectTo - Optional redirect path after login (will be added as query param)
+ * @param opts.requireOnboarding - If true, redirects to /onboarding if not completed (default: false)
  * @returns User object if authenticated (never returns null - redirects instead)
  */
-export async function requireUser(opts?: { redirectTo?: string }): Promise<User> {
+export async function requireUser(opts?: {
+  redirectTo?: string;
+  requireOnboarding?: boolean;
+}): Promise<User> {
   const user = await getUser();
 
   if (!user) {
@@ -97,7 +101,25 @@ export async function requireUser(opts?: { redirectTo?: string }): Promise<User>
     redirect(redirectPath);
   }
 
+  // Check onboarding status if required
+  if (opts?.requireOnboarding && !user.onboarding_completed) {
+    redirect("/onboarding");
+  }
+
   return user;
+}
+
+/**
+ * Require user to be authenticated AND have completed onboarding.
+ * Redirects to /login if not authenticated.
+ * Redirects to /onboarding if onboarding not completed.
+ *
+ * @param opts - Options object
+ * @param opts.redirectTo - Optional redirect path after login (will be added as query param)
+ * @returns User object if authenticated and onboarded
+ */
+export async function requireOnboardedUser(opts?: { redirectTo?: string }): Promise<User> {
+  return requireUser({ ...opts, requireOnboarding: true });
 }
 
 /**

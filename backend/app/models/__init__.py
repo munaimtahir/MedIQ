@@ -1,6 +1,14 @@
 """Database models."""
 
 # Import all models here so Alembic can detect them
+from app.models.academic import (
+    AcademicBlock,
+    AcademicSubject,
+    AcademicYear,
+    UserBlock,
+    UserProfile,
+    UserSubject,
+)
 from app.models.attempt import AttemptAnswer, AttemptSession
 from app.models.auth import PasswordResetToken, RefreshToken
 from app.models.mfa import MFATOTP, MFABackupCode
@@ -23,4 +31,10 @@ __all__ = [
     "Question",
     "AttemptSession",
     "AttemptAnswer",
+    "AcademicYear",
+    "AcademicBlock",
+    "AcademicSubject",
+    "UserProfile",
+    "UserBlock",
+    "UserSubject",
 ]

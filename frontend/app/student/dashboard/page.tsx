@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { syllabusAPI } from "@/lib/api";
-import { Block } from "@/lib/api";
+import { onboardingAPI, UserProfile, UserProfileBlock } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { BookOpen, TrendingUp, Clock, Target } from "lucide-react";
 import { SkeletonCardGrid } from "@/components/status/SkeletonCardGrid";
@@ -13,22 +12,29 @@ import { ErrorState } from "@/components/status/ErrorState";
 
 export default function StudentDashboard() {
   const router = useRouter();
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
+  const loadProfile = () => {
     setLoading(true);
     setError(null);
-    syllabusAPI
-      .getBlocks(1)
-      .then(setBlocks)
+    onboardingAPI
+      .getProfile()
+      .then(setProfile)
       .catch((err) => {
-        console.error("Failed to load blocks:", err);
-        setError(err instanceof Error ? err : new Error("Failed to load blocks"));
+        console.error("Failed to load profile:", err);
+        setError(err instanceof Error ? err : new Error("Failed to load profile"));
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadProfile();
   }, []);
+
+  const blocks = profile?.selected_blocks || [];
+  const yearName = profile?.selected_year?.display_name || "Your";
 
   return (
     <div className="space-y-6">
@@ -84,43 +90,33 @@ export default function StudentDashboard() {
       </div>
 
       <div>
-        <h2 className="mb-4 text-2xl font-semibold">Year 1 Blocks</h2>
+        <h2 className="mb-4 text-2xl font-semibold">{yearName} Blocks</h2>
         {loading ? (
           <SkeletonCardGrid cards={3} />
         ) : error ? (
           <ErrorState
             variant="card"
-            title="Failed to load blocks"
-            description={error.message || "An error occurred while loading blocks."}
+            title="Failed to load profile"
+            description={error.message || "An error occurred while loading your profile."}
             actionLabel="Retry"
-            onAction={() => {
-              setError(null);
-              setLoading(true);
-              syllabusAPI
-                .getBlocks(1)
-                .then(setBlocks)
-                .catch((err) => {
-                  setError(err instanceof Error ? err : new Error("Failed to load blocks"));
-                })
-                .finally(() => setLoading(false));
-            }}
+            onAction={loadProfile}
           />
         ) : blocks.length === 0 ? (
           <EmptyState
             variant="card"
-            title="No activity yet"
-            description="Start practicing to see your progress and available blocks."
+            title="No blocks selected"
+            description="Complete onboarding to select your blocks and start practicing."
             icon={<BookOpen className="h-8 w-8 text-slate-400" />}
-            actionLabel="Start Practice"
-            onAction={() => router.push("/student/practice/build")}
+            actionLabel="Go to Onboarding"
+            onAction={() => router.push("/onboarding")}
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {blocks.map((block) => (
               <Card key={block.id} className="cursor-pointer transition-shadow hover:shadow-lg">
                 <CardHeader>
-                  <CardTitle>{block.name}</CardTitle>
-                  <CardDescription>{block.description}</CardDescription>
+                  <CardTitle>{block.display_name}</CardTitle>
+                  <CardDescription>Block {block.code}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button

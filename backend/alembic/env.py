@@ -12,6 +12,9 @@ from app.db.engine import engine
 # Import all models so Alembic can detect them
 from app.models import (  # noqa: F401
     MFATOTP,
+    AcademicBlock,
+    AcademicSubject,
+    AcademicYear,
     AttemptAnswer,
     AttemptSession,
     Block,
@@ -22,6 +25,9 @@ from app.models import (  # noqa: F401
     RefreshToken,
     Theme,
     User,
+    UserBlock,
+    UserProfile,
+    UserSubject,
 )
 
 # this is the Alembic Config object, which provides
