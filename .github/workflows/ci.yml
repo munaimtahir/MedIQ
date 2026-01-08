@@ -34,7 +34,7 @@ jobs:
 
       - name: Run linter
         working-directory: frontend
-        run: npx eslint . --ext .js,.jsx,.ts,.tsx --config .eslintrc.json
+        run: npx next lint --max-warnings 0
 
       - name: Check formatting
         working-directory: frontend
