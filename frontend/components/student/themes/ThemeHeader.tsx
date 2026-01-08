@@ -19,7 +19,7 @@ export function ThemeHeader({
   theme,
   block,
   yearName,
-  isAllowed,
+  isAllowed: _isAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
   status = "not_available",
 }: ThemeHeaderProps) {
   const router = useRouter();

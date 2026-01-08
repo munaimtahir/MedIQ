@@ -13,7 +13,11 @@ interface StreakSummaryCardProps {
   error?: Error | null;
 }
 
-export function StreakSummaryCard({ metrics, loading, error }: StreakSummaryCardProps) {
+export function StreakSummaryCard({ 
+  metrics, 
+  loading, 
+  error: _error // eslint-disable-line @typescript-eslint/no-unused-vars
+}: StreakSummaryCardProps) {
   const router = useRouter();
 
   if (loading) {

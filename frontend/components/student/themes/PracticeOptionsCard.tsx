@@ -15,8 +15,8 @@ interface PracticeOptionsCardProps {
 export function PracticeOptionsCard({
   themeId,
   blockId,
-  isAllowed,
-  allowedBlockIds,
+  isAllowed: _isAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  allowedBlockIds: _allowedBlockIds, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: PracticeOptionsCardProps) {
   const router = useRouter();
 

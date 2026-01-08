@@ -43,7 +43,6 @@ export function computeAttentionItems(
     if (block.is_active) {
       const blockThemes = themes.filter((t) => t.block_id === block.id && t.is_active);
       if (blockThemes.length === 0) {
-        const year = years.find((y) => y.id === block.year_id);
         items.push({
           id: `block-no-themes-${block.id}`,
           title: `No themes in ${block.code}`,
