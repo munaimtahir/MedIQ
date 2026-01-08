@@ -3,8 +3,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { syllabusAPI } from "@/lib/api";
-import { Block, Theme } from "@/lib/api";
+import { adminSyllabusAPI } from "@/lib/api";
+import { BlockAdmin, ThemeAdmin } from "@/lib/api";
 import { AttentionItem, computeAttentionItems } from "./attentionRules";
 
 interface UseAttentionItemsResult {
@@ -28,24 +28,24 @@ export function useAttentionItems(): UseAttentionItemsResult {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       // Load all syllabus data
-      const years = await syllabusAPI.getYears();
+      const years = await adminSyllabusAPI.getYears();
 
       // Load blocks for all years
-      const allBlocks: Block[] = [];
+      const allBlocks: BlockAdmin[] = [];
       for (const year of years) {
         try {
-          const blocks = await syllabusAPI.getBlocks(year.name);
+          const blocks = await adminSyllabusAPI.getBlocks(year.id);
           allBlocks.push(...blocks);
         } catch (error) {
-          console.error(`Failed to load blocks for year ${year.name}:`, error);
+          console.error(`Failed to load blocks for year ${year.id}:`, error);
         }
       }
 
       // Load themes for all blocks
-      const allThemes: Theme[] = [];
+      const allThemes: ThemeAdmin[] = [];
       for (const block of allBlocks) {
         try {
-          const themes = await syllabusAPI.getThemes(block.id);
+          const themes = await adminSyllabusAPI.getThemes(block.id);
           allThemes.push(...themes);
         } catch (error) {
           console.error(`Failed to load themes for block ${block.id}:`, error);

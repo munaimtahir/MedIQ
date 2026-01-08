@@ -66,12 +66,15 @@ export async function GET(request: NextRequest) {
           error: {
             code: errorData.code,
             message: errorData.message,
-            request_id: err.request_id || errorData.request_id,
+            request_id: err.request_id || (errorData as { request_id?: string }).request_id,
           },
         },
         {
           status: statusCode,
-          headers: err.request_id ? { "X-Request-ID": err.request_id } : undefined,
+          headers:
+            err.request_id && typeof err.request_id === "string"
+              ? { "X-Request-ID": err.request_id }
+              : undefined,
         },
       );
     }

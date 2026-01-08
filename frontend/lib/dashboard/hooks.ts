@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { syllabusAPI, onboardingAPI } from "@/lib/api";
 import { Year, Block, Theme, UserProfile } from "@/lib/api";
-import { DashboardVM, NextAction } from "./types";
+import { DashboardVM, NextAction, RecentSession } from "./types";
 import {
   getMockMetrics,
   getMockWeakThemes,

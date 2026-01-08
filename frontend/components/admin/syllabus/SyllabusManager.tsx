@@ -166,11 +166,12 @@ export function SyllabusManager() {
     }
   };
 
-  const handleReorderYears = async (orderedIds: number[]) => {
+  const handleReorderYears = async (orderedIds: number[]): Promise<boolean> => {
     const success = await reorderYears(orderedIds);
     if (success) {
       await refetchYears();
     }
+    return success;
   };
 
   const handleReorderBlocks = async (orderedIds: number[]) => {
@@ -605,7 +606,7 @@ export function SyllabusManager() {
       <EditYearDialog
         open={yearDialogOpen}
         onOpenChange={setYearDialogOpen}
-        year={editingYear}
+        year={editingYear || undefined}
         onSave={editingYear ? handleUpdateYear : handleCreateYear}
         maxOrderNo={years.length > 0 ? Math.max(...years.map((y) => y.order_no)) : 0}
       />
@@ -613,7 +614,7 @@ export function SyllabusManager() {
       <EditBlockDialog
         open={blockDialogOpen}
         onOpenChange={setBlockDialogOpen}
-        block={editingBlock}
+        block={editingBlock || undefined}
         yearId={selectedYearId || 0}
         onSave={editingBlock ? handleUpdateBlock : handleCreateBlock}
         maxOrderNo={blocks.length > 0 ? Math.max(...blocks.map((b) => b.order_no)) : 0}
@@ -622,7 +623,7 @@ export function SyllabusManager() {
       <EditThemeDialog
         open={themeDialogOpen}
         onOpenChange={setThemeDialogOpen}
-        theme={editingTheme}
+        theme={editingTheme || undefined}
         blockId={selectedBlockId || 0}
         onSave={editingTheme ? handleUpdateTheme : handleCreateTheme}
         maxOrderNo={themes.length > 0 ? Math.max(...themes.map((t) => t.order_no)) : 0}

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SystemInfo } from "@/lib/admin/settings/hooks";
+import type { SystemInfo } from "@/lib/admin/settings/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, XCircle } from "lucide-react";
 

@@ -2,7 +2,7 @@
  * Rules for computing "Attention Needed" items from syllabus data.
  */
 
-import { Year, Block, Theme } from "@/lib/api";
+import { YearAdmin, BlockAdmin, ThemeAdmin } from "@/lib/api";
 
 export interface AttentionItem {
   id: string;
@@ -16,9 +16,9 @@ export interface AttentionItem {
  * Compute attention items from syllabus data.
  */
 export function computeAttentionItems(
-  years: Year[],
-  blocks: Block[],
-  themes: Theme[],
+  years: YearAdmin[],
+  blocks: BlockAdmin[],
+  themes: ThemeAdmin[],
 ): AttentionItem[] {
   const items: AttentionItem[] = [];
 

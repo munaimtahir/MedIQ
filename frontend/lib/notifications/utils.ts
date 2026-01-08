@@ -2,7 +2,7 @@
  * Notification utility functions.
  */
 
-import { NotificationItem } from "./types";
+import { NotificationItem, NotificationType } from "./types";
 
 /**
  * Check if a notification is unread.

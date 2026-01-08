@@ -11,7 +11,8 @@ import { AdminDashboardSkeleton } from "@/components/admin/dashboard/AdminDashbo
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
 import { useAdminDashboardSummary, useSystemReady } from "@/lib/admin/dashboard/hooks";
 import { useAttentionItems } from "@/lib/admin/dashboard/useAttentionItems";
-import { FileQuestion, Upload, Badge } from "lucide-react";
+import { FileQuestion, Upload } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminDashboard() {
   const {

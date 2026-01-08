@@ -41,6 +41,11 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: CsvImportDial
     rows_processed?: number;
     rows_failed?: number;
     errors?: Array<{ row: number; reason?: string; message?: string }>;
+    dry_run?: boolean;
+    accepted?: number;
+    rejected?: number;
+    created?: number;
+    updated?: number;
   } | null>(null);
 
   const { importCsv, importing } = useCsvImport();

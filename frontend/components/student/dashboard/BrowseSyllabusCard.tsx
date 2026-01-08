@@ -164,7 +164,7 @@ export function BrowseSyllabusCard({
                 <SelectContent>
                   {themes.map((theme) => (
                     <SelectItem key={theme.id} value={theme.id.toString()}>
-                      {theme.name || `Theme ${theme.id}`}
+                      {theme.title || `Theme ${theme.id}`}
                     </SelectItem>
                   ))}
                 </SelectContent>

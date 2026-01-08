@@ -77,7 +77,7 @@ export function useBlocksForYear(yearName: string | null): UseBlocksForYearResul
 
     async function loadBlocks() {
       try {
-        const blocks = await syllabusAPI.getBlocks(yearName);
+        const blocks = await syllabusAPI.getBlocks(yearName || "");
         if (cancelled) return;
         setState({ blocks, loading: false, error: null });
       } catch (error) {

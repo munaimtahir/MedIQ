@@ -46,9 +46,12 @@ export async function POST(request: NextRequest) {
       },
       {
         status,
-        headers: (error as { request_id?: string }).request_id
-          ? { "X-Request-ID": (error as { request_id?: string }).request_id }
-          : undefined,
+        headers: (() => {
+          const requestId = (error as { request_id?: string }).request_id;
+          return requestId && typeof requestId === "string"
+            ? { "X-Request-ID": requestId }
+            : undefined;
+        })(),
       },
     );
   }

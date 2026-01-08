@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { adminAPI, syllabusAPI } from "@/lib/api";
+import { adminAPI } from "@/lib/api";
 import { Theme } from "@/lib/api";
 
 export default function NewQuestionPage() {
@@ -32,7 +32,9 @@ export default function NewQuestionPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    syllabusAPI.getThemes().then(setThemes);
+    // TODO: Load themes when a block is selected
+    // For now, themes will be loaded when needed
+    setThemes([]);
   }, []);
 
   const handleOptionChange = (index: number, value: string) => {
@@ -97,7 +99,7 @@ export default function NewQuestionPage() {
                 <SelectContent>
                   {themes.map((theme) => (
                     <SelectItem key={theme.id} value={theme.id.toString()}>
-                      {theme.name} (Block {theme.block_id})
+                      {theme.title} (Block {theme.block_id})
                     </SelectItem>
                   ))}
                 </SelectContent>

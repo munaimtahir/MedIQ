@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     const err = error as {
       status?: number;
-      error?: { code: string; message: string; request_id?: string };
+      error?: { code: string; message: string; details?: unknown; request_id?: string };
       request_id?: string;
     };
     const status = err.status || 500;
@@ -72,18 +72,29 @@ export async function POST(request: NextRequest) {
       message: "An error occurred",
     };
 
+    const errorResponse: {
+      code: string;
+      message: string;
+      details?: unknown;
+      request_id?: string;
+    } = {
+      code: backendError.code,
+      message: backendError.message,
+      request_id: err.request_id || backendError.request_id,
+    };
+    if (backendError.details && typeof backendError.details === "object") {
+      errorResponse.details = backendError.details;
+    }
     return NextResponse.json(
       {
-        error: {
-          code: backendError.code,
-          message: backendError.message,
-          details: backendError.details,
-          request_id: err.request_id || backendError.request_id,
-        },
+        error: errorResponse,
       },
       {
         status,
-        headers: err.request_id ? { "X-Request-ID": err.request_id } : undefined,
+        headers:
+          err.request_id && typeof err.request_id === "string"
+            ? { "X-Request-ID": err.request_id }
+            : undefined,
       },
     );
   }
