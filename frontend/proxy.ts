@@ -25,7 +25,7 @@ import { NextResponse } from "next/server";
  * Passthrough proxy function - satisfies Next.js 16 requirement.
  * Does NOT perform authentication - that's handled by layout guards.
  */
-export default function proxy(request: NextRequest): NextResponse {
+export default function proxy(_request: NextRequest): NextResponse {
   // Passthrough - no auth logic here
   // Layout guards handle authentication/authorization
   return NextResponse.next();

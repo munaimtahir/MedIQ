@@ -28,7 +28,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       } else if (result.error) {
         set({ user: null });
       }
-    } catch (error) {
+    } catch {
       set({ user: null });
     } finally {
       set({ loading: false });

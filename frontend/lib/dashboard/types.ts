@@ -2,7 +2,7 @@
  * Dashboard view model types.
  */
 
-import { Block, Theme, Year } from "@/lib/api";
+import { Block, Theme } from "@/lib/api";
 
 export interface DashboardVM {
   user: {

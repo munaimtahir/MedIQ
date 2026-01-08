@@ -50,7 +50,6 @@ export function useDashboardData(): DashboardDataState {
         
         // Determine year to use
         let selectedYear: Year | null = null;
-        let selectedYearName: string | undefined;
 
         // Load years first
         let years: Year[] = [];
@@ -102,7 +101,7 @@ export function useDashboardData(): DashboardDataState {
         }
 
         const selectedYearId = selectedYear.id;
-        selectedYearName = selectedYear.name;
+        const selectedYearName = selectedYear.name;
         console.log("[Dashboard] Using year:", selectedYearName, "(ID:", selectedYearId, ")");
 
         // Load blocks for selected year
@@ -221,7 +220,6 @@ function determineNextAction(
   if (unfinishedSession) {
     const firstBlock = blocks[0];
     const firstBlockThemes = themesByBlock[firstBlock?.id || 0] || [];
-    const firstTheme = firstBlockThemes[0];
 
     return {
       type: "resume",

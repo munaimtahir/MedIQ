@@ -68,9 +68,10 @@ export async function getUser(): Promise<User | null> {
     });
 
     return data.user || null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If 401 (unauthorized), return null (not authenticated)
-    if (error.status === 401) {
+    const err = error as { status?: number };
+    if (err.status === 401) {
       return null;
     }
 
