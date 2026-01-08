@@ -33,7 +33,9 @@ jobs:
         run: npm ci
 
       - name: Run linter
-        run: cd frontend && npm run lint
+        run: |
+          cd frontend
+          npx next lint --dir .
 
       - name: Check formatting
         working-directory: frontend
