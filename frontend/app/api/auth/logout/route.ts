@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { backendFetch } from "@/lib/server/backendClient";
 import { clearAuthCookies } from "@/lib/server/cookies";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refresh_token")?.value;
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     clearAuthCookies(response);
 
     return response;
-  } catch (error: any) {
+  } catch {
     // Always clear cookies on logout attempt
     const response = NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Logout failed" } },

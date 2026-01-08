@@ -2,7 +2,6 @@
  * BFF route for CSV import (multipart file upload).
  */
 import { NextRequest, NextResponse } from "next/server";
-import { backendFetch } from "@/lib/server/backendClient";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://backend:8000";
 

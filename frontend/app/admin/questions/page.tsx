@@ -81,7 +81,7 @@ export default function QuestionsPage() {
           <p className="text-muted-foreground">Manage all questions</p>
         </div>
         <div className="flex gap-4">
-          <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
+          <Select value={filter} onValueChange={(v) => setFilter(v as "all" | "published" | "unpublished")}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>

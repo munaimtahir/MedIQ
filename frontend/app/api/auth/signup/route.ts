@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
-import { setAuthCookies } from "@/lib/server/cookies";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,9 +34,10 @@ export async function POST(request: NextRequest) {
     );
 
     return response;
-  } catch (error: any) {
-    const status = error.status || 500;
-    const backendError = error.error || {
+  } catch (error: unknown) {
+    const err = error as { status?: number; error?: { code: string; message: string; details?: unknown; request_id?: string }; request_id?: string };
+    const status = err.status || 500;
+    const backendError = err.error || {
       code: "INTERNAL_ERROR",
       message: "An error occurred",
     };
@@ -48,12 +48,12 @@ export async function POST(request: NextRequest) {
           code: backendError.code,
           message: backendError.message,
           details: backendError.details,
-          request_id: error.request_id || backendError.request_id,
+          request_id: err.request_id || backendError.request_id,
         },
       },
       {
         status,
-        headers: error.request_id ? { "X-Request-ID": error.request_id } : undefined,
+        headers: err.request_id ? { "X-Request-ID": err.request_id } : undefined,
       },
     );
   }

@@ -23,7 +23,6 @@ function LoginForm() {
   const oauthError = searchParams.get("error");
   const oauthProvider = searchParams.get("provider");
   const linkRequired = searchParams.get("link_required");
-  const linkToken = searchParams.get("link_token");
   const linkEmail = searchParams.get("email");
   const mfaRequired = searchParams.get("mfa");
   const emailParam = searchParams.get("email");

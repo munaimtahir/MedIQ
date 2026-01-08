@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies();
     
@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
         "X-Request-ID": headers.get("X-Request-ID") || "",
       },
     });
-  } catch (error: any) {
-    const status = error.status || 500;
-    const backendError = error.error || {
+  } catch (error: unknown) {
+    const err = error as { status?: number; error?: { code: string; message: string; request_id?: string }; request_id?: string };
+    const status = err.status || 500;
+    const backendError = err.error || {
       code: "INTERNAL_ERROR",
       message: "An error occurred",
     };
@@ -34,12 +35,12 @@ export async function GET(request: NextRequest) {
         error: {
           code: backendError.code,
           message: backendError.message,
-          request_id: error.request_id || backendError.request_id,
+          request_id: err.request_id || backendError.request_id,
         },
       },
       {
         status,
-        headers: error.request_id ? { "X-Request-ID": error.request_id } : undefined,
+        headers: err.request_id ? { "X-Request-ID": err.request_id } : undefined,
       },
     );
   }

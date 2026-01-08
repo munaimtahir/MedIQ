@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, TrendingUp, Target, Clock, Info } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { InlineAlert } from "@/components/auth/InlineAlert";
 
 interface AnalyticsData {
   total_sessions?: number;
@@ -16,7 +15,6 @@ interface AnalyticsData {
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -26,7 +24,6 @@ export default function AnalyticsPage() {
 
   async function loadAnalytics() {
     setLoading(true);
-    setError(null);
 
     try {
       // TODO: Replace with actual analytics endpoint when available
@@ -44,7 +41,7 @@ export default function AnalyticsPage() {
       } else {
         throw new Error("Failed to load analytics");
       }
-    } catch (err) {
+    } catch {
       // Endpoint doesn't exist yet - this is fine
       setData(null);
     } finally {

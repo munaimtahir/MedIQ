@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { studentAPI } from "@/lib/api";
 import { Session, Question } from "@/lib/api";
-import { Clock, CheckCircle2, XCircle, Flag } from "lucide-react";
+import { Clock, Flag } from "lucide-react";
 
 export default function TestPlayerPage() {
   const params = useParams();
@@ -53,7 +53,6 @@ export default function TestPlayerPage() {
   }, [timeRemaining, session?.is_submitted]);
 
   const currentQuestion = questions[currentIndex];
-  const currentAnswer = currentQuestion ? answers[currentQuestion.id] : null;
 
   const handleOptionSelect = (optionIndex: number) => {
     setSelectedOption(optionIndex);

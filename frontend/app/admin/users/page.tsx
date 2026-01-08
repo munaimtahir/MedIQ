@@ -39,7 +39,6 @@ export default function UsersPage() {
     total,
     refetch,
     setPage,
-    setPageSize,
     setSearch: setSearchFilter,
     setRoleFilter: setRoleFilterState,
     setStatusFilter: setStatusFilterState,
@@ -107,18 +106,6 @@ export default function UsersPage() {
     } finally {
       setActionLoading(false);
     }
-  };
-
-  const handleRoleChange = (user: User, newRole: string) => {
-    if (user.role === newRole) return;
-    showConfirmDialog(
-      "Change User Role",
-      `Changing role from ${user.role} to ${newRole} affects access permissions. Continue?`,
-      "Change Role",
-      async () => {
-        await updateUser(user.id, { role: newRole as any });
-      }
-    );
   };
 
   const totalPages = Math.ceil(total / pageSize);

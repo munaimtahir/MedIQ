@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +17,6 @@ import { Year, Block } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
 
 export default function BlocksPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [years, setYears] = useState<Year[]>([]);

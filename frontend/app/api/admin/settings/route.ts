@@ -66,11 +66,35 @@ export async function PUT(request: NextRequest) {
 
     const { data } = await backendFetch<{
       data: {
-        general: any;
-        academic_defaults: any;
-        practice_defaults: any;
-        security: any;
-        notifications: any;
+        general: {
+          platform_name: string;
+          platform_description: string;
+          default_language: string;
+          timezone: string;
+          default_landing: string;
+        };
+        academic_defaults: {
+          default_year_id: number | null;
+          blocks_visibility_mode: string;
+        };
+        practice_defaults: {
+          default_mode: string;
+          timer_default: string;
+          review_policy: string;
+          allow_mixed_blocks: boolean;
+          allow_any_block_anytime: boolean;
+        };
+        security: {
+          access_token_minutes: number;
+          refresh_token_days: number;
+          force_logout_on_password_reset: boolean;
+        };
+        notifications: {
+          password_reset_emails_enabled: boolean;
+          practice_reminders_enabled: boolean;
+          admin_alerts_enabled: boolean;
+          inapp_announcements_enabled: boolean;
+        };
         version: number;
       };
       updated_at: string | null;

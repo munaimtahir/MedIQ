@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,9 +74,10 @@ export default function EditQuestionPage() {
         difficulty: formData.difficulty || undefined,
       });
       router.push("/admin/questions");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update question:", error);
-      alert(error.message || "Failed to update question");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update question";
+      alert(errorMessage);
     } finally {
       setSaving(false);
     }

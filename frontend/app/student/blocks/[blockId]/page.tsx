@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { BlockHeader } from "@/components/student/blocks/BlockHeader";
 import { BlockOverviewCard } from "@/components/student/blocks/BlockOverviewCard";
 import { ThemeCard } from "@/components/student/blocks/ThemeCard";
@@ -13,7 +13,6 @@ import {
   useBlockData,
   useThemes,
 } from "@/lib/blocks/hooks";
-import Link from "next/link";
 
 export default function BlockDetailPage() {
   const params = useParams();

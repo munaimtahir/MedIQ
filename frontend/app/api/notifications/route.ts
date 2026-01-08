@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({ items: data.items || [] }, { status: 200 });
-    } catch (backendError) {
+    } catch {
       // Backend unavailable
       if (USE_MOCK) {
         // In dev mode, return mock data

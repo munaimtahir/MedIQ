@@ -9,7 +9,6 @@ import { DangerZoneCard } from "@/components/student/settings/DangerZoneCard";
 import { SettingsSkeleton } from "@/components/student/settings/SettingsSkeleton";
 import { useYears, useProfile } from "@/lib/settings/hooks";
 import { onboardingAPI } from "@/lib/api";
-import { Year } from "@/lib/api";
 
 export default function SettingsPage() {
   // Fetch data

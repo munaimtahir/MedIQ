@@ -60,9 +60,10 @@ export default function NewQuestionPage() {
         difficulty: formData.difficulty || undefined,
       });
       router.push("/admin/questions");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create question:", error);
-      alert(error.message || "Failed to create question");
+      const errorMessage = error instanceof Error ? error.message : "Failed to create question";
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }

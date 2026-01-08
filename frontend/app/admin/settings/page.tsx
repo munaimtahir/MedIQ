@@ -36,7 +36,7 @@ export default function AdminSettingsPage() {
     try {
       await updateSettings(draftSettings);
       // Draft will be updated by the hook's refetch
-    } catch (error) {
+    } catch {
       // Error already handled in hook
     }
   };

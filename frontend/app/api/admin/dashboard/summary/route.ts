@@ -2,11 +2,11 @@
  * BFF route for admin dashboard summary.
  * Proxies to backend dashboard summary endpoint.
  */
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies();
     const cookieHeader = Array.from(cookieStore.getAll())
