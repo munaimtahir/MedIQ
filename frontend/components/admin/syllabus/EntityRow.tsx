@@ -20,7 +20,7 @@ interface EntityRowProps {
 }
 
 export function EntityRow({
-  id,
+  id: _id,
   title,
   subtitle,
   isActive,

@@ -44,7 +44,7 @@ export function CsvImportDialog({
     message?: string;
     rows_processed?: number;
     rows_failed?: number;
-    errors?: Array<{ row: number; error: string }>;
+    errors?: Array<{ row: number; reason?: string; message?: string }>;
   } | null>(null);
 
   const { importCsv, importing } = useCsvImport();
@@ -93,7 +93,7 @@ export function CsvImportDialog({
           {/* Import Type */}
           <div className="space-y-2">
             <Label>Import Type</Label>
-            <Select value={importType} onValueChange={(v) => setImportType(v as any)}>
+            <Select value={importType} onValueChange={(v) => setImportType(v as "years" | "blocks" | "themes")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -175,7 +175,7 @@ export function CsvImportDialog({
                 <div className="mt-3">
                   <p className="text-sm font-medium mb-2">Errors:</p>
                   <div className="max-h-48 overflow-y-auto space-y-1">
-                    {result.errors.map((error: any, idx: number) => (
+                    {result.errors.map((error, idx: number) => (
                       <div
                         key={idx}
                         className="text-xs p-2 bg-destructive/10 rounded border border-destructive/20"

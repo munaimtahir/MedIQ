@@ -11,7 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { User } from "@/lib/admin/users/types";
 import { UserRowActions } from "./UserRowActions";
-import { format } from "date-fns";
 
 interface UsersTableProps {
   users: User[];

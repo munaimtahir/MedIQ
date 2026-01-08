@@ -129,7 +129,7 @@ export function UserFormDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role *</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as any)}>
+            <Select value={role} onValueChange={(v) => setRole(v as "STUDENT" | "ADMIN" | "REVIEWER")}>
               <SelectTrigger id="role">
                 <SelectValue />
               </SelectTrigger>

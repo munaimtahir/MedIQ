@@ -14,7 +14,6 @@ import { InlineError } from "./InlineError";
 import { ReorderableList } from "./ReorderableList";
 import { EditYearDialog, EditBlockDialog, EditThemeDialog } from "./EditEntityDialog";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
-import { SyllabusSkeleton } from "./SyllabusSkeleton";
 
 export function SyllabusManager() {
   // Data hooks
@@ -115,7 +114,7 @@ export function SyllabusManager() {
         await toggleTheme(deletingEntity.id, false);
         await refetchThemes();
       }
-    } catch (error) {
+    } catch {
       // Error handled in hook
     }
   };
@@ -187,7 +186,7 @@ export function SyllabusManager() {
               <ReorderableList
                 items={years}
                 onReorder={handleReorderYears}
-                renderItem={(year, index) => (
+                renderItem={(year) => (
                   <EntityRow
                     id={year.id}
                     title={year.name}
@@ -255,7 +254,7 @@ export function SyllabusManager() {
               <ReorderableList
                 items={blocks}
                 onReorder={handleReorderBlocks}
-                renderItem={(block, index) => (
+                renderItem={(block) => (
                   <EntityRow
                     id={block.id}
                     title={block.name}
@@ -323,7 +322,7 @@ export function SyllabusManager() {
               <ReorderableList
                 items={themes}
                 onReorder={handleReorderThemes}
-                renderItem={(theme, index) => (
+                renderItem={(theme) => (
                   <EntityRow
                     id={theme.id}
                     title={theme.title}
