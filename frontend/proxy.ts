@@ -25,6 +25,7 @@ import { NextResponse } from "next/server";
  * Passthrough proxy function - satisfies Next.js 16 requirement.
  * Does NOT perform authentication - that's handled by layout guards.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function proxy(_request: NextRequest): NextResponse {
   // Passthrough - no auth logic here
   // Layout guards handle authentication/authorization

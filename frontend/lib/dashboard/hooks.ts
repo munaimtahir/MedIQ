@@ -218,9 +218,6 @@ function determineNextAction(
 
   // If there's an unfinished session, prioritize resume
   if (unfinishedSession) {
-    const firstBlock = blocks[0];
-    const firstBlockThemes = themesByBlock[firstBlock?.id || 0] || [];
-
     return {
       type: "resume",
       label: "Resume Session",
