@@ -1,6 +1,6 @@
 """Admin settings endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -56,6 +56,8 @@ async def get_settings(
         settings.data = default_data
         db.commit()
         settings_data = PlatformSettingsData.model_validate(default_data)
+        # Suppress the original exception as we're handling it by resetting to defaults
+        del e
 
     return PlatformSettingsResponse(
         data=settings_data,
@@ -85,11 +87,11 @@ async def update_settings(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid settings data: {str(e)}",
-        )
+        ) from e
 
     # Update settings
     settings.data = validated_data.model_dump()
-    settings.updated_at = datetime.now(timezone.utc)
+    settings.updated_at = datetime.now(UTC)
     settings.updated_by_user_id = current_user.id
 
     try:
@@ -100,7 +102,7 @@ async def update_settings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update settings: {str(e)}",
-        )
+        ) from e
 
     return PlatformSettingsResponse(
         data=validated_data,

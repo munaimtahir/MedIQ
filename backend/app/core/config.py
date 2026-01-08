@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator  # type: ignore
+from pydantic import Field, model_validator  # type: ignore
 from pydantic_settings import BaseSettings, SettingsConfigDict  # type: ignore
 
 

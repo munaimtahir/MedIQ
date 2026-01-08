@@ -23,7 +23,7 @@ async def get_years(
     current_user: User = Depends(get_current_user),
 ) -> list[YearResponse]:
     """Get all active years ordered by order_no."""
-    years = db.query(Year).filter(Year.is_active == True).order_by(Year.order_no).all()
+    years = db.query(Year).filter(Year.is_active.is_(True)).order_by(Year.order_no).all()
     return [YearResponse.model_validate(year) for year in years]
 
 
@@ -45,11 +45,11 @@ async def get_blocks(
     # Try to find year by ID first (if year is numeric)
     year_obj = None
     if year.isdigit():
-        year_obj = db.query(Year).filter(Year.id == int(year), Year.is_active == True).first()
+        year_obj = db.query(Year).filter(Year.id == int(year), Year.is_active.is_(True)).first()
 
     # If not found by ID, try by name
     if not year_obj:
-        year_obj = db.query(Year).filter(Year.name == year, Year.is_active == True).first()
+        year_obj = db.query(Year).filter(Year.name == year, Year.is_active.is_(True)).first()
 
     if not year_obj:
         raise HTTPException(
@@ -59,7 +59,7 @@ async def get_blocks(
 
     blocks = (
         db.query(Block)
-        .filter(Block.year_id == year_obj.id, Block.is_active == True)
+        .filter(Block.year_id == year_obj.id, Block.is_active.is_(True))
         .order_by(Block.order_no)
         .all()
     )
@@ -80,7 +80,7 @@ async def get_themes(
 ) -> list[ThemeResponse]:
     """Get active themes for a block."""
     # Verify block exists and is active
-    block = db.query(Block).filter(Block.id == block_id, Block.is_active == True).first()
+    block = db.query(Block).filter(Block.id == block_id, Block.is_active.is_(True)).first()
     if not block:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -89,7 +89,7 @@ async def get_themes(
 
     themes = (
         db.query(Theme)
-        .filter(Theme.block_id == block_id, Theme.is_active == True)
+        .filter(Theme.block_id == block_id, Theme.is_active.is_(True))
         .order_by(Theme.order_no)
         .all()
     )

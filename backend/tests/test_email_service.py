@@ -3,9 +3,6 @@
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from app.core.config import settings
 from app.services.email.console import ConsoleEmailProvider
 from app.services.email.service import get_email_service, send_email
 from app.services.email.smtp import SMTPEmailProvider

@@ -1,7 +1,6 @@
 """Schemas for admin user management."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
@@ -16,7 +15,7 @@ class UserListItem(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -43,9 +42,9 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     """Schema for updating a user."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: Optional[str] = Field(None, pattern="^(STUDENT|ADMIN|REVIEWER)$")
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    role: str | None = Field(None, pattern="^(STUDENT|ADMIN|REVIEWER)$")
+    is_active: bool | None = None
 
 
 class UserResponse(BaseModel):
@@ -57,7 +56,7 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
 
     class Config:
         from_attributes = True

@@ -4,8 +4,8 @@
 import json
 import sys
 import time
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 BASE_URL = "http://localhost:8000/v1"
 
@@ -34,7 +34,7 @@ def make_request(method, path, data=None, headers=None):
         headers_dict = dict(e.headers.items()) if e.headers else {}
         try:
             body = json.loads(e.read().decode())
-        except:
+        except Exception:
             body = {"error": str(e)}
         return status, body, headers_dict
     except URLError as e:
@@ -48,9 +48,8 @@ def test_invalid_login_generic():
     # Test with correct email, wrong password
     test_email = f"test_{int(time.time())}@example.com"
     # First create the user
-    from urllib.request import Request, urlopen
-    from urllib.error import HTTPError
     import json
+    from urllib.request import Request, urlopen
 
     signup_data = {"name": "Test User", "email": test_email, "password": "CorrectPass123!"}
     try:
@@ -62,7 +61,7 @@ def test_invalid_login_generic():
         )
         with urlopen(req, timeout=10):
             pass  # User created
-    except:
+    except Exception:
         pass
 
     # Test 1: Wrong password for existing email
@@ -88,15 +87,15 @@ def test_invalid_login_generic():
             wrong_pass_code == fake_email_code or (wrong_pass_code and fake_email_code)
         ):
             print(f"   ✓ Both return same status: {wrong_pass_status}")
-            print(f"   ✓ Error codes are consistent (no account leak)")
+            print("   ✓ Error codes are consistent (no account leak)")
             return True
         else:
-            print(f"   ⚠ Status matches but codes differ - may leak account existence")
+            print("   ⚠ Status matches but codes differ - may leak account existence")
             print(f"   Wrong pass: {wrong_pass_status} / {wrong_pass_code}")
             print(f"   Fake email: {fake_email_status} / {fake_email_code}")
             return False
     else:
-        print(f"   ✗ Different status codes - leaks account existence!")
+        print("   ✗ Different status codes - leaks account existence!")
         print(f"   Wrong pass: {wrong_pass_status}")
         print(f"   Fake email: {fake_email_status}")
         return False
@@ -110,11 +109,10 @@ def test_rate_limiting():
 
     # Make multiple rapid login attempts with wrong password
     attempts = 0
-    rate_limited = False
     retry_after = None
     last_status = None
 
-    for i in range(15):  # Should hit rate limit before this
+    for _i in range(15):  # Should hit rate limit before this
         attempts += 1
         status, response, headers = make_request(
             "POST", "/auth/login", data={"email": test_email, "password": "WrongPass123!"}
@@ -122,11 +120,10 @@ def test_rate_limiting():
         last_status = status
 
         if status == 429:
-            rate_limited = True
             retry_after = headers.get("Retry-After") or headers.get("retry-after")
             error_code = response.get("error", {}).get("code", "")
             print(f"   ✓ Rate limited after {attempts} attempts")
-            print(f"   ✓ Status: 429")
+            print("   ✓ Status: 429")
             print(f"   ✓ Retry-After header: {retry_after}")
             print(f"   ✓ Error code: {error_code}")
 
@@ -156,7 +153,7 @@ def test_account_lockout():
     signup_data = {"name": "Lockout Test User", "email": test_email, "password": test_password}
     try:
         req = Request(
-            f"http://localhost:8000/v1/auth/signup",
+            "http://localhost:8000/v1/auth/signup",
             data=json.dumps(signup_data).encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -177,7 +174,7 @@ def test_account_lockout():
     attempts = 0
     lockout_attempt = None
 
-    for i in range(12):  # Need at least 9 attempts (8 failures + 1 lockout response)
+    for _i in range(12):  # Need at least 9 attempts (8 failures + 1 lockout response)
         attempts += 1
         status, response, headers = make_request(
             "POST", "/auth/login", data={"email": test_email, "password": "WrongPass123!"}
@@ -196,7 +193,7 @@ def test_account_lockout():
                 )
 
                 print(f"   ✓ Account locked after {attempts} attempts")
-                print(f"   ✓ Status: 403")
+                print("   ✓ Status: 403")
                 print(f"   ✓ Error code: {error_code}")
                 if lock_expires_in is not None:
                     print(f"   ✓ Lock expires in: {lock_expires_in} seconds")
@@ -216,7 +213,7 @@ def test_account_lockout():
     if not lockout_triggered:
         print(f"   ✗ Lockout not triggered after {attempts} attempts")
         print(f"   Last status: {status if 'status' in locals() else 'N/A'}")
-        print(f"   Expected: 403 with ACCOUNT_LOCKED code after 8 failed attempts")
+        print("   Expected: 403 with ACCOUNT_LOCKED code after 8 failed attempts")
         return False
 
     return lockout_triggered

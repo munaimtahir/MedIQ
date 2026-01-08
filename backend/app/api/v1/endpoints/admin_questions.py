@@ -1,7 +1,5 @@
 """Admin endpoints for managing questions."""
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -29,8 +27,8 @@ router = APIRouter(prefix="/admin/questions", tags=["Admin - Questions"])
 async def list_questions(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
-    published: Optional[bool] = Query(None, description="Filter by published status"),
-    theme_id: Optional[int] = Query(None, gt=0, description="Filter by theme ID"),
+    published: bool | None = Query(None, description="Filter by published status"),
+    theme_id: int | None = Query(None, gt=0, description="Filter by theme ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
 ) -> list[QuestionResponse]:
@@ -105,7 +103,7 @@ async def create_question(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create question: {str(e)}",
-        )
+        ) from e
 
     return QuestionResponse.model_validate(question)
 
@@ -190,7 +188,7 @@ async def update_question(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update question: {str(e)}",
-        )
+        ) from e
 
     return QuestionResponse.model_validate(question)
 
@@ -231,7 +229,7 @@ async def publish_question(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to publish question: {str(e)}",
-        )
+        ) from e
 
     return QuestionResponse.model_validate(question)
 
@@ -265,6 +263,6 @@ async def unpublish_question(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to unpublish question: {str(e)}",
-        )
+        ) from e
 
     return QuestionResponse.model_validate(question)

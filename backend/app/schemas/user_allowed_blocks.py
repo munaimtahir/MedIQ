@@ -5,8 +5,6 @@ These schemas are no longer used. The platform is now fully self-paced.
 Kept for backward compatibility only.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -15,7 +13,7 @@ class AllowedBlocksResponse(BaseModel):
 
     year_id: int
     allowed_block_ids: list[int] = Field(default_factory=list)
-    max_allowed_order_no: Optional[int] = None  # Highest order_no among allowed blocks
+    max_allowed_order_no: int | None = None  # Highest order_no among allowed blocks
 
     class Config:
         from_attributes = True

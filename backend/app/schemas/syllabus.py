@@ -1,10 +1,8 @@
 """Schemas for syllabus (Years, Blocks, Themes)."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Student Read Schemas
@@ -42,7 +40,7 @@ class ThemeResponse(BaseModel):
     block_id: int
     title: str
     order_no: int
-    description: Optional[str] = None
+    description: str | None = None
 
     class Config:
         from_attributes = True
@@ -70,9 +68,9 @@ class YearCreate(YearBase):
 class YearUpdate(BaseModel):
     """Schema for updating a year."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    order_no: Optional[int] = Field(None, ge=1)
-    is_active: Optional[bool] = None
+    name: str | None = Field(None, min_length=1, max_length=100)
+    order_no: int | None = Field(None, ge=1)
+    is_active: bool | None = None
 
 
 class YearAdminResponse(YearBase):
@@ -80,7 +78,7 @@ class YearAdminResponse(YearBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -105,11 +103,11 @@ class BlockCreate(BlockBase):
 class BlockUpdate(BaseModel):
     """Schema for updating a block."""
 
-    year_id: Optional[int] = None
-    code: Optional[str] = Field(None, min_length=1, max_length=50)
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    order_no: Optional[int] = Field(None, ge=1)
-    is_active: Optional[bool] = None
+    year_id: int | None = None
+    code: str | None = Field(None, min_length=1, max_length=50)
+    name: str | None = Field(None, min_length=1, max_length=100)
+    order_no: int | None = Field(None, ge=1)
+    is_active: bool | None = None
 
 
 class BlockAdminResponse(BlockBase):
@@ -117,7 +115,7 @@ class BlockAdminResponse(BlockBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -129,7 +127,7 @@ class ThemeBase(BaseModel):
     block_id: int
     title: str = Field(..., min_length=1, max_length=200)
     order_no: int = Field(..., ge=1)
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = Field(default=True)
 
 
@@ -142,11 +140,11 @@ class ThemeCreate(ThemeBase):
 class ThemeUpdate(BaseModel):
     """Schema for updating a theme."""
 
-    block_id: Optional[int] = None
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    order_no: Optional[int] = Field(None, ge=1)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    block_id: int | None = None
+    title: str | None = Field(None, min_length=1, max_length=200)
+    order_no: int | None = Field(None, ge=1)
+    description: str | None = None
+    is_active: bool | None = None
 
 
 class ThemeAdminResponse(ThemeBase):
@@ -154,7 +152,7 @@ class ThemeAdminResponse(ThemeBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True

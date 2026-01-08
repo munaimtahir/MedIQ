@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.dependencies import get_current_user, require_roles
+from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.academic import (
     AcademicBlock,
@@ -13,8 +13,7 @@ from app.models.academic import (
     UserProfile,
     UserSubject,
 )
-from app.models.syllabus import Block, Year
-from app.models.user import User, UserRole
+from app.models.user import User
 
 # UserAllowedBlock model deprecated - no longer used for restrictions
 from app.schemas.academic import (

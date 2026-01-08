@@ -1,7 +1,6 @@
 """Base email provider interface."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class EmailProvider(ABC):
@@ -13,7 +12,7 @@ class EmailProvider(ABC):
         to: str,
         subject: str,
         body_text: str,
-        body_html: Optional[str] = None,
+        body_html: str | None = None,
     ) -> None:
         """
         Send an email.

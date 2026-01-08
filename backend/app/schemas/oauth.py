@@ -1,7 +1,5 @@
 """OAuth schemas."""
 
-from typing import Any
-
 from pydantic import BaseModel
 
 from app.schemas.auth import TokensResponse, UserResponse

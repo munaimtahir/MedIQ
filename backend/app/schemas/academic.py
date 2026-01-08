@@ -1,11 +1,9 @@
 """Schemas for academic structure and onboarding."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
 
 # ============================================================================
 # Academic Structure Schemas
@@ -30,10 +28,10 @@ class AcademicBlockCreate(AcademicBlockBase):
 class AcademicBlockUpdate(BaseModel):
     """Schema for updating an academic block."""
 
-    code: Optional[str] = Field(None, min_length=1, max_length=50)
-    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    sort_order: Optional[int] = Field(None, ge=0)
-    is_active: Optional[bool] = None
+    code: str | None = Field(None, min_length=1, max_length=50)
+    display_name: str | None = Field(None, min_length=1, max_length=100)
+    sort_order: int | None = Field(None, ge=0)
+    is_active: bool | None = None
 
 
 class AcademicBlockResponse(AcademicBlockBase):
@@ -42,7 +40,7 @@ class AcademicBlockResponse(AcademicBlockBase):
     id: int
     year_id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -51,7 +49,7 @@ class AcademicBlockResponse(AcademicBlockBase):
 class AcademicSubjectBase(BaseModel):
     """Base schema for academic subject."""
 
-    code: Optional[str] = Field(None, max_length=50)
+    code: str | None = Field(None, max_length=50)
     display_name: str = Field(..., min_length=1, max_length=100)
     sort_order: int = Field(default=0, ge=0)
     is_active: bool = Field(default=True)
@@ -66,10 +64,10 @@ class AcademicSubjectCreate(AcademicSubjectBase):
 class AcademicSubjectUpdate(BaseModel):
     """Schema for updating an academic subject."""
 
-    code: Optional[str] = Field(None, max_length=50)
-    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    sort_order: Optional[int] = Field(None, ge=0)
-    is_active: Optional[bool] = None
+    code: str | None = Field(None, max_length=50)
+    display_name: str | None = Field(None, min_length=1, max_length=100)
+    sort_order: int | None = Field(None, ge=0)
+    is_active: bool | None = None
 
 
 class AcademicSubjectResponse(AcademicSubjectBase):
@@ -78,7 +76,7 @@ class AcademicSubjectResponse(AcademicSubjectBase):
     id: int
     year_id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -102,10 +100,10 @@ class AcademicYearCreate(AcademicYearBase):
 class AcademicYearUpdate(BaseModel):
     """Schema for updating an academic year."""
 
-    slug: Optional[str] = Field(None, min_length=1, max_length=50)
-    display_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    sort_order: Optional[int] = Field(None, ge=0)
-    is_active: Optional[bool] = None
+    slug: str | None = Field(None, min_length=1, max_length=50)
+    display_name: str | None = Field(None, min_length=1, max_length=100)
+    sort_order: int | None = Field(None, ge=0)
+    is_active: bool | None = None
 
 
 class AcademicYearResponse(AcademicYearBase):
@@ -113,7 +111,7 @@ class AcademicYearResponse(AcademicYearBase):
 
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -146,7 +144,7 @@ class OnboardingSubjectOption(BaseModel):
     """Subject option for onboarding."""
 
     id: int
-    code: Optional[str]
+    code: str | None
     display_name: str
 
     class Config:
@@ -174,7 +172,7 @@ class OnboardingRequest(BaseModel):
 
     year_id: int
     block_ids: list[int] = Field(..., min_length=1)
-    subject_ids: Optional[list[int]] = None
+    subject_ids: list[int] | None = None
 
 
 class OnboardingStatusResponse(BaseModel):
@@ -204,7 +202,7 @@ class UserProfileSubjectResponse(BaseModel):
     """Subject in user profile response."""
 
     id: int
-    code: Optional[str]
+    code: str | None
     display_name: str
 
     class Config:
@@ -227,11 +225,11 @@ class UserProfileResponse(BaseModel):
 
     user_id: UUID
     onboarding_completed: bool
-    selected_year: Optional[UserProfileYearResponse] = None
+    selected_year: UserProfileYearResponse | None = None
     selected_blocks: list[UserProfileBlockResponse] = []
     selected_subjects: list[UserProfileSubjectResponse] = []
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 # ============================================================================

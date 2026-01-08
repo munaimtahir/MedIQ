@@ -1,8 +1,9 @@
 """Notification endpoints for students."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
@@ -67,7 +68,7 @@ async def mark_all_read(
     """
     Mark all unread notifications for the current user as read.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     updated = (
         db.query(Notification)

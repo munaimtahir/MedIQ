@@ -25,7 +25,7 @@ from app.db.session import get_db
 from app.models.auth import RefreshToken
 from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginResponse, TokensResponse, UserResponse
+from app.schemas.auth import TokensResponse, UserResponse
 from app.schemas.oauth import (
     OAuthExchangeRequest,
     OAuthExchangeResponse,

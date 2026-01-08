@@ -14,6 +14,7 @@ from app.core.abuse_protection import (
 from app.core.app_exceptions import raise_app_error
 from app.core.config import settings
 from app.core.dependencies import get_current_user, require_roles
+from app.core.logging import get_logger
 from app.core.rate_limit import get_client_ip
 from app.core.rate_limit_deps import (
     require_rate_limit_login_email,
@@ -32,14 +33,13 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
-from app.core.logging import get_logger
 from app.core.security_logging import log_security_event
 from app.db.session import get_db
-
-logger = get_logger(__name__)
 from app.models.auth import EmailVerificationToken, PasswordResetToken, RefreshToken
 from app.models.oauth import OAuthIdentity
 from app.models.user import User, UserRole
+
+logger = get_logger(__name__)
 from app.schemas.auth import (
     EmailVerificationRequest,
     LoginRequest,

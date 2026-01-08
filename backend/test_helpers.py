@@ -7,7 +7,6 @@ Provides retry logic, health checks, and Docker network awareness.
 import json
 import os
 import socket
-import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -20,7 +19,7 @@ def is_running_in_docker() -> bool:
         return True
     # Check cgroup (Linux containers)
     try:
-        with open("/proc/1/cgroup", "r") as f:
+        with open("/proc/1/cgroup") as f:
             return "docker" in f.read()
     except (FileNotFoundError, PermissionError):
         pass

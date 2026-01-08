@@ -1,8 +1,5 @@
 """Notification schemas."""
 
-from datetime import datetime
-from typing import Optional
-
 from pydantic import BaseModel
 
 
@@ -14,7 +11,7 @@ class NotificationResponse(BaseModel):
     title: str
     body: str
     created_at: str  # ISO timestamp
-    read_at: Optional[str] = None  # ISO timestamp or null
+    read_at: str | None = None  # ISO timestamp or null
 
     class Config:
         from_attributes = True

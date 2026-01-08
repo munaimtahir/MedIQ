@@ -1,7 +1,5 @@
 """Console email provider (fallback for local dev)."""
 
-from typing import Optional
-
 from app.core.logging import get_logger
 from app.services.email.base import EmailProvider
 
@@ -16,7 +14,7 @@ class ConsoleEmailProvider(EmailProvider):
         to: str,
         subject: str,
         body_text: str,
-        body_html: Optional[str] = None,
+        body_html: str | None = None,
     ) -> None:
         """Log email to console."""
         logger.info(

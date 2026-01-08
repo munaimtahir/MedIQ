@@ -1,7 +1,5 @@
 """Academic structure models for student onboarding."""
 
-import uuid
-
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship

@@ -1,7 +1,6 @@
 """Admin user management endpoints."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,7 +8,11 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_roles
-from app.core.security import generate_password_reset_token, hash_password
+from app.core.security import (
+    generate_password_reset_token,
+    hash_password,
+    hash_token,
+)
 from app.db.session import get_db
 from app.models.auth import PasswordResetToken
 from app.models.user import User, UserRole
@@ -18,8 +21,8 @@ from app.schemas.admin_users import (
     UserCreate,
     UserListItem,
     UserResponse,
-    UserUpdate,
     UsersListResponse,
+    UserUpdate,
 )
 
 router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
@@ -32,9 +35,9 @@ router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
     description="Get paginated list of users with optional search and filters.",
 )
 async def list_users(
-    q: Optional[str] = Query(None, description="Search by name or email"),
-    role: Optional[str] = Query(None, description="Filter by role"),
-    status: Optional[str] = Query(None, description="Filter by status: active|disabled"),
+    q: str | None = Query(None, description="Search by name or email"),
+    role: str | None = Query(None, description="Filter by role"),
+    status: str | None = Query(None, description="Filter by status: active|disabled"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
@@ -58,18 +61,18 @@ async def list_users(
         try:
             role_enum = UserRole(role)
             query = query.filter(User.role == role_enum.value)
-        except ValueError:
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid role: {role}",
-            )
+            ) from e
 
     # Status filter
     if status:
         if status == "active":
-            query = query.filter(User.is_active == True)
+            query = query.filter(User.is_active.is_(True))
         elif status == "disabled":
-            query = query.filter(User.is_active == False)
+            query = query.filter(User.is_active.is_(False))
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -117,11 +120,11 @@ async def create_user(
     # Validate role
     try:
         role_enum = UserRole(request.role)
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid role: {request.role}",
-        )
+        ) from e
 
     # Create user with temporary unusable password
     # User will need to reset password via email
@@ -171,11 +174,11 @@ async def update_user(
             try:
                 role_enum = UserRole(value)
                 setattr(user, field, role_enum.value)
-            except ValueError:
+            except ValueError as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid role: {value}",
-                )
+                ) from e
         else:
             setattr(user, field, value)
 

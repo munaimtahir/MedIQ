@@ -7,7 +7,6 @@ from pathlib import Path
 # Add parent directory to path to import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.db.session import SessionLocal
@@ -30,9 +29,9 @@ def create_admin_user(
             logger.warning(f"User with email {email} already exists.")
             if existing_user.role == UserRole.ADMIN.value:
                 logger.info(f"Admin user already exists: {email}")
-                print(f"\n✓ Admin user already exists!")
+                print("\n✓ Admin user already exists!")
                 print(f"  Email: {email}")
-                print(f"  Password: (use existing password)")
+                print("  Password: (use existing password)")
                 return
             else:
                 # Update existing user to admin
@@ -44,7 +43,7 @@ def create_admin_user(
                 existing_user.onboarding_completed = True
                 db.commit()
                 logger.info(f"Updated user {email} to admin role")
-                print(f"\n✓ Updated user to admin!")
+                print("\n✓ Updated user to admin!")
                 print(f"  Email: {email}")
                 print(f"  Password: {password}")
                 return
@@ -62,11 +61,11 @@ def create_admin_user(
         db.add(admin)
         db.commit()
         logger.info(f"Created admin user: {email}")
-        print(f"\n✓ Admin user created successfully!")
+        print("\n✓ Admin user created successfully!")
         print(f"  Email: {email}")
         print(f"  Password: {password}")
         print(f"  Name: {name}")
-        print(f"\nYou can now log in with these credentials.")
+        print("\nYou can now log in with these credentials.")
 
     except Exception as e:
         db.rollback()

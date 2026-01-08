@@ -1,14 +1,14 @@
 """add_academic_structure_and_onboarding_tables
 
 Revision ID: 5b8663bb123c
-Revises: 
+Revises:
 Create Date: 2026-01-01 11:02:08.637571
 
 """
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "5b8663bb123c"

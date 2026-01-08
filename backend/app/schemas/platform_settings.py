@@ -1,7 +1,5 @@
 """Schemas for platform settings."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -18,7 +16,7 @@ class GeneralSettings(BaseModel):
 class AcademicDefaults(BaseModel):
     """Academic default settings."""
 
-    default_year_id: Optional[int] = None
+    default_year_id: int | None = None
     blocks_visibility_mode: str = Field(default="user_selected")  # user_selected | all
 
 
@@ -64,8 +62,8 @@ class PlatformSettingsResponse(BaseModel):
     """Response schema for platform settings."""
 
     data: PlatformSettingsData
-    updated_at: Optional[str] = None
-    updated_by_user_id: Optional[int] = None
+    updated_at: str | None = None
+    updated_by_user_id: int | None = None
 
 
 class PlatformSettingsUpdate(BaseModel):

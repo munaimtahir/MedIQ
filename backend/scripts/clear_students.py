@@ -17,8 +17,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import text
-from app.db.session import SessionLocal
+
 from app.core.logging import get_logger
+from app.db.session import SessionLocal
 
 logger = get_logger(__name__)
 

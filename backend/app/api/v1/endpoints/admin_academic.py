@@ -129,12 +129,12 @@ async def create_academic_year(
         db.add(year)
         db.commit()
         db.refresh(year)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Academic year with slug '{request.slug}' already exists",
-        )
+        ) from e
 
     return AcademicYearResponse.model_validate(year)
 
@@ -167,12 +167,12 @@ async def update_academic_year(
     try:
         db.commit()
         db.refresh(year)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Academic year with slug '{request.slug}' already exists",
-        )
+        ) from e
 
     return AcademicYearResponse.model_validate(year)
 
@@ -215,12 +215,12 @@ async def create_academic_block(
         db.add(block)
         db.commit()
         db.refresh(block)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
-        )
+        ) from e
 
     return AcademicBlockResponse.model_validate(block)
 
@@ -253,12 +253,12 @@ async def update_academic_block(
     try:
         db.commit()
         db.refresh(block)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
-        )
+        ) from e
 
     return AcademicBlockResponse.model_validate(block)
 
@@ -301,12 +301,12 @@ async def create_academic_subject(
         db.add(subject)
         db.commit()
         db.refresh(subject)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Subject '{request.display_name}' already exists in this year",
-        )
+        ) from e
 
     return AcademicSubjectResponse.model_validate(subject)
 
@@ -339,12 +339,12 @@ async def update_academic_subject(
     try:
         db.commit()
         db.refresh(subject)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Subject '{request.display_name}' already exists in this year",
-        )
+        ) from e
 
     return AcademicSubjectResponse.model_validate(subject)
 

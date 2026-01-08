@@ -1,7 +1,5 @@
 """Email service factory and main service."""
 
-from typing import Optional
-
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.services.email.base import EmailProvider
@@ -11,7 +9,7 @@ from app.services.email.smtp import SMTPEmailProvider
 logger = get_logger(__name__)
 
 # Global email service instance
-_email_service: Optional[EmailProvider] = None
+_email_service: EmailProvider | None = None
 
 
 def get_email_service() -> EmailProvider:
@@ -54,7 +52,7 @@ def send_email(
     to: str,
     subject: str,
     body_text: str,
-    body_html: Optional[str] = None,
+    body_html: str | None = None,
 ) -> None:
     """
     Send an email using the configured email service.

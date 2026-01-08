@@ -4,8 +4,8 @@
 import json
 import sys
 import time
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 BASE_URL = "http://localhost:8000/v1"
 
@@ -32,7 +32,7 @@ def make_request(method, path, data=None, headers=None):
         status = e.code
         try:
             body = json.loads(e.read().decode())
-        except:
+        except Exception:
             body = {"error": str(e)}
         return status, body
     except URLError as e:
@@ -56,7 +56,7 @@ def test_ready():
     print("\n2. Testing /v1/ready...")
     status, data = make_request("GET", "/ready")
     if status == 200:
-        print(f"   ✓ Ready check passed")
+        print("   ✓ Ready check passed")
         print(f"   Status: {data.get('status')}")
         print(f"   Checks: {data.get('checks', {})}")
         print(f"   Request ID: {data.get('request_id', 'N/A')}")
@@ -73,11 +73,11 @@ def test_signup():
     data = {"name": "Test User", "email": test_email, "password": "TestPass123!"}
     status, response = make_request("POST", "/auth/signup", data=data)
     if status == 201:
-        print(f"   ✓ Signup passed")
+        print("   ✓ Signup passed")
         print(f"   User ID: {response.get('user', {}).get('id', 'N/A')}")
         print(f"   Email: {response.get('user', {}).get('email', 'N/A')}")
         if "tokens" in response:
-            print(f"   ✓ Tokens returned (access_token and refresh_token present)")
+            print("   ✓ Tokens returned (access_token and refresh_token present)")
         return True, test_email, response.get("tokens", {})
     else:
         print(f"   ✗ Signup failed: {status} - {response}")
@@ -86,18 +86,18 @@ def test_signup():
 
 def test_login(email, password="TestPass123!"):
     """Test login endpoint."""
-    print(f"\n4. Testing /v1/auth/login...")
+    print("\n4. Testing /v1/auth/login...")
     data = {"email": email, "password": password}
     status, response = make_request("POST", "/auth/login", data=data)
     if status == 200:
-        print(f"   ✓ Login passed")
+        print("   ✓ Login passed")
         if "tokens" in response:
             tokens = response["tokens"]
             print(f"   ✓ Access token: {tokens.get('access_token', 'N/A')[:20]}...")
             print(f"   ✓ Refresh token: {tokens.get('refresh_token', 'N/A')[:20]}...")
             return True, tokens
         else:
-            print(f"   ⚠ No tokens in response")
+            print("   ⚠ No tokens in response")
             return True, None
     else:
         print(f"   ✗ Login failed: {status} - {response}")
@@ -106,11 +106,11 @@ def test_login(email, password="TestPass123!"):
 
 def test_me(access_token):
     """Test /me endpoint."""
-    print(f"\n5. Testing /v1/auth/me...")
+    print("\n5. Testing /v1/auth/me...")
     headers = {"Authorization": f"Bearer {access_token}"}
     status, response = make_request("GET", "/auth/me", headers=headers)
     if status == 200:
-        print(f"   ✓ /me passed")
+        print("   ✓ /me passed")
         print(f"   User: {response.get('user', {}).get('email', 'N/A')}")
         return True, response.get("user")
     else:
@@ -120,15 +120,15 @@ def test_me(access_token):
 
 def test_refresh(refresh_token):
     """Test refresh token endpoint."""
-    print(f"\n6. Testing /v1/auth/refresh...")
+    print("\n6. Testing /v1/auth/refresh...")
     data = {"refresh_token": refresh_token}
     status, response = make_request("POST", "/auth/refresh", data=data)
     if status == 200:
-        print(f"   ✓ Refresh passed")
+        print("   ✓ Refresh passed")
         if "tokens" in response:
             new_tokens = response["tokens"]
-            print(f"   ✓ New access token received")
-            print(f"   ✓ New refresh token received (rotation)")
+            print("   ✓ New access token received")
+            print("   ✓ New refresh token received (rotation)")
             return True, new_tokens
         return True, None
     else:
@@ -138,11 +138,11 @@ def test_refresh(refresh_token):
 
 def test_logout(refresh_token):
     """Test logout endpoint."""
-    print(f"\n7. Testing /v1/auth/logout...")
+    print("\n7. Testing /v1/auth/logout...")
     data = {"refresh_token": refresh_token}
     status, response = make_request("POST", "/auth/logout", data=data)
     if status == 200:
-        print(f"   ✓ Logout passed")
+        print("   ✓ Logout passed")
         return True
     else:
         print(f"   ✗ Logout failed: {status} - {response}")
@@ -204,26 +204,27 @@ def main():
         results.append(("Logout", False))
 
     # Test RBAC - admin endpoint (as student - should fail)
-    print(f"\n8. Testing RBAC - /v1/auth/admin/_rbac_smoke (STUDENT token - should fail)...")
+    print("\n8. Testing RBAC - /v1/auth/admin/_rbac_smoke (STUDENT token - should fail)...")
     if access_token:
         rbac_student_ok = False
         status, response = make_request(
             "GET", "/auth/admin/_rbac_smoke", headers={"Authorization": f"Bearer {access_token}"}
         )
         if status == 403:
-            print(f"   ✓ Correctly rejected STUDENT token with 403")
+            print("   ✓ Correctly rejected STUDENT token with 403")
             rbac_student_ok = True
         else:
             print(f"   ✗ Unexpected response: {status} - {response}")
         results.append(("RBAC Student", rbac_student_ok))
 
     # Test RBAC - create admin user via DB and test
-    print(f"\n9. Testing RBAC - /v1/auth/admin/_rbac_smoke (ADMIN token - should pass)...")
+    print("\n9. Testing RBAC - /v1/auth/admin/_rbac_smoke (ADMIN token - should pass)...")
     try:
+        import uuid
+
+        from app.core.security import hash_password
         from app.db.session import SessionLocal
         from app.models.user import User, UserRole
-        from app.core.security import hash_password
-        import uuid
 
         admin_email = f"admin_{int(time.time())}@example.com"
         admin_password = "AdminPass123!"
@@ -253,13 +254,13 @@ def main():
                     headers={"Authorization": f"Bearer {admin_access_token}"},
                 )
                 if status == 200:
-                    print(f"   ✓ ADMIN token accepted")
+                    print("   ✓ ADMIN token accepted")
                     results.append(("RBAC Admin", True))
                 else:
                     print(f"   ✗ ADMIN token rejected: {status} - {response}")
                     results.append(("RBAC Admin", False))
             else:
-                print(f"   ✗ Failed to login as admin")
+                print("   ✗ Failed to login as admin")
                 results.append(("RBAC Admin", False))
         finally:
             db.close()

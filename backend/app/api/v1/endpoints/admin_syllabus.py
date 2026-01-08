@@ -2,7 +2,6 @@
 
 import csv
 import io
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import IntegrityError
@@ -94,12 +93,12 @@ async def create_year(
         db.add(year)
         db.commit()
         db.refresh(year)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Year with name '{request.name}' already exists",
-        )
+        ) from e
 
     return YearAdminResponse.model_validate(year)
 
@@ -131,12 +130,12 @@ async def update_year(
     try:
         db.commit()
         db.refresh(year)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Year with name '{request.name}' already exists",
-        )
+        ) from e
 
     return YearAdminResponse.model_validate(year)
 
@@ -256,12 +255,12 @@ async def create_block(
         db.add(block)
         db.commit()
         db.refresh(block)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
-        )
+        ) from e
 
     return BlockAdminResponse.model_validate(block)
 
@@ -302,12 +301,12 @@ async def update_block(
     try:
         db.commit()
         db.refresh(block)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
-        )
+        ) from e
 
     return BlockAdminResponse.model_validate(block)
 
@@ -430,7 +429,7 @@ async def create_theme(
         db.add(theme)
         db.commit()
         db.refresh(theme)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         # Check if it's a duplicate title
         existing = (
@@ -442,11 +441,11 @@ async def create_theme(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Theme with title '{normalized_title}' already exists in this block",
-            )
+            ) from e
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Failed to create theme",
-        )
+        ) from e
 
     return ThemeAdminResponse.model_validate(theme)
 
@@ -491,12 +490,12 @@ async def update_theme(
     try:
         db.commit()
         db.refresh(theme)
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Theme with title '{request.title}' already exists in this block",
-        )
+        ) from e
 
     return ThemeAdminResponse.model_validate(theme)
 
@@ -579,7 +578,9 @@ async def reorder_blocks(
         )
 
     # Get all active blocks for this year
-    active_blocks = db.query(Block).filter(Block.year_id == year_id, Block.is_active == True).all()
+    active_blocks = (
+        db.query(Block).filter(Block.year_id == year_id, Block.is_active.is_(True)).all()
+    )
 
     active_block_ids = {b.id for b in active_blocks}
     requested_ids = set(request.ordered_block_ids)
@@ -606,7 +607,7 @@ async def reorder_blocks(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reorder blocks: {str(e)}",
-        )
+        ) from e
 
     return {"message": "Blocks reordered successfully"}
 
@@ -633,7 +634,7 @@ async def reorder_themes(
 
     # Get all active themes for this block
     active_themes = (
-        db.query(Theme).filter(Theme.block_id == block_id, Theme.is_active == True).all()
+        db.query(Theme).filter(Theme.block_id == block_id, Theme.is_active.is_(True)).all()
     )
 
     active_theme_ids = {t.id for t in active_themes}
@@ -661,7 +662,7 @@ async def reorder_themes(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reorder themes: {str(e)}",
-        )
+        ) from e
 
     return {"message": "Themes reordered successfully"}
 
