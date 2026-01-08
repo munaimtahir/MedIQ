@@ -9,7 +9,7 @@ interface BlockOverviewCardProps {
   isAllowed?: boolean; // Deprecated - always true now
 }
 
-export function BlockOverviewCard({ block, themeCount, isAllowed }: BlockOverviewCardProps) {
+export function BlockOverviewCard({ block: _block, themeCount, isAllowed: _isAllowed }: BlockOverviewCardProps) {
   return (
     <Card>
       <CardHeader>

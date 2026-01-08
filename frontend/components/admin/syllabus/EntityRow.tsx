@@ -20,7 +20,7 @@ interface EntityRowProps {
 }
 
 export function EntityRow({
-  id: _id,
+  id: _id, // eslint-disable-line @typescript-eslint/no-unused-vars
   title,
   subtitle,
   isActive,

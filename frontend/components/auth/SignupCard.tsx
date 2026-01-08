@@ -91,7 +91,6 @@ export function SignupCard() {
       }
 
       if (result.data?.user) {
-        const user = result.data.user as User;
         notify.success("Account created", "Welcome! Let's set up your profile.");
 
         // Get full user details
@@ -108,9 +107,10 @@ export function SignupCard() {
           router.push("/onboarding");
         }
       }
-    } catch (error: any) {
-      setErrors({ general: error.message || "An error occurred. Please try again." });
-      notify.error("Signup failed", error.message || "An error occurred");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
+      setErrors({ general: errorMessage });
+      notify.error("Signup failed", errorMessage);
     } finally {
       setLoading(false);
     }

@@ -17,7 +17,7 @@ interface BlockCardProps {
   loading?: boolean;
 }
 
-export function BlockCard({ block, isAllowed, loading }: BlockCardProps) {
+export function BlockCard({ block, isAllowed: _isAllowed, loading }: BlockCardProps) {
   const router = useRouter();
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(false);

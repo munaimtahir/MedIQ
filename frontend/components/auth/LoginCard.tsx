@@ -100,9 +100,10 @@ function LoginCardContent() {
           router.push("/student/dashboard");
         }
       }
-    } catch (error: any) {
-      setErrors({ general: error.message || "An error occurred. Please try again." });
-      notify.error("Login failed", error.message || "An error occurred");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred. Please try again.";
+      setErrors({ general: errorMessage });
+      notify.error("Login failed", errorMessage);
     } finally {
       setLoading(false);
     }

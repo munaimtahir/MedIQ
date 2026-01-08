@@ -38,8 +38,9 @@ export function StudentSidebar() {
       await authClient.logout();
       notify.success("Logged out", "You have been logged out successfully.");
       router.push("/login");
-    } catch (error: any) {
-      notify.error("Logout failed", error.message || "An error occurred");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
+      notify.error("Logout failed", errorMessage);
     }
   };
 
