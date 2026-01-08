@@ -33,9 +33,7 @@ async def get_dashboard_summary(
 
     # Question counts (if available)
     published_count = (
-        db.query(func.count(Question.id))
-        .filter(Question.is_published == True)
-        .scalar() or 0
+        db.query(func.count(Question.id)).filter(Question.is_published == True).scalar() or 0
     )
     # In review and draft counts can be added when those statuses are implemented
     in_review_count = None

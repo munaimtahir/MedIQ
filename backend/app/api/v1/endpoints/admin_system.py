@@ -30,12 +30,12 @@ async def get_system_info(
         db_connected = True
     except Exception:
         pass
-    
+
     # Check Redis
     redis_connected = False
     if settings.REDIS_ENABLED:
         redis_connected = is_redis_available()
-    
+
     return {
         "environment": settings.ENVIRONMENT if hasattr(settings, "ENVIRONMENT") else "development",
         "api_version": "v1",

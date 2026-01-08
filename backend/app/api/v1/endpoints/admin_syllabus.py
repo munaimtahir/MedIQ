@@ -46,7 +46,7 @@ async def seed_syllabus_structure_endpoint(
 ) -> dict:
     """Seed the syllabus structure with default years and blocks."""
     from app.core.seed_syllabus import seed_syllabus_structure
-    
+
     result = seed_syllabus_structure(db)
     return result
 
@@ -89,7 +89,7 @@ async def create_year(
         order_no=request.order_no,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(year)
         db.commit()
@@ -100,7 +100,7 @@ async def create_year(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Year with name '{request.name}' already exists",
         )
-    
+
     return YearAdminResponse.model_validate(year)
 
 
@@ -123,11 +123,11 @@ async def update_year(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
+
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(year, field, value)
-    
+
     try:
         db.commit()
         db.refresh(year)
@@ -137,7 +137,7 @@ async def update_year(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Year with name '{request.name}' already exists",
         )
-    
+
     return YearAdminResponse.model_validate(year)
 
 
@@ -159,11 +159,11 @@ async def disable_year(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
+
     year.is_active = False
     db.commit()
     db.refresh(year)
-    
+
     return YearAdminResponse.model_validate(year)
 
 
@@ -185,11 +185,11 @@ async def enable_year(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
+
     year.is_active = True
     db.commit()
     db.refresh(year)
-    
+
     return YearAdminResponse.model_validate(year)
 
 
@@ -217,14 +217,9 @@ async def get_blocks_for_year(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
-    blocks = (
-        db.query(Block)
-        .filter(Block.year_id == year_id)
-        .order_by(Block.order_no)
-        .all()
-    )
-    
+
+    blocks = db.query(Block).filter(Block.year_id == year_id).order_by(Block.order_no).all()
+
     return [BlockAdminResponse.model_validate(block) for block in blocks]
 
 
@@ -248,7 +243,7 @@ async def create_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
+
     block = Block(
         year_id=request.year_id,
         code=request.code,
@@ -256,7 +251,7 @@ async def create_block(
         order_no=request.order_no,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(block)
         db.commit()
@@ -267,7 +262,7 @@ async def create_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
         )
-    
+
     return BlockAdminResponse.model_validate(block)
 
 
@@ -290,7 +285,7 @@ async def update_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
+
     # If year_id is being updated, verify new year exists
     if request.year_id is not None and request.year_id != block.year_id:
         year = db.query(Year).filter(Year.id == request.year_id).first()
@@ -299,11 +294,11 @@ async def update_block(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Year not found",
             )
-    
+
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(block, field, value)
-    
+
     try:
         db.commit()
         db.refresh(block)
@@ -313,7 +308,7 @@ async def update_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
         )
-    
+
     return BlockAdminResponse.model_validate(block)
 
 
@@ -335,11 +330,11 @@ async def disable_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
+
     block.is_active = False
     db.commit()
     db.refresh(block)
-    
+
     return BlockAdminResponse.model_validate(block)
 
 
@@ -361,11 +356,11 @@ async def enable_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
+
     block.is_active = True
     db.commit()
     db.refresh(block)
-    
+
     return BlockAdminResponse.model_validate(block)
 
 
@@ -393,14 +388,9 @@ async def get_themes_for_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
-    themes = (
-        db.query(Theme)
-        .filter(Theme.block_id == block_id)
-        .order_by(Theme.order_no)
-        .all()
-    )
-    
+
+    themes = db.query(Theme).filter(Theme.block_id == block_id).order_by(Theme.order_no).all()
+
     return [ThemeAdminResponse.model_validate(theme) for theme in themes]
 
 
@@ -424,10 +414,10 @@ async def create_theme(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
+
     # Normalize title (trim whitespace, case-insensitive check)
     normalized_title = request.title.strip()
-    
+
     theme = Theme(
         block_id=request.block_id,
         title=normalized_title,
@@ -435,7 +425,7 @@ async def create_theme(
         description=request.description,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(theme)
         db.commit()
@@ -443,10 +433,11 @@ async def create_theme(
     except IntegrityError:
         db.rollback()
         # Check if it's a duplicate title
-        existing = db.query(Theme).filter(
-            Theme.block_id == request.block_id,
-            Theme.title.ilike(normalized_title)
-        ).first()
+        existing = (
+            db.query(Theme)
+            .filter(Theme.block_id == request.block_id, Theme.title.ilike(normalized_title))
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -456,7 +447,7 @@ async def create_theme(
             status_code=status.HTTP_409_CONFLICT,
             detail="Failed to create theme",
         )
-    
+
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -479,7 +470,7 @@ async def update_theme(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Theme not found",
         )
-    
+
     # If block_id is being updated, verify new block exists
     if request.block_id is not None and request.block_id != theme.block_id:
         block = db.query(Block).filter(Block.id == request.block_id).first()
@@ -488,15 +479,15 @@ async def update_theme(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Block not found",
             )
-    
+
     update_data = request.model_dump(exclude_unset=True)
     # Normalize title if provided
     if "title" in update_data and update_data["title"]:
         update_data["title"] = update_data["title"].strip()
-    
+
     for field, value in update_data.items():
         setattr(theme, field, value)
-    
+
     try:
         db.commit()
         db.refresh(theme)
@@ -506,7 +497,7 @@ async def update_theme(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Theme with title '{request.title}' already exists in this block",
         )
-    
+
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -528,11 +519,11 @@ async def disable_theme(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Theme not found",
         )
-    
+
     theme.is_active = False
     db.commit()
     db.refresh(theme)
-    
+
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -554,11 +545,11 @@ async def enable_theme(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Theme not found",
         )
-    
+
     theme.is_active = True
     db.commit()
     db.refresh(theme)
-    
+
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -586,32 +577,29 @@ async def reorder_blocks(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Year not found",
         )
-    
+
     # Get all active blocks for this year
-    active_blocks = db.query(Block).filter(
-        Block.year_id == year_id,
-        Block.is_active == True
-    ).all()
-    
+    active_blocks = db.query(Block).filter(Block.year_id == year_id, Block.is_active == True).all()
+
     active_block_ids = {b.id for b in active_blocks}
     requested_ids = set(request.ordered_block_ids)
-    
+
     # Verify all requested IDs exist and are active
     if requested_ids != active_block_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="ordered_block_ids must contain exactly all active block IDs for this year",
         )
-    
+
     # Create a mapping of block_id -> order_no
     block_map = {b.id: b for b in active_blocks}
-    
+
     # Update order_no in a single transaction
     try:
         for order_no, block_id in enumerate(request.ordered_block_ids, start=1):
             block = block_map[block_id]
             block.order_no = order_no
-        
+
         db.commit()
     except Exception as e:
         db.rollback()
@@ -619,7 +607,7 @@ async def reorder_blocks(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reorder blocks: {str(e)}",
         )
-    
+
     return {"message": "Blocks reordered successfully"}
 
 
@@ -642,32 +630,31 @@ async def reorder_themes(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Block not found",
         )
-    
+
     # Get all active themes for this block
-    active_themes = db.query(Theme).filter(
-        Theme.block_id == block_id,
-        Theme.is_active == True
-    ).all()
-    
+    active_themes = (
+        db.query(Theme).filter(Theme.block_id == block_id, Theme.is_active == True).all()
+    )
+
     active_theme_ids = {t.id for t in active_themes}
     requested_ids = set(request.ordered_theme_ids)
-    
+
     # Verify all requested IDs exist and are active
     if requested_ids != active_theme_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="ordered_theme_ids must contain exactly all active theme IDs for this block",
         )
-    
+
     # Create a mapping of theme_id -> order_no
     theme_map = {t.id: t for t in active_themes}
-    
+
     # Update order_no in a single transaction
     try:
         for order_no, theme_id in enumerate(request.ordered_theme_ids, start=1):
             theme = theme_map[theme_id]
             theme.order_no = order_no
-        
+
         db.commit()
     except Exception as e:
         db.rollback()
@@ -675,7 +662,7 @@ async def reorder_themes(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reorder themes: {str(e)}",
         )
-    
+
     return {"message": "Themes reordered successfully"}
 
 
@@ -697,7 +684,7 @@ async def download_years_template(
     writer = csv.writer(output)
     writer.writerow(["year_name", "order_no", "is_active"])
     writer.writerow(["1st Year", "1", "true"])
-    
+
     return {
         "content": output.getvalue(),
         "filename": "years_template.csv",
@@ -718,7 +705,7 @@ async def download_blocks_template(
     writer = csv.writer(output)
     writer.writerow(["year_name", "block_code", "block_name", "order_no", "is_active"])
     writer.writerow(["1st Year", "A", "Block A", "1", "true"])
-    
+
     return {
         "content": output.getvalue(),
         "filename": "blocks_template.csv",
@@ -737,9 +724,20 @@ async def download_themes_template(
     """Download CSV template for themes."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["year_name", "block_code", "theme_title", "order_no", "description", "is_active"])
-    writer.writerow(["1st Year", "A", "Cardiovascular System", "1", "Introduction to cardiovascular anatomy", "true"])
-    
+    writer.writerow(
+        ["year_name", "block_code", "theme_title", "order_no", "description", "is_active"]
+    )
+    writer.writerow(
+        [
+            "1st Year",
+            "A",
+            "Cardiovascular System",
+            "1",
+            "Introduction to cardiovascular anatomy",
+            "true",
+        ]
+    )
+
     return {
         "content": output.getvalue(),
         "filename": "themes_template.csv",
@@ -771,37 +769,41 @@ def _import_years(
     created = 0
     updated = 0
     errors = []
-    
+
     for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
         try:
             year_name = row.get("year_name", "").strip()
             order_no_str = row.get("order_no", "").strip()
             is_active_str = row.get("is_active", "true").strip()
-            
+
             if not year_name:
-                errors.append({
-                    "row": row_num,
-                    "reason": "Missing year_name",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": "Missing year_name",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             try:
                 order_no = int(order_no_str)
                 if order_no < 1:
                     raise ValueError("order_no must be >= 1")
             except (ValueError, TypeError):
-                errors.append({
-                    "row": row_num,
-                    "reason": f"Invalid order_no: {order_no_str}",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": f"Invalid order_no: {order_no_str}",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             is_active = _parse_bool(is_active_str)
-            
+
             if dry_run:
                 # Just validate
                 accepted += 1
@@ -817,26 +819,30 @@ def _import_years(
                     db.add(year)
                     created += 1
                 accepted += 1
-        
+
         except Exception as e:
-            errors.append({
-                "row": row_num,
-                "reason": str(e),
-                "data": row,
-            })
+            errors.append(
+                {
+                    "row": row_num,
+                    "reason": str(e),
+                    "data": row,
+                }
+            )
             rejected += 1
-    
+
     if not dry_run:
         try:
             db.commit()
         except Exception as e:
             db.rollback()
-            errors.append({
-                "row": 0,
-                "reason": f"Database error: {str(e)}",
-                "data": {},
-            })
-    
+            errors.append(
+                {
+                    "row": 0,
+                    "reason": f"Database error: {str(e)}",
+                    "data": {},
+                }
+            )
+
     return CSVImportResult(
         dry_run=dry_run,
         accepted=accepted,
@@ -860,7 +866,7 @@ def _import_blocks(
     created = 0
     updated = 0
     errors = []
-    
+
     for row_num, row in enumerate(reader, start=2):
         try:
             year_name = row.get("year_name", "").strip()
@@ -868,16 +874,18 @@ def _import_blocks(
             block_name = row.get("block_name", "").strip()
             order_no_str = row.get("order_no", "").strip()
             is_active_str = row.get("is_active", "true").strip()
-            
+
             if not year_name or not block_code or not block_name:
-                errors.append({
-                    "row": row_num,
-                    "reason": "Missing required field (year_name, block_code, or block_name)",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": "Missing required field (year_name, block_code, or block_name)",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             # Find year
             year = db.query(Year).filter(Year.name == year_name).first()
             if not year:
@@ -888,37 +896,42 @@ def _import_blocks(
                     db.add(year)
                     db.flush()
                 else:
-                    errors.append({
-                        "row": row_num,
-                        "reason": f"Year '{year_name}' not found",
-                        "data": row,
-                    })
+                    errors.append(
+                        {
+                            "row": row_num,
+                            "reason": f"Year '{year_name}' not found",
+                            "data": row,
+                        }
+                    )
                     rejected += 1
                     continue
-            
+
             try:
                 order_no = int(order_no_str)
                 if order_no < 1:
                     raise ValueError("order_no must be >= 1")
             except (ValueError, TypeError):
-                errors.append({
-                    "row": row_num,
-                    "reason": f"Invalid order_no: {order_no_str}",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": f"Invalid order_no: {order_no_str}",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             is_active = _parse_bool(is_active_str)
-            
+
             if dry_run:
                 accepted += 1
             else:
                 # Upsert by year_id + code
-                existing = db.query(Block).filter(
-                    Block.year_id == year.id,
-                    Block.code == block_code
-                ).first()
+                existing = (
+                    db.query(Block)
+                    .filter(Block.year_id == year.id, Block.code == block_code)
+                    .first()
+                )
                 if existing:
                     existing.name = block_name
                     existing.order_no = order_no
@@ -935,26 +948,30 @@ def _import_blocks(
                     db.add(block)
                     created += 1
                 accepted += 1
-        
+
         except Exception as e:
-            errors.append({
-                "row": row_num,
-                "reason": str(e),
-                "data": row,
-            })
+            errors.append(
+                {
+                    "row": row_num,
+                    "reason": str(e),
+                    "data": row,
+                }
+            )
             rejected += 1
-    
+
     if not dry_run:
         try:
             db.commit()
         except Exception as e:
             db.rollback()
-            errors.append({
-                "row": 0,
-                "reason": f"Database error: {str(e)}",
-                "data": {},
-            })
-    
+            errors.append(
+                {
+                    "row": 0,
+                    "reason": f"Database error: {str(e)}",
+                    "data": {},
+                }
+            )
+
     return CSVImportResult(
         dry_run=dry_run,
         accepted=accepted,
@@ -978,7 +995,7 @@ def _import_themes(
     created = 0
     updated = 0
     errors = []
-    
+
     for row_num, row in enumerate(reader, start=2):
         try:
             year_name = row.get("year_name", "").strip()
@@ -987,16 +1004,18 @@ def _import_themes(
             order_no_str = row.get("order_no", "").strip()
             description = row.get("description", "").strip() or None
             is_active_str = row.get("is_active", "true").strip()
-            
+
             if not year_name or not block_code or not theme_title:
-                errors.append({
-                    "row": row_num,
-                    "reason": "Missing required field (year_name, block_code, or theme_title)",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": "Missing required field (year_name, block_code, or theme_title)",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             # Find year
             year = db.query(Year).filter(Year.name == year_name).first()
             if not year:
@@ -1006,19 +1025,20 @@ def _import_themes(
                     db.add(year)
                     db.flush()
                 else:
-                    errors.append({
-                        "row": row_num,
-                        "reason": f"Year '{year_name}' not found",
-                        "data": row,
-                    })
+                    errors.append(
+                        {
+                            "row": row_num,
+                            "reason": f"Year '{year_name}' not found",
+                            "data": row,
+                        }
+                    )
                     rejected += 1
                     continue
-            
+
             # Find block
-            block = db.query(Block).filter(
-                Block.year_id == year.id,
-                Block.code == block_code
-            ).first()
+            block = (
+                db.query(Block).filter(Block.year_id == year.id, Block.code == block_code).first()
+            )
             if not block:
                 if auto_create:
                     # Create block with default order_no
@@ -1033,38 +1053,43 @@ def _import_themes(
                     db.add(block)
                     db.flush()
                 else:
-                    errors.append({
-                        "row": row_num,
-                        "reason": f"Block '{block_code}' not found in year '{year_name}'",
-                        "data": row,
-                    })
+                    errors.append(
+                        {
+                            "row": row_num,
+                            "reason": f"Block '{block_code}' not found in year '{year_name}'",
+                            "data": row,
+                        }
+                    )
                     rejected += 1
                     continue
-            
+
             try:
                 order_no = int(order_no_str)
                 if order_no < 1:
                     raise ValueError("order_no must be >= 1")
             except (ValueError, TypeError):
-                errors.append({
-                    "row": row_num,
-                    "reason": f"Invalid order_no: {order_no_str}",
-                    "data": row,
-                })
+                errors.append(
+                    {
+                        "row": row_num,
+                        "reason": f"Invalid order_no: {order_no_str}",
+                        "data": row,
+                    }
+                )
                 rejected += 1
                 continue
-            
+
             is_active = _parse_bool(is_active_str)
             normalized_title = theme_title.strip()
-            
+
             if dry_run:
                 accepted += 1
             else:
                 # Upsert by block_id + title
-                existing = db.query(Theme).filter(
-                    Theme.block_id == block.id,
-                    Theme.title.ilike(normalized_title)
-                ).first()
+                existing = (
+                    db.query(Theme)
+                    .filter(Theme.block_id == block.id, Theme.title.ilike(normalized_title))
+                    .first()
+                )
                 if existing:
                     existing.order_no = order_no
                     existing.description = description
@@ -1081,26 +1106,30 @@ def _import_themes(
                     db.add(theme)
                     created += 1
                 accepted += 1
-        
+
         except Exception as e:
-            errors.append({
-                "row": row_num,
-                "reason": str(e),
-                "data": row,
-            })
+            errors.append(
+                {
+                    "row": row_num,
+                    "reason": str(e),
+                    "data": row,
+                }
+            )
             rejected += 1
-    
+
     if not dry_run:
         try:
             db.commit()
         except Exception as e:
             db.rollback()
-            errors.append({
-                "row": 0,
-                "reason": f"Database error: {str(e)}",
-                "data": {},
-            })
-    
+            errors.append(
+                {
+                    "row": 0,
+                    "reason": f"Database error: {str(e)}",
+                    "data": {},
+                }
+            )
+
     return CSVImportResult(
         dry_run=dry_run,
         accepted=accepted,
@@ -1120,7 +1149,9 @@ def _import_themes(
 async def import_years(
     file: UploadFile = File(...),
     dry_run: bool = Query(True, description="If true, only validate without writing"),
-    auto_create: bool = Query(False, description="Auto-create missing parents (not applicable for years)"),
+    auto_create: bool = Query(
+        False, description="Auto-create missing parents (not applicable for years)"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
 ) -> CSVImportResult:

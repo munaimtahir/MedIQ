@@ -9,15 +9,21 @@ from urllib.error import HTTPError, URLError
 
 BASE_URL = "http://localhost:8000/v1"
 
+
 def make_request(method, path, data=None, headers=None):
     """Make HTTP request and return (status_code, response_data)."""
     url = f"{BASE_URL}{path}"
     req_headers = {"Content-Type": "application/json"}
     if headers:
         req_headers.update(headers)
-    
+
     try:
-        req = Request(url, data=json.dumps(data).encode() if data else None, headers=req_headers, method=method)
+        req = Request(
+            url,
+            data=json.dumps(data).encode() if data else None,
+            headers=req_headers,
+            method=method,
+        )
         with urlopen(req, timeout=10) as response:
             status = response.getcode()
             body = json.loads(response.read().decode())
@@ -32,6 +38,7 @@ def make_request(method, path, data=None, headers=None):
     except URLError as e:
         return None, {"error": str(e)}
 
+
 def test_health():
     """Test health endpoint."""
     print("1. Testing /v1/health...")
@@ -42,6 +49,7 @@ def test_health():
     else:
         print(f"   ✗ Health check failed: {status} - {data}")
         return False
+
 
 def test_ready():
     """Test ready endpoint."""
@@ -57,15 +65,12 @@ def test_ready():
         print(f"   ✗ Ready check failed: {status} - {data}")
         return False
 
+
 def test_signup():
     """Test signup endpoint."""
     print("\n3. Testing /v1/auth/signup...")
     test_email = f"test_{int(time.time())}@example.com"
-    data = {
-        "name": "Test User",
-        "email": test_email,
-        "password": "TestPass123!"
-    }
+    data = {"name": "Test User", "email": test_email, "password": "TestPass123!"}
     status, response = make_request("POST", "/auth/signup", data=data)
     if status == 201:
         print(f"   ✓ Signup passed")
@@ -77,6 +82,7 @@ def test_signup():
     else:
         print(f"   ✗ Signup failed: {status} - {response}")
         return False, None, None
+
 
 def test_login(email, password="TestPass123!"):
     """Test login endpoint."""
@@ -97,6 +103,7 @@ def test_login(email, password="TestPass123!"):
         print(f"   ✗ Login failed: {status} - {response}")
         return False, None
 
+
 def test_me(access_token):
     """Test /me endpoint."""
     print(f"\n5. Testing /v1/auth/me...")
@@ -109,6 +116,7 @@ def test_me(access_token):
     else:
         print(f"   ✗ /me failed: {status} - {response}")
         return False, None
+
 
 def test_refresh(refresh_token):
     """Test refresh token endpoint."""
@@ -127,6 +135,7 @@ def test_refresh(refresh_token):
         print(f"   ✗ Refresh failed: {status} - {response}")
         return False, None
 
+
 def test_logout(refresh_token):
     """Test logout endpoint."""
     print(f"\n7. Testing /v1/auth/logout...")
@@ -139,48 +148,49 @@ def test_logout(refresh_token):
         print(f"   ✗ Logout failed: {status} - {response}")
         return False
 
+
 def main():
     """Run all tests."""
     print("=" * 60)
     print("Backend Auth Flow Tests")
     print("=" * 60)
-    
+
     results = []
-    
+
     # Test health
     results.append(("Health", test_health()))
-    
+
     # Test ready
     results.append(("Ready", test_ready()))
-    
+
     # Test signup
     signup_ok, test_email, signup_tokens = test_signup()
     results.append(("Signup", signup_ok))
-    
+
     if not signup_ok:
         print("\n⚠ Signup failed, skipping remaining tests")
         sys.exit(1)
-    
+
     # Test login
     login_ok, login_tokens = test_login(test_email)
     results.append(("Login", login_ok))
-    
+
     if not login_ok or not login_tokens:
         print("\n⚠ Login failed, skipping remaining tests")
         sys.exit(1)
-    
+
     access_token = login_tokens.get("access_token")
     refresh_token = login_tokens.get("refresh_token")
-    
+
     # Test /me
     me_ok, user = test_me(access_token)
     results.append(("/me", me_ok))
-    
+
     # Test refresh
     if refresh_token:
         refresh_ok, new_tokens = test_refresh(refresh_token)
         results.append(("Refresh", refresh_ok))
-        
+
         # Test logout with new refresh token
         if new_tokens and new_tokens.get("refresh_token"):
             logout_ok = test_logout(new_tokens["refresh_token"])
@@ -192,19 +202,21 @@ def main():
         print("\n⚠ No refresh token, skipping refresh/logout tests")
         results.append(("Refresh", False))
         results.append(("Logout", False))
-    
+
     # Test RBAC - admin endpoint (as student - should fail)
     print(f"\n8. Testing RBAC - /v1/auth/admin/_rbac_smoke (STUDENT token - should fail)...")
     if access_token:
         rbac_student_ok = False
-        status, response = make_request("GET", "/auth/admin/_rbac_smoke", headers={"Authorization": f"Bearer {access_token}"})
+        status, response = make_request(
+            "GET", "/auth/admin/_rbac_smoke", headers={"Authorization": f"Bearer {access_token}"}
+        )
         if status == 403:
             print(f"   ✓ Correctly rejected STUDENT token with 403")
             rbac_student_ok = True
         else:
             print(f"   ✗ Unexpected response: {status} - {response}")
         results.append(("RBAC Student", rbac_student_ok))
-    
+
     # Test RBAC - create admin user via DB and test
     print(f"\n9. Testing RBAC - /v1/auth/admin/_rbac_smoke (ADMIN token - should pass)...")
     try:
@@ -212,10 +224,10 @@ def main():
         from app.models.user import User, UserRole
         from app.core.security import hash_password
         import uuid
-        
+
         admin_email = f"admin_{int(time.time())}@example.com"
         admin_password = "AdminPass123!"
-        
+
         # Create admin user directly in DB (signup only creates STUDENT)
         db = SessionLocal()
         try:
@@ -230,12 +242,16 @@ def main():
             )
             db.add(admin_user)
             db.commit()
-            
+
             # Login as admin
             login_ok, admin_tokens = test_login(admin_email, admin_password)
             if login_ok and admin_tokens:
                 admin_access_token = admin_tokens.get("access_token")
-                status, response = make_request("GET", "/auth/admin/_rbac_smoke", headers={"Authorization": f"Bearer {admin_access_token}"})
+                status, response = make_request(
+                    "GET",
+                    "/auth/admin/_rbac_smoke",
+                    headers={"Authorization": f"Bearer {admin_access_token}"},
+                )
                 if status == 200:
                     print(f"   ✓ ADMIN token accepted")
                     results.append(("RBAC Admin", True))
@@ -250,7 +266,7 @@ def main():
     except Exception as e:
         print(f"   ✗ Error creating/admin user: {e}")
         results.append(("RBAC Admin", False))
-    
+
     # Summary
     print("\n" + "=" * 60)
     print("Test Summary")
@@ -260,9 +276,9 @@ def main():
     for name, ok in results:
         status = "✓ PASS" if ok else "✗ FAIL"
         print(f"{status} - {name}")
-    
+
     print(f"\nTotal: {passed}/{total} tests passed")
-    
+
     if passed == total:
         print("✅ All tests passed!")
         sys.exit(0)
@@ -270,6 +286,6 @@ def main():
         print("❌ Some tests failed")
         sys.exit(1)
 
+
 if __name__ == "__main__":
     main()
-

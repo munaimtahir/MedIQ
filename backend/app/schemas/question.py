@@ -11,7 +11,9 @@ class QuestionBase(BaseModel):
 
     theme_id: int = Field(..., gt=0, description="Theme ID")
     question_text: str = Field(..., min_length=1, description="Question text")
-    options: list[str] = Field(..., min_items=5, max_items=5, description="List of 5 answer options")
+    options: list[str] = Field(
+        ..., min_items=5, max_items=5, description="List of 5 answer options"
+    )
     correct_option_index: int = Field(..., ge=0, le=4, description="Index of correct option (0-4)")
     explanation: Optional[str] = Field(None, description="Explanation for the answer")
     tags: Optional[list[str]] = Field(None, description="Tags for categorization")

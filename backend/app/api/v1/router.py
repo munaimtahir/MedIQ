@@ -38,6 +38,7 @@ api_router.include_router(admin_users.router, prefix="", tags=["Admin - Users"])
 # Include notifications router if available
 try:
     from app.api.v1.endpoints import notifications
+
     api_router.include_router(notifications.router, prefix="/v1", tags=["Notifications"])
 except ImportError:
     pass  # Notifications endpoint is optional

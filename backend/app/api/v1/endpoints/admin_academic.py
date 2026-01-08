@@ -53,12 +53,12 @@ async def get_academic_structure(
         .order_by(AcademicYear.sort_order)
         .all()
     )
-    
+
     result_years = []
     for year in years:
         sorted_blocks = sorted(year.blocks, key=lambda x: x.sort_order)
         sorted_subjects = sorted(year.subjects, key=lambda x: x.sort_order)
-        
+
         result_years.append(
             AcademicYearWithRelations(
                 id=year.id,
@@ -96,7 +96,7 @@ async def get_academic_structure(
                 ],
             )
         )
-    
+
     return AcademicStructureResponse(years=result_years)
 
 
@@ -124,7 +124,7 @@ async def create_academic_year(
         sort_order=request.sort_order,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(year)
         db.commit()
@@ -135,7 +135,7 @@ async def create_academic_year(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Academic year with slug '{request.slug}' already exists",
         )
-    
+
     return AcademicYearResponse.model_validate(year)
 
 
@@ -158,12 +158,12 @@ async def update_academic_year(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Academic year not found",
         )
-    
+
     # Update only provided fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(year, field, value)
-    
+
     try:
         db.commit()
         db.refresh(year)
@@ -173,7 +173,7 @@ async def update_academic_year(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Academic year with slug '{request.slug}' already exists",
         )
-    
+
     return AcademicYearResponse.model_validate(year)
 
 
@@ -202,7 +202,7 @@ async def create_academic_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Academic year not found",
         )
-    
+
     block = AcademicBlock(
         year_id=request.year_id,
         code=request.code,
@@ -210,7 +210,7 @@ async def create_academic_block(
         sort_order=request.sort_order,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(block)
         db.commit()
@@ -221,7 +221,7 @@ async def create_academic_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
         )
-    
+
     return AcademicBlockResponse.model_validate(block)
 
 
@@ -244,12 +244,12 @@ async def update_academic_block(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Academic block not found",
         )
-    
+
     # Update only provided fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(block, field, value)
-    
+
     try:
         db.commit()
         db.refresh(block)
@@ -259,7 +259,7 @@ async def update_academic_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Block with code '{request.code}' already exists in this year",
         )
-    
+
     return AcademicBlockResponse.model_validate(block)
 
 
@@ -288,7 +288,7 @@ async def create_academic_subject(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Academic year not found",
         )
-    
+
     subject = AcademicSubject(
         year_id=request.year_id,
         code=request.code,
@@ -296,7 +296,7 @@ async def create_academic_subject(
         sort_order=request.sort_order,
         is_active=request.is_active,
     )
-    
+
     try:
         db.add(subject)
         db.commit()
@@ -307,7 +307,7 @@ async def create_academic_subject(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Subject '{request.display_name}' already exists in this year",
         )
-    
+
     return AcademicSubjectResponse.model_validate(subject)
 
 
@@ -330,12 +330,12 @@ async def update_academic_subject(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Academic subject not found",
         )
-    
+
     # Update only provided fields
     update_data = request.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(subject, field, value)
-    
+
     try:
         db.commit()
         db.refresh(subject)
@@ -345,7 +345,7 @@ async def update_academic_subject(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Subject '{request.display_name}' already exists in this year",
         )
-    
+
     return AcademicSubjectResponse.model_validate(subject)
 
 
@@ -365,6 +365,6 @@ async def seed_academic_structure_endpoint(
 ) -> dict:
     """Seed the academic structure with initial data."""
     from app.core.seed_academic import seed_academic_structure
-    
+
     result = seed_academic_structure(db)
     return result

@@ -45,9 +45,7 @@ class AcademicBlock(Base):
     # Relationships
     year = relationship("AcademicYear", back_populates="blocks")
 
-    __table_args__ = (
-        UniqueConstraint("year_id", "code", name="uq_academic_block_year_code"),
-    )
+    __table_args__ = (UniqueConstraint("year_id", "code", name="uq_academic_block_year_code"),)
 
 
 class AcademicSubject(Base):

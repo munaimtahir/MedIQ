@@ -171,7 +171,9 @@ async def signup(
     try:
         from app.services.email.service import send_email
 
-        verify_link = f"{settings.FRONTEND_BASE_URL}{settings.EMAIL_VERIFY_PATH}?token={verification_token}"
+        verify_link = (
+            f"{settings.FRONTEND_BASE_URL}{settings.EMAIL_VERIFY_PATH}?token={verification_token}"
+        )
         email_subject = "Verify your email"
         email_body_text = f"""
 Welcome! Please verify your email address to complete your account setup.
@@ -325,7 +327,9 @@ async def resend_verification(
         # Generate new verification token
         verification_token = generate_email_verification_token()
         token_hash = hash_token(verification_token)
-        expires_at = datetime.now(UTC) + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES)
+        expires_at = datetime.now(UTC) + timedelta(
+            minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES
+        )
 
         # Revoke old unused tokens for this user
         db.query(EmailVerificationToken).filter(
@@ -445,11 +449,13 @@ async def login(
         if oauth_identities:
             # User is OAuth-only - get the provider
             provider = oauth_identities[0].provider
-            provider_display = provider.replace("_", " ").title() if "_" in provider else provider.title()
-            
+            provider_display = (
+                provider.replace("_", " ").title() if "_" in provider else provider.title()
+            )
+
             # Record failure
             record_login_failure(email_normalized, ip)
-            
+
             # Log security event
             log_security_event(
                 request,
@@ -458,7 +464,7 @@ async def login(
                 reason_code="OAUTH_ONLY_ACCOUNT",
                 user_id=str(user.id),
             )
-            
+
             raise_app_error(
                 status_code=status.HTTP_403_FORBIDDEN,
                 code="OAUTH_ONLY_ACCOUNT",

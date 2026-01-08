@@ -37,7 +37,9 @@ def get_email_service() -> EmailProvider:
                 use_tls=getattr(settings, "EMAIL_USE_TLS", False),
                 use_ssl=getattr(settings, "EMAIL_USE_SSL", False),
             )
-            logger.info(f"Email service initialized: SMTP ({settings.EMAIL_HOST}:{settings.EMAIL_PORT})")
+            logger.info(
+                f"Email service initialized: SMTP ({settings.EMAIL_HOST}:{settings.EMAIL_PORT})"
+            )
         except Exception as e:
             logger.warning(f"Failed to initialize SMTP email service, falling back to console: {e}")
             _email_service = ConsoleEmailProvider()

@@ -30,23 +30,23 @@ def clear_students():
         # Count students before deletion using raw SQL
         result = db.execute(text("SELECT COUNT(*) FROM users WHERE role = 'STUDENT'"))
         student_count = result.scalar()
-        
+
         if student_count == 0:
             logger.info("No student users found in database.")
             print("No student users found in database.")
             return
-        
+
         logger.info(f"Found {student_count} student user(s) to delete.")
         print(f"Found {student_count} student user(s) to delete.")
-        
+
         # Delete all students using raw SQL (cascade will handle related data)
         result = db.execute(text("DELETE FROM users WHERE role = 'STUDENT'"))
         deleted_count = result.rowcount
         db.commit()
-        
+
         logger.info(f"Successfully deleted {deleted_count} student user(s) and their related data.")
         print(f"Successfully deleted {deleted_count} student user(s) and their related data.")
-        
+
     except Exception as e:
         db.rollback()
         logger.error(f"Error clearing students: {e}", exc_info=True)

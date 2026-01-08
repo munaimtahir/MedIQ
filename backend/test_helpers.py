@@ -32,14 +32,14 @@ def is_running_in_docker() -> bool:
 def get_service_url(service: str, port: int) -> str:
     """
     Get the correct URL for a service based on execution context.
-    
+
     When running inside Docker, use service names (backend:8000, frontend:3000).
     When running on host, use localhost.
-    
+
     Args:
         service: Service name (backend, frontend)
         port: Service port
-        
+
     Returns:
         Full URL with protocol
     """
@@ -68,21 +68,21 @@ def wait_for_service(
 ) -> bool:
     """
     Wait for a service to be ready.
-    
+
     Args:
         url: URL to check (e.g., http://backend:8000/v1/health)
         timeout: Maximum wait time in seconds
         interval: Time between checks in seconds
         expected_status: Expected HTTP status (None = any 2xx/3xx)
-        
+
     Returns:
         True if service is ready, False if timeout
     """
     start_time = time.time()
     last_error = None
-    
+
     print(f"Waiting for {url} (timeout: {timeout}s)...")
-    
+
     while time.time() - start_time < timeout:
         try:
             req = Request(url, method="GET")
@@ -104,11 +104,11 @@ def wait_for_service(
             last_error = str(e.reason)
         except Exception as e:
             last_error = str(e)
-        
+
         elapsed = int(time.time() - start_time)
         print(f"  ... waiting ({elapsed}s, last: {last_error})")
         time.sleep(interval)
-    
+
     print(f"  ✗ Timeout after {timeout}s (last: {last_error})")
     return False
 
@@ -124,7 +124,7 @@ def make_request_with_retry(
 ) -> tuple[int | None, dict, dict]:
     """
     Make HTTP request with retry logic for transient failures.
-    
+
     Args:
         method: HTTP method (GET, POST, etc.)
         url: Full URL
@@ -133,7 +133,7 @@ def make_request_with_retry(
         max_retries: Number of retries for transient errors
         timeout: Request timeout in seconds
         retry_on_5xx: Whether to retry on 5xx errors
-        
+
     Returns:
         Tuple of (status_code, response_body, response_headers)
         status_code is None on connection failure
@@ -141,10 +141,10 @@ def make_request_with_retry(
     req_headers = {"Content-Type": "application/json"}
     if headers:
         req_headers.update(headers)
-    
+
     body_bytes = json.dumps(data).encode() if data else None
     last_error = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             req = Request(
@@ -161,7 +161,7 @@ def make_request_with_retry(
                 except json.JSONDecodeError:
                     body = {}
                 return status, body, resp_headers
-                
+
         except HTTPError as e:
             status = e.code
             resp_headers = dict(e.headers.items()) if e.headers else {}
@@ -169,45 +169,49 @@ def make_request_with_retry(
                 body = json.loads(e.read().decode())
             except (json.JSONDecodeError, AttributeError):
                 body = {"error": {"code": "HTTP_ERROR", "message": str(e)}}
-            
+
             # Don't retry on 4xx errors (client errors)
             if 400 <= status < 500:
                 return status, body, resp_headers
-            
+
             # Retry on 5xx if enabled
             if retry_on_5xx and 500 <= status < 600 and attempt < max_retries:
-                wait_time = 2 ** attempt  # Exponential backoff
+                wait_time = 2**attempt  # Exponential backoff
                 print(f"  Retry {attempt + 1}/{max_retries} after {wait_time}s (HTTP {status})")
                 time.sleep(wait_time)
                 continue
-            
+
             return status, body, resp_headers
-            
+
         except URLError as e:
             last_error = str(e.reason)
             if attempt < max_retries:
-                wait_time = 2 ** attempt
+                wait_time = 2**attempt
                 print(f"  Retry {attempt + 1}/{max_retries} after {wait_time}s ({last_error})")
                 time.sleep(wait_time)
                 continue
             return None, {"error": {"code": "CONNECTION_ERROR", "message": last_error}}, {}
-            
+
         except Exception as e:
             last_error = str(e)
             if attempt < max_retries:
-                wait_time = 2 ** attempt
+                wait_time = 2**attempt
                 print(f"  Retry {attempt + 1}/{max_retries} after {wait_time}s ({last_error})")
                 time.sleep(wait_time)
                 continue
             return None, {"error": {"code": "UNKNOWN_ERROR", "message": last_error}}, {}
-    
-    return None, {"error": {"code": "MAX_RETRIES", "message": f"Failed after {max_retries} retries"}}, {}
+
+    return (
+        None,
+        {"error": {"code": "MAX_RETRIES", "message": f"Failed after {max_retries} retries"}},
+        {},
+    )
 
 
 def check_docker_network() -> dict:
     """
     Check Docker network connectivity.
-    
+
     Returns:
         Dict with connectivity status for each service
     """
@@ -215,12 +219,12 @@ def check_docker_network() -> dict:
         "running_in_docker": is_running_in_docker(),
         "services": {},
     }
-    
+
     services = [
         ("backend", 8000, "/v1/health"),
         ("frontend", 3000, "/"),
     ]
-    
+
     for service, port, path in services:
         url = get_service_url(service, port) + path
         try:
@@ -249,7 +253,7 @@ def check_docker_network() -> dict:
                 "url": url,
                 "error": str(e),
             }
-    
+
     return results
 
 
@@ -264,10 +268,10 @@ def print_test_header(title: str):
 def print_test_summary(results: list[tuple[str, bool]]) -> int:
     """
     Print test summary and return exit code.
-    
+
     Args:
         results: List of (test_name, passed) tuples
-        
+
     Returns:
         0 if all passed, 1 if any failed
     """
@@ -275,17 +279,17 @@ def print_test_summary(results: list[tuple[str, bool]]) -> int:
     print("=" * 60)
     print("Test Summary")
     print("=" * 60)
-    
+
     passed = sum(1 for _, ok in results if ok)
     total = len(results)
-    
+
     for name, ok in results:
         status = "✓ PASS" if ok else "✗ FAIL"
         print(f"{status} - {name}")
-    
+
     print()
     print(f"Total: {passed}/{total} tests passed")
-    
+
     if passed == total:
         print("✅ All tests passed!")
         return 0
@@ -297,13 +301,13 @@ def print_test_summary(results: list[tuple[str, bool]]) -> int:
 if __name__ == "__main__":
     # Self-test
     print_test_header("Test Helpers Self-Test")
-    
+
     print("Environment Detection:")
     print(f"  Running in Docker: {is_running_in_docker()}")
     print(f"  Backend URL: {get_backend_url()}")
     print(f"  Frontend URL: {get_frontend_url()}")
     print()
-    
+
     print("Docker Network Check:")
     network_status = check_docker_network()
     print(f"  Running in Docker: {network_status['running_in_docker']}")

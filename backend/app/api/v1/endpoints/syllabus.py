@@ -23,12 +23,7 @@ async def get_years(
     current_user: User = Depends(get_current_user),
 ) -> list[YearResponse]:
     """Get all active years ordered by order_no."""
-    years = (
-        db.query(Year)
-        .filter(Year.is_active == True)
-        .order_by(Year.order_no)
-        .all()
-    )
+    years = db.query(Year).filter(Year.is_active == True).order_by(Year.order_no).all()
     return [YearResponse.model_validate(year) for year in years]
 
 
@@ -51,24 +46,24 @@ async def get_blocks(
     year_obj = None
     if year.isdigit():
         year_obj = db.query(Year).filter(Year.id == int(year), Year.is_active == True).first()
-    
+
     # If not found by ID, try by name
     if not year_obj:
         year_obj = db.query(Year).filter(Year.name == year, Year.is_active == True).first()
-    
+
     if not year_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Year '{year}' not found or inactive",
         )
-    
+
     blocks = (
         db.query(Block)
         .filter(Block.year_id == year_obj.id, Block.is_active == True)
         .order_by(Block.order_no)
         .all()
     )
-    
+
     return [BlockResponse.model_validate(block) for block in blocks]
 
 
@@ -91,12 +86,12 @@ async def get_themes(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Block with ID {block_id} not found or inactive",
         )
-    
+
     themes = (
         db.query(Theme)
         .filter(Theme.block_id == block_id, Theme.is_active == True)
         .order_by(Theme.order_no)
         .all()
     )
-    
+
     return [ThemeResponse.model_validate(theme) for theme in themes]

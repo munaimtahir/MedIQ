@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         from app.models.syllabus import Year
+
         year_count = db.query(Year).count()
         if year_count == 0:
             print("No years found, seeding syllabus structure...")

@@ -60,7 +60,9 @@ class OAuthProviderAdapter:
         """Exchange authorization code for tokens."""
         raise NotImplementedError
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
+    async def validate_id_token(
+        self, id_token: str, nonce: str, client_id: str, access_token: str | None = None
+    ) -> dict[str, Any]:
         """Validate and decode id_token."""
         raise NotImplementedError
 
@@ -116,10 +118,18 @@ class GoogleOAuthAdapter(OAuthProviderAdapter):
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                logger.error("Google token exchange failed", extra={"status_code": e.response.status_code, "response_body": e.response.text[:500]})
+                logger.error(
+                    "Google token exchange failed",
+                    extra={
+                        "status_code": e.response.status_code,
+                        "response_body": e.response.text[:500],
+                    },
+                )
                 raise
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
+    async def validate_id_token(
+        self, id_token: str, nonce: str, client_id: str, access_token: str | None = None
+    ) -> dict[str, Any]:
         """Validate Google id_token."""
         try:
             # Get JWKS
@@ -154,10 +164,16 @@ class GoogleOAuthAdapter(OAuthProviderAdapter):
                 raise ValueError("Nonce mismatch")
             return payload
         except JWTError as e:
-            logger.error("Google id_token JWT validation failed", extra={"error": str(e), "error_type": type(e).__name__})
+            logger.error(
+                "Google id_token JWT validation failed",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
             raise ValueError(f"Invalid id_token: {e}") from e
         except Exception as e:
-            logger.error("Google id_token validation error", extra={"error": str(e), "error_type": type(e).__name__})
+            logger.error(
+                "Google id_token validation error",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
             raise
 
     async def _get_jwks(self) -> dict:
@@ -223,9 +239,15 @@ class MicrosoftOAuthAdapter(OAuthProviderAdapter):
         async with httpx.AsyncClient() as client:
             try:
                 # Log what we're sending (mask secret for security)
-                secret_masked = f"{self.client_secret[:8]}...{self.client_secret[-4:]}" if self.client_secret and len(self.client_secret) > 12 else "***"
-                logger.info(f"Microsoft token exchange: client_id={self.client_id}, secret_len={len(self.client_secret or '')}, secret_preview={secret_masked}, tenant={self.tenant}")
-                
+                secret_masked = (
+                    f"{self.client_secret[:8]}...{self.client_secret[-4:]}"
+                    if self.client_secret and len(self.client_secret) > 12
+                    else "***"
+                )
+                logger.info(
+                    f"Microsoft token exchange: client_id={self.client_id}, secret_len={len(self.client_secret or '')}, secret_preview={secret_masked}, tenant={self.tenant}"
+                )
+
                 response = await client.post(
                     self.get_token_endpoint(),
                     data={
@@ -239,10 +261,18 @@ class MicrosoftOAuthAdapter(OAuthProviderAdapter):
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                logger.error("Microsoft token exchange failed", extra={"status_code": e.response.status_code, "response_body": e.response.text[:500]})
+                logger.error(
+                    "Microsoft token exchange failed",
+                    extra={
+                        "status_code": e.response.status_code,
+                        "response_body": e.response.text[:500],
+                    },
+                )
                 raise
 
-    async def validate_id_token(self, id_token: str, nonce: str, client_id: str, access_token: str | None = None) -> dict[str, Any]:
+    async def validate_id_token(
+        self, id_token: str, nonce: str, client_id: str, access_token: str | None = None
+    ) -> dict[str, Any]:
         """Validate Microsoft id_token."""
         try:
             # Get JWKS
@@ -282,10 +312,16 @@ class MicrosoftOAuthAdapter(OAuthProviderAdapter):
                 raise ValueError("Nonce mismatch")
             return payload
         except JWTError as e:
-            logger.error("Microsoft id_token JWT validation failed", extra={"error": str(e), "error_type": type(e).__name__})
+            logger.error(
+                "Microsoft id_token JWT validation failed",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
             raise ValueError(f"Invalid id_token: {e}") from e
         except Exception as e:
-            logger.error("Microsoft id_token validation error", extra={"error": str(e), "error_type": type(e).__name__})
+            logger.error(
+                "Microsoft id_token validation error",
+                extra={"error": str(e), "error_type": type(e).__name__},
+            )
             raise
 
     async def _get_jwks(self) -> dict:

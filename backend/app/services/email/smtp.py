@@ -75,7 +75,9 @@ class SMTPEmailProvider(EmailProvider):
             server.send_message(msg)
             server.quit()
 
-            logger.info(f"Email sent successfully to {to}", extra={"email_to": to, "email_subject": subject})
+            logger.info(
+                f"Email sent successfully to {to}", extra={"email_to": to, "email_subject": subject}
+            )
         except Exception as e:
             logger.error(f"Failed to send email to {to}: {str(e)}", exc_info=True)
             raise

@@ -35,9 +35,7 @@ class Settings(BaseSettings):
     REDIS_REQUIRED: bool = Field(default=False)  # True in prod, False in dev
 
     # CORS - Accept string or list, will be normalized to list
-    CORS_ORIGINS: str | list[str] = Field(
-        default="http://localhost:3000,http://localhost:3001"
-    )
+    CORS_ORIGINS: str | list[str] = Field(default="http://localhost:3000,http://localhost:3001")
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO")
@@ -77,7 +75,7 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = Field(default="http://localhost:3000")  # For password reset links
     EMAIL_VERIFY_PATH: str = Field(default="/verify-email")
     RESET_PASSWORD_PATH: str = Field(default="/reset-password")
-    
+
     # Email verification
     EMAIL_VERIFICATION_EXPIRE_MINUTES: int = Field(default=1440)  # 24 hours
 
@@ -127,7 +125,9 @@ class Settings(BaseSettings):
         if isinstance(data, dict) and "CORS_ORIGINS" in data:
             cors_origins = data["CORS_ORIGINS"]
             if isinstance(cors_origins, str):
-                data["CORS_ORIGINS"] = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+                data["CORS_ORIGINS"] = [
+                    origin.strip() for origin in cors_origins.split(",") if origin.strip()
+                ]
             elif isinstance(cors_origins, list):
                 data["CORS_ORIGINS"] = cors_origins
         return data
@@ -136,11 +136,17 @@ class Settings(BaseSettings):
         """Validate settings on initialization."""
         # Normalize CORS_ORIGINS to list if it's a string
         if "CORS_ORIGINS" in kwargs and isinstance(kwargs["CORS_ORIGINS"], str):
-            kwargs["CORS_ORIGINS"] = [origin.strip() for origin in kwargs["CORS_ORIGINS"].split(",") if origin.strip()]
+            kwargs["CORS_ORIGINS"] = [
+                origin.strip() for origin in kwargs["CORS_ORIGINS"].split(",") if origin.strip()
+            ]
         super().__init__(**kwargs)
         # Ensure CORS_ORIGINS is a list after initialization
         if isinstance(self.CORS_ORIGINS, str):
-            object.__setattr__(self, "CORS_ORIGINS", [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()])
+            object.__setattr__(
+                self,
+                "CORS_ORIGINS",
+                [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()],
+            )
         # Fail fast in production if critical vars are missing
         if self.ENV == "prod":
             if not self.DATABASE_URL or self.DATABASE_URL.startswith(

@@ -44,6 +44,7 @@ def test_get_email_service_console():
     with patch.dict(os.environ, {"EMAIL_BACKEND": "console"}):
         # Reload settings
         from app.core.config import Settings
+
         test_settings = Settings()
         with patch("app.services.email.service.settings", test_settings):
             service = get_email_service()
@@ -55,6 +56,7 @@ def test_get_email_service_mailpit():
     """Test that SMTP provider is selected when EMAIL_BACKEND=mailpit."""
     with patch.dict(os.environ, {"EMAIL_BACKEND": "mailpit"}):
         from app.core.config import Settings
+
         test_settings = Settings()
         with patch("app.services.email.service.settings", test_settings):
             service = get_email_service()

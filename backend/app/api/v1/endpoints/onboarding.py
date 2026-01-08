@@ -15,6 +15,7 @@ from app.models.academic import (
 )
 from app.models.syllabus import Block, Year
 from app.models.user import User, UserRole
+
 # UserAllowedBlock model deprecated - no longer used for restrictions
 from app.schemas.academic import (
     OnboardingBlockOption,
@@ -28,6 +29,7 @@ from app.schemas.academic import (
     UserProfileSubjectResponse,
     UserProfileYearResponse,
 )
+
 # Allowed blocks schemas deprecated - no longer used
 
 router = APIRouter(tags=["Onboarding"])
@@ -58,7 +60,7 @@ async def get_onboarding_options(
         .order_by(AcademicYear.sort_order)
         .all()
     )
-    
+
     result_years = []
     for year in years:
         # Filter and sort active blocks
@@ -71,7 +73,7 @@ async def get_onboarding_options(
             [s for s in year.subjects if s.is_active],
             key=lambda x: x.sort_order,
         )
-        
+
         result_years.append(
             OnboardingYearOption(
                 id=year.id,
@@ -95,7 +97,7 @@ async def get_onboarding_options(
                 ],
             )
         )
-    
+
     return OnboardingOptionsResponse(years=result_years)
 
 
@@ -112,12 +114,12 @@ async def complete_onboarding(
 ) -> OnboardingStatusResponse:
     """
     Complete the onboarding process by selecting year, blocks, and optionally subjects.
-    
+
     Validation:
     - Year must exist and be active
     - All blocks must belong to the selected year and be active
     - All subjects (if provided) must belong to the selected year and be active
-    
+
     This is idempotent - calling again replaces existing selections.
     """
     # Validate year exists and is active
@@ -134,7 +136,7 @@ async def complete_onboarding(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or inactive academic year selected",
         )
-    
+
     # Validate blocks belong to selected year and are active
     blocks = (
         db.query(AcademicBlock)
@@ -150,7 +152,7 @@ async def complete_onboarding(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="One or more blocks are invalid, inactive, or do not belong to the selected year",
         )
-    
+
     # Validate subjects if provided
     if request.subject_ids:
         subjects = (
@@ -167,37 +169,37 @@ async def complete_onboarding(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="One or more subjects are invalid, inactive, or do not belong to the selected year",
             )
-    
+
     # Get or create user profile
     profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
     if not profile:
         profile = UserProfile(user_id=current_user.id)
         db.add(profile)
-    
+
     # Update profile
     profile.selected_year_id = request.year_id
     profile.onboarding_completed = True
-    
+
     # Clear existing block selections
     db.query(UserBlock).filter(UserBlock.user_id == current_user.id).delete()
-    
+
     # Add new block selections
     for block_id in request.block_ids:
         db.add(UserBlock(user_id=current_user.id, block_id=block_id))
-    
+
     # Clear existing subject selections
     db.query(UserSubject).filter(UserSubject.user_id == current_user.id).delete()
-    
+
     # Add new subject selections if provided
     if request.subject_ids:
         for subject_id in request.subject_ids:
             db.add(UserSubject(user_id=current_user.id, subject_id=subject_id))
-    
+
     # Also update the onboarding_completed flag on the User model
     current_user.onboarding_completed = True
-    
+
     db.commit()
-    
+
     return OnboardingStatusResponse(
         status="success",
         message="Onboarding completed successfully",
@@ -231,7 +233,7 @@ async def get_user_profile(
         .filter(UserProfile.user_id == current_user.id)
         .first()
     )
-    
+
     if not profile:
         # Return empty profile if not yet created
         return UserProfileResponse(
@@ -243,7 +245,7 @@ async def get_user_profile(
             created_at=current_user.created_at,
             updated_at=None,
         )
-    
+
     # Build response
     selected_year = None
     if profile.selected_year:
@@ -252,7 +254,7 @@ async def get_user_profile(
             slug=profile.selected_year.slug,
             display_name=profile.selected_year.display_name,
         )
-    
+
     selected_blocks = [
         UserProfileBlockResponse(
             id=ub.block.id,
@@ -262,7 +264,7 @@ async def get_user_profile(
         for ub in profile.selected_blocks
         if ub.block
     ]
-    
+
     selected_subjects = [
         UserProfileSubjectResponse(
             id=us.subject.id,
@@ -272,7 +274,7 @@ async def get_user_profile(
         for us in profile.selected_subjects
         if us.subject
     ]
-    
+
     return UserProfileResponse(
         user_id=profile.user_id,
         onboarding_completed=profile.onboarding_completed,

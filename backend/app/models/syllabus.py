@@ -1,6 +1,15 @@
 """Syllabus models (Year, Block, and Theme)."""
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -21,9 +30,7 @@ class Year(Base):
 
     blocks = relationship("Block", back_populates="year", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        UniqueConstraint("name", name="uq_year_name"),
-    )
+    __table_args__ = (UniqueConstraint("name", name="uq_year_name"),)
 
 
 class Block(Base):
@@ -43,9 +50,7 @@ class Block(Base):
     year = relationship("Year", back_populates="blocks")
     themes = relationship("Theme", back_populates="block", cascade="all, delete-orphan")
 
-    __table_args__ = (
-        UniqueConstraint("year_id", "code", name="uq_block_year_code"),
-    )
+    __table_args__ = (UniqueConstraint("year_id", "code", name="uq_block_year_code"),)
 
 
 class Theme(Base):
@@ -65,6 +70,4 @@ class Theme(Base):
     block = relationship("Block", back_populates="themes")
     questions = relationship("Question", back_populates="theme")
 
-    __table_args__ = (
-        UniqueConstraint("block_id", "title", name="uq_theme_block_title"),
-    )
+    __table_args__ = (UniqueConstraint("block_id", "title", name="uq_theme_block_title"),)

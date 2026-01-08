@@ -46,7 +46,7 @@ async def get_settings(
 ) -> PlatformSettingsResponse:
     """Get platform settings."""
     settings = get_or_create_settings(db)
-    
+
     # Validate and parse data
     try:
         settings_data = PlatformSettingsData.model_validate(settings.data)
@@ -56,7 +56,7 @@ async def get_settings(
         settings.data = default_data
         db.commit()
         settings_data = PlatformSettingsData.model_validate(default_data)
-    
+
     return PlatformSettingsResponse(
         data=settings_data,
         updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
@@ -77,7 +77,7 @@ async def update_settings(
 ) -> PlatformSettingsResponse:
     """Update platform settings."""
     settings = get_or_create_settings(db)
-    
+
     # Validate the data
     try:
         validated_data = PlatformSettingsData.model_validate(request.data.model_dump())
@@ -86,12 +86,12 @@ async def update_settings(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid settings data: {str(e)}",
         )
-    
+
     # Update settings
     settings.data = validated_data.model_dump()
     settings.updated_at = datetime.now(timezone.utc)
     settings.updated_by_user_id = current_user.id
-    
+
     try:
         db.commit()
         db.refresh(settings)
@@ -101,7 +101,7 @@ async def update_settings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update settings: {str(e)}",
         )
-    
+
     return PlatformSettingsResponse(
         data=validated_data,
         updated_at=settings.updated_at.isoformat() if settings.updated_at else None,

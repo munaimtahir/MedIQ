@@ -125,7 +125,9 @@ async def create_user(
 
     # Create user with temporary unusable password
     # User will need to reset password via email
-    temp_password_hash = hash_password("TEMP_PASSWORD_NOT_USABLE_" + str(datetime.now(UTC).timestamp()))
+    temp_password_hash = hash_password(
+        "TEMP_PASSWORD_NOT_USABLE_" + str(datetime.now(UTC).timestamp())
+    )
 
     user = User(
         name=request.name,

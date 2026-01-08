@@ -25,7 +25,9 @@ class Notification(Base):
     type = Column(String, nullable=False)  # "announcement", "system", "reminder"
     title = Column(String, nullable=False)
     body = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
     read_at = Column(DateTime(timezone=True), nullable=True, index=True)
 
     # Relationships

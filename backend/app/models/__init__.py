@@ -16,6 +16,7 @@ from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.question import Question
 from app.models.syllabus import Block, Theme, Year
 from app.models.user import User, UserRole
+
 # UserAllowedBlock model deprecated - table left in DB but no longer used for restrictions
 # from app.models.user_allowed_blocks import UserAllowedBlock
 from app.models.notification import Notification

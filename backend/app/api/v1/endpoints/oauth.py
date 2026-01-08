@@ -26,7 +26,12 @@ from app.models.auth import RefreshToken
 from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.user import User, UserRole
 from app.schemas.auth import LoginResponse, TokensResponse, UserResponse
-from app.schemas.oauth import OAuthExchangeRequest, OAuthExchangeResponse, OAuthLinkConfirmRequest, OAuthLinkConfirmResponse
+from app.schemas.oauth import (
+    OAuthExchangeRequest,
+    OAuthExchangeResponse,
+    OAuthLinkConfirmRequest,
+    OAuthLinkConfirmResponse,
+)
 
 router = APIRouter(tags=["OAuth"])
 
@@ -163,7 +168,9 @@ async def oauth_callback(
             reason_code="OAUTH_STATE_INVALID",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider)
+        )
 
     stored_provider = state_data["provider"]
     nonce = state_data["nonce"]
@@ -176,7 +183,9 @@ async def oauth_callback(
             reason_code="OAUTH_STATE_INVALID",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="OAUTH_STATE_INVALID", provider=provider)
+        )
 
     try:
         adapter = get_provider_adapter(provider)
@@ -188,7 +197,9 @@ async def oauth_callback(
             reason_code="VALIDATION_ERROR",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="VALIDATION_ERROR", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="VALIDATION_ERROR", provider=provider)
+        )
 
     # Exchange code for tokens
     try:
@@ -204,7 +215,9 @@ async def oauth_callback(
             reason_code="OAUTH_TOKEN_EXCHANGE_FAILED",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_TOKEN_EXCHANGE_FAILED", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="OAUTH_TOKEN_EXCHANGE_FAILED", provider=provider)
+        )
 
     # Validate id_token
     try:
@@ -221,7 +234,9 @@ async def oauth_callback(
             reason_code="OAUTH_ID_TOKEN_INVALID",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider)
+        )
 
     # Extract identity
     provider_subject = id_token_payload.get("sub")
@@ -237,7 +252,9 @@ async def oauth_callback(
             reason_code="OAUTH_ID_TOKEN_INVALID",
             provider=provider,
         )
-        return RedirectResponse(url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider))
+        return RedirectResponse(
+            url=_build_frontend_redirect(error="OAUTH_ID_TOKEN_INVALID", provider=provider)
+        )
 
     provider_enum = OAuthProvider(provider.upper())
 
@@ -263,7 +280,9 @@ async def oauth_callback(
                 provider=provider,
                 user_id=str(user.id) if user else None,
             )
-            return RedirectResponse(url=_build_frontend_redirect(error="ACCOUNT_INACTIVE", provider=provider))
+            return RedirectResponse(
+                url=_build_frontend_redirect(error="ACCOUNT_INACTIVE", provider=provider)
+            )
 
         # Check MFA
         from app.core.mfa import create_mfa_token
@@ -327,12 +346,14 @@ async def oauth_callback(
                 reason_code="OAUTH_LINK_REQUIRED",
                 provider=provider,
             )
-            return RedirectResponse(url=_build_frontend_redirect(
-                link_required=True,
-                link_token=link_token,
-                provider=provider,
-                email=email,
-            ))
+            return RedirectResponse(
+                url=_build_frontend_redirect(
+                    link_required=True,
+                    link_token=link_token,
+                    provider=provider,
+                    email=email,
+                )
+            )
 
     # Create new user and identity
     user = User(
@@ -433,7 +454,11 @@ async def oauth_exchange(
 
     return OAuthExchangeResponse(
         user=UserResponse.model_validate(user_data) if user_data else None,
-        tokens=TokensResponse.model_validate(tokens_data) if tokens_data and tokens_data.get("access_token") else None,
+        tokens=(
+            TokensResponse.model_validate(tokens_data)
+            if tokens_data and tokens_data.get("access_token")
+            else None
+        ),
         mfa_required=token_data.get("mfa_required", False),
         mfa_token=token_data.get("mfa_token"),
         method=token_data.get("mfa_method"),

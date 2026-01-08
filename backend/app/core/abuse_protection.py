@@ -123,6 +123,7 @@ def check_email_locked(email: str, request: Request) -> None:
     except Exception as e:
         # Re-raise AppError (lock detected) - don't catch it
         from app.core.app_exceptions import AppError
+
         if isinstance(e, AppError):
             raise
         # Only catch non-AppError exceptions (Redis connection errors, etc.)
@@ -159,6 +160,7 @@ def check_ip_locked(ip: str, request: Request) -> None:
     except Exception as e:
         # Re-raise AppError (lock detected) - don't catch it
         from app.core.app_exceptions import AppError
+
         if isinstance(e, AppError):
             raise
         # Only catch non-AppError exceptions (Redis connection errors, etc.)

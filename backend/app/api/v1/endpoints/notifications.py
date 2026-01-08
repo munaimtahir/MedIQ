@@ -68,7 +68,7 @@ async def mark_all_read(
     Mark all unread notifications for the current user as read.
     """
     now = datetime.now(timezone.utc)
-    
+
     updated = (
         db.query(Notification)
         .filter(
