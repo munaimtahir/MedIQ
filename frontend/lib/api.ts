@@ -1,9 +1,3 @@
-// Support both NEXT_PUBLIC_API_BASE_URL (preferred) and NEXT_PUBLIC_API_URL (legacy)
-const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000";
-
 // ============================================================================
 // Onboarding Types
 // ============================================================================
@@ -167,12 +161,6 @@ export interface ReviewData {
     explanation?: string;
     is_marked_for_review: boolean;
   }>;
-}
-
-function getHeaders(): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-  };
 }
 
 // Syllabus APIs (Student)

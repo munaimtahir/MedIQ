@@ -8,20 +8,12 @@ import { Year, Block, Theme, UserProfile } from "@/lib/api";
 import {
   DashboardVM,
   NextAction,
-  DashboardMetrics,
-  WeakTheme,
-  RecentSession,
-  Announcement,
 } from "./types";
 import {
   getMockMetrics,
   getMockWeakThemes,
   getMockRecentSessions,
   getMockAnnouncements,
-  getEmptyMetrics,
-  getEmptyWeakThemes,
-  getEmptyRecentSessions,
-  getEmptyAnnouncements,
 } from "./mock";
 
 interface DashboardDataState {
@@ -58,7 +50,6 @@ export function useDashboardData(): DashboardDataState {
         
         // Determine year to use
         let selectedYear: Year | null = null;
-        let selectedYearId: number | undefined;
         let selectedYearName: string | undefined;
 
         // Load years first
@@ -110,7 +101,7 @@ export function useDashboardData(): DashboardDataState {
           throw new Error("No years available");
         }
 
-        selectedYearId = selectedYear.id;
+        const selectedYearId = selectedYear.id;
         selectedYearName = selectedYear.name;
         console.log("[Dashboard] Using year:", selectedYearName, "(ID:", selectedYearId, ")");
 
