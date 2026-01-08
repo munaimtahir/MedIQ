@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Block, Theme } from "@/lib/api";
-import { BookOpen, X } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { syllabusAPI } from "@/lib/api";
@@ -34,7 +34,7 @@ export function BrowseSyllabusCard({
   const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(false);
-  const [recentThemes, setRecentThemes] = useState<Theme[]>([]); // Mock for now
+  const [recentThemes] = useState<Theme[]>([]); // Mock for now
 
   // Initialize selectedBlockId when blocks are available
   useEffect(() => {
@@ -164,7 +164,7 @@ export function BrowseSyllabusCard({
                 <SelectContent>
                   {themes.map((theme) => (
                     <SelectItem key={theme.id} value={theme.id.toString()}>
-                      {(theme as any).title || (theme as any).name || `Theme ${theme.id}`}
+                      {theme.name || `Theme ${theme.id}`}
                     </SelectItem>
                   ))}
                 </SelectContent>

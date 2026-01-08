@@ -15,8 +15,8 @@ interface QuickActionsCardProps {
 export function QuickActionsCard({
   blockId,
   yearId,
-  isBlockAllowed,
-  allowedBlockIds,
+  isBlockAllowed: _isBlockAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  allowedBlockIds: _allowedBlockIds, // eslint-disable-line @typescript-eslint/no-unused-vars
 }: QuickActionsCardProps) {
   const router = useRouter();
 

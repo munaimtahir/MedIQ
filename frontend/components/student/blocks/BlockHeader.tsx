@@ -14,7 +14,12 @@ interface BlockHeaderProps {
   status?: "not_started" | "in_progress" | "completed" | "not_available";
 }
 
-export function BlockHeader({ block, yearName, isAllowed: _isAllowed, status = "not_available" }: BlockHeaderProps) {
+export function BlockHeader({ 
+  block, 
+  yearName, 
+  isAllowed: _isAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  status = "not_available" 
+}: BlockHeaderProps) {
   const router = useRouter();
 
   const statusLabels = {

@@ -13,7 +13,12 @@ interface ThemeCardProps {
   isBlockAllowed?: boolean; // Deprecated - always true now
 }
 
-export function ThemeCard({ theme, index, total, isBlockAllowed }: ThemeCardProps) {
+export function ThemeCard({ 
+  theme, 
+  index, 
+  total, 
+  isBlockAllowed: _isBlockAllowed // eslint-disable-line @typescript-eslint/no-unused-vars
+}: ThemeCardProps) {
   const router = useRouter();
 
   return (

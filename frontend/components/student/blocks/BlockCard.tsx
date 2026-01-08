@@ -17,7 +17,11 @@ interface BlockCardProps {
   loading?: boolean;
 }
 
-export function BlockCard({ block, isAllowed: _isAllowed, loading }: BlockCardProps) {
+export function BlockCard({ 
+  block, 
+  isAllowed: _isAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
+  loading 
+}: BlockCardProps) {
   const router = useRouter();
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loadingThemes, setLoadingThemes] = useState(false);
