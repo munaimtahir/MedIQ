@@ -34,7 +34,7 @@ jobs:
 
       - name: Run linter
         working-directory: frontend
-        run: npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0
+        run: ESLINT_USE_FLAT_CONFIG=false npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0
 
       - name: Check formatting
         working-directory: frontend
