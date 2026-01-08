@@ -15,10 +15,12 @@ import {
   Settings,
   RotateCcw,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 const studentNavItems = [
   { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/student/notifications", label: "Notifications", icon: Bell },
   { href: "/student/blocks", label: "Blocks", icon: BookOpen },
   { href: "/student/practice/build", label: "Practice", icon: PlayCircle },
   { href: "/student/analytics", label: "Analytics", icon: BarChart3 },
@@ -47,7 +49,8 @@ export function StudentSidebar() {
       <nav className="flex-1 space-y-1">
         {studentNavItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          // Check if current path matches or starts with the nav item href
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}

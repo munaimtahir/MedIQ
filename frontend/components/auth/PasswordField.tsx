@@ -16,6 +16,7 @@ interface PasswordFieldProps {
   helperText?: string;
   className?: string;
   autoComplete?: string;
+  disabled?: boolean;
 }
 
 export function PasswordField({
@@ -28,6 +29,7 @@ export function PasswordField({
   helperText,
   className,
   autoComplete = "current-password",
+  disabled = false,
 }: PasswordFieldProps) {
   const [showPassword, setShowPassword] = React.useState(false);
 
@@ -44,9 +46,11 @@ export function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
+          disabled={disabled}
           className={cn(
             "pr-10 h-11 rounded-lg border-slate-200 bg-white focus:border-primary focus:ring-primary",
-            error && "border-red-500 focus:border-red-500 focus:ring-red-500"
+            error && "border-red-500 focus:border-red-500 focus:ring-red-500",
+            disabled && "opacity-50 cursor-not-allowed"
           )}
         />
         <button

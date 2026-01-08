@@ -1,4 +1,4 @@
-"""Authentication-related models (refresh tokens, password reset tokens)."""
+"""Authentication-related models (refresh tokens, password reset tokens, email verification tokens)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -68,3 +68,33 @@ class PasswordResetToken(Base):
             return False
         now = datetime.now(UTC)
         return now < self.expires_at
+
+
+class EmailVerificationToken(Base):
+    """Email verification token model."""
+
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="email_verification_tokens")
+
+    def is_valid(self) -> bool:
+        """Check if token is valid (not used and not expired)."""
+        if self.used_at is not None:
+            return False
+        now = datetime.now(UTC)
+        return now < self.expires_at
+
+    def is_expired(self) -> bool:
+        """Check if token is expired."""
+        now = datetime.now(UTC)
+        return now >= self.expires_at

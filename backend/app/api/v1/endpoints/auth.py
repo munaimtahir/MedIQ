@@ -26,16 +26,22 @@ from app.core.rate_limit_deps import (
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    generate_email_verification_token,
     generate_password_reset_token,
     hash_password,
     hash_token,
     verify_password,
 )
+from app.core.logging import get_logger
 from app.core.security_logging import log_security_event
 from app.db.session import get_db
-from app.models.auth import PasswordResetToken, RefreshToken
+
+logger = get_logger(__name__)
+from app.models.auth import EmailVerificationToken, PasswordResetToken, RefreshToken
+from app.models.oauth import OAuthIdentity
 from app.models.user import User, UserRole
 from app.schemas.auth import (
+    EmailVerificationRequest,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -44,6 +50,7 @@ from app.schemas.auth import (
     PasswordResetRequest,
     RefreshRequest,
     RefreshResponse,
+    ResendVerificationRequest,
     SignupRequest,
     SignupResponse,
     StatusResponse,
@@ -114,7 +121,21 @@ async def signup(
         raise_app_error(
             status_code=status.HTTP_409_CONFLICT,
             code="CONFLICT",
-            message="Email already registered",
+            message="An account with this email already exists. Please log in instead.",
+        )
+
+    # Validate password strength
+    if not any(c.isalpha() for c in request_data.password):
+        raise_app_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="INVALID_PASSWORD",
+            message="Password must contain at least one letter",
+        )
+    if not any(c.isdigit() for c in request_data.password):
+        raise_app_error(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            code="INVALID_PASSWORD",
+            message="Password must contain at least one number",
         )
 
     # Create user
@@ -126,10 +147,63 @@ async def signup(
         onboarding_completed=False,
         is_active=True,
         email_verified=False,
+        email_verification_sent_at=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Generate verification token
+    verification_token = generate_email_verification_token()
+    token_hash = hash_token(verification_token)
+    expires_at = datetime.now(UTC) + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES)
+
+    # Create verification token record
+    verification_token_record = EmailVerificationToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+    db.add(verification_token_record)
+    db.commit()
+
+    # Send verification email
+    try:
+        from app.services.email.service import send_email
+
+        verify_link = f"{settings.FRONTEND_BASE_URL}{settings.EMAIL_VERIFY_PATH}?token={verification_token}"
+        email_subject = "Verify your email"
+        email_body_text = f"""
+Welcome! Please verify your email address to complete your account setup.
+
+Click the link below to verify your email:
+{verify_link}
+
+This link will expire in {settings.EMAIL_VERIFICATION_EXPIRE_MINUTES // 60} hours.
+
+If you did not create this account, please ignore this email.
+"""
+        email_body_html = f"""
+<html>
+<body>
+<p>Welcome! Please verify your email address to complete your account setup.</p>
+<p><a href="{verify_link}">Click here to verify your email</a></p>
+<p>Or copy and paste this link into your browser:</p>
+<p>{verify_link}</p>
+<p>This link will expire in {settings.EMAIL_VERIFICATION_EXPIRE_MINUTES // 60} hours.</p>
+<p>If you did not create this account, please ignore this email.</p>
+</body>
+</html>
+"""
+        send_email(
+            to=user.email,
+            subject=email_subject,
+            body_text=email_body_text.strip(),
+            body_html=email_body_html.strip(),
+        )
+    except Exception as e:
+        # Log error but don't fail signup
+        logger.error(f"Failed to send verification email: {e}", exc_info=True)
 
     # Log successful signup
     log_security_event(
@@ -139,12 +213,186 @@ async def signup(
         user_id=str(user.id),
     )
 
-    # Create tokens
-    tokens = _create_tokens_for_user(user, db)
-
+    # Do NOT create tokens - user must verify email first
     return SignupResponse(
         user=UserResponse.model_validate(user),
-        tokens=tokens,
+        message="Account created. Please verify your email.",
+    )
+
+
+@router.post(
+    "/verify-email",
+    response_model=StatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verify email",
+    description="Verify email address using a verification token.",
+)
+async def verify_email(
+    request_data: EmailVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> StatusResponse:
+    """Verify email address with token."""
+    # Hash the provided token
+    token_hash = hash_token(request_data.token)
+
+    # Find valid verification token
+    verification_token_record = (
+        db.query(EmailVerificationToken)
+        .filter(EmailVerificationToken.token_hash == token_hash)
+        .first()
+    )
+
+    if not verification_token_record or not verification_token_record.is_valid():
+        log_security_event(
+            request,
+            event_type="email_verification_failed",
+            outcome="deny",
+            reason_code="UNAUTHORIZED",
+        )
+        if verification_token_record and verification_token_record.is_expired():
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="TOKEN_EXPIRED",
+                message="This verification link has expired. Please request a new one.",
+            )
+        raise_app_error(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="TOKEN_INVALID",
+            message="This verification link is invalid. Please request a new one.",
+        )
+
+    # Get user
+    user = verification_token_record.user
+    if not user or not user.is_active:
+        log_security_event(
+            request,
+            event_type="email_verification_failed",
+            outcome="deny",
+            reason_code="UNAUTHORIZED",
+        )
+        raise_app_error(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="UNAUTHORIZED",
+            message="User not found or inactive",
+        )
+
+    # Mark email as verified
+    user.email_verified = True
+    user.email_verified_at = datetime.now(UTC)
+    verification_token_record.used_at = datetime.now(UTC)
+
+    db.commit()
+
+    # Log successful verification
+    log_security_event(
+        request,
+        event_type="email_verification_success",
+        outcome="allow",
+        user_id=str(user.id),
+    )
+
+    return StatusResponse(status="ok", message="Email verified successfully")
+
+
+@router.post(
+    "/resend-verification",
+    response_model=StatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Resend verification email",
+    description="Resend verification email. Always returns success to prevent email enumeration.",
+)
+async def resend_verification(
+    request_data: ResendVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> StatusResponse:
+    """Resend verification email."""
+    email_normalized = request_data.email.lower().strip()
+
+    # Always return success to prevent email enumeration
+    user = db.query(User).filter(User.email == email_normalized, User.is_active).first()
+
+    if user:
+        # Check if already verified
+        if user.email_verified:
+            # Still return success (security: don't reveal if email exists)
+            return StatusResponse(
+                status="ok",
+                message="If an account exists and is unverified, you will receive an email shortly.",
+            )
+
+        # Generate new verification token
+        verification_token = generate_email_verification_token()
+        token_hash = hash_token(verification_token)
+        expires_at = datetime.now(UTC) + timedelta(minutes=settings.EMAIL_VERIFICATION_EXPIRE_MINUTES)
+
+        # Revoke old unused tokens for this user
+        db.query(EmailVerificationToken).filter(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        ).update({"used_at": datetime.now(UTC)})
+
+        # Create new verification token record
+        verification_token_record = EmailVerificationToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        db.add(verification_token_record)
+        user.email_verification_sent_at = datetime.now(UTC)
+        db.commit()
+
+        # Send verification email
+        try:
+            from app.services.email.service import send_email
+
+            verify_link = f"{settings.FRONTEND_BASE_URL}{settings.EMAIL_VERIFY_PATH}?token={verification_token}"
+            email_subject = "Verify your email"
+            email_body_text = f"""
+Welcome! Please verify your email address to complete your account setup.
+
+Click the link below to verify your email:
+{verify_link}
+
+This link will expire in {settings.EMAIL_VERIFICATION_EXPIRE_MINUTES // 60} hours.
+
+If you did not create this account, please ignore this email.
+"""
+            email_body_html = f"""
+<html>
+<body>
+<p>Welcome! Please verify your email address to complete your account setup.</p>
+<p><a href="{verify_link}">Click here to verify your email</a></p>
+<p>Or copy and paste this link into your browser:</p>
+<p>{verify_link}</p>
+<p>This link will expire in {settings.EMAIL_VERIFICATION_EXPIRE_MINUTES // 60} hours.</p>
+<p>If you did not create this account, please ignore this email.</p>
+</body>
+</html>
+"""
+            send_email(
+                to=user.email,
+                subject=email_subject,
+                body_text=email_body_text.strip(),
+                body_html=email_body_html.strip(),
+            )
+        except Exception as e:
+            # Log error but don't fail the request (security: always return success)
+            logger.error(f"Failed to send verification email: {e}", exc_info=True)
+
+        # Log security event
+        log_security_event(
+            request,
+            event_type="email_verification_resent",
+            outcome="allow",
+            user_id=str(user.id),
+        )
+
+    # Always return generic success message
+    return StatusResponse(
+        status="ok",
+        message="If an account exists and is unverified, you will receive an email shortly.",
     )
 
 
@@ -189,6 +437,35 @@ async def login(
         else False
     )
 
+    # Check for OAuth-only accounts before generic error
+    # This check happens after password verification to maintain timing protection
+    if user and not password_valid and not user.password_hash:
+        # Check if user has OAuth identities
+        oauth_identities = db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id).all()
+        if oauth_identities:
+            # User is OAuth-only - get the provider
+            provider = oauth_identities[0].provider
+            provider_display = provider.replace("_", " ").title() if "_" in provider else provider.title()
+            
+            # Record failure
+            record_login_failure(email_normalized, ip)
+            
+            # Log security event
+            log_security_event(
+                request,
+                event_type="auth_login_failed",
+                outcome="deny",
+                reason_code="OAUTH_ONLY_ACCOUNT",
+                user_id=str(user.id),
+            )
+            
+            raise_app_error(
+                status_code=status.HTTP_403_FORBIDDEN,
+                code="OAUTH_ONLY_ACCOUNT",
+                message=f"This account was created with {provider_display}. Please sign in with {provider_display} instead.",
+                details={"provider": provider},
+            )
+
     # Generic error for invalid credentials (don't reveal if email exists)
     if not user or not password_valid:
         # Record failure
@@ -221,6 +498,21 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
             code="FORBIDDEN",
             message="User account is inactive",
+        )
+
+    # Check if email is verified
+    if not user.email_verified:
+        log_security_event(
+            request,
+            event_type="auth_login_failed",
+            outcome="deny",
+            reason_code="EMAIL_NOT_VERIFIED",
+            user_id=str(user.id),
+        )
+        raise_app_error(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="EMAIL_NOT_VERIFIED",
+            message="Please verify your email before logging in.",
         )
 
     # Clear failure counters on successful login
@@ -495,6 +787,44 @@ async def request_password_reset(
         db.add(reset_token_record)
         db.commit()
 
+        # Send password reset email
+        try:
+            from app.services.email.service import send_email
+
+            reset_link = f"{settings.FRONTEND_BASE_URL}/reset-password?token={reset_token}"
+            email_subject = "Password Reset Request"
+            email_body_text = f"""
+You requested a password reset for your account.
+
+Click the link below to reset your password:
+{reset_link}
+
+This link will expire in {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutes.
+
+If you did not request this reset, please ignore this email.
+"""
+            email_body_html = f"""
+<html>
+<body>
+<p>You requested a password reset for your account.</p>
+<p><a href="{reset_link}">Click here to reset your password</a></p>
+<p>Or copy and paste this link into your browser:</p>
+<p>{reset_link}</p>
+<p>This link will expire in {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutes.</p>
+<p>If you did not request this reset, please ignore this email.</p>
+</body>
+</html>
+"""
+            send_email(
+                to=user.email,
+                subject=email_subject,
+                body_text=email_body_text.strip(),
+                body_html=email_body_html.strip(),
+            )
+        except Exception as e:
+            # Log error but don't fail the request (security: always return success)
+            logger.error(f"Failed to send password reset email: {e}", exc_info=True)
+
         # Log security event (never log the token itself)
         log_security_event(
             request,
@@ -506,18 +836,18 @@ async def request_password_reset(
     # Always return generic success message
     return StatusResponse(
         status="ok",
-        message="If the email exists, a reset link will be sent.",
+        message="If an account exists, you will receive an email shortly.",
     )
 
 
 @router.post(
-    "/password-reset/confirm",
+    "/reset-password",
     response_model=StatusResponse,
     status_code=status.HTTP_200_OK,
-    summary="Confirm password reset",
+    summary="Reset password",
     description="Reset password using a reset token.",
 )
-async def confirm_password_reset(
+async def reset_password(
     request_data: PasswordResetConfirm,
     request: Request,
     db: Session = Depends(get_db),

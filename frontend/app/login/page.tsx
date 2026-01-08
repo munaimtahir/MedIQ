@@ -26,11 +26,15 @@ function LoginForm() {
   const linkToken = searchParams.get("link_token");
   const linkEmail = searchParams.get("email");
   const mfaRequired = searchParams.get("mfa");
+  const emailParam = searchParams.get("email");
 
   // Form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [oauthOnlyProvider, setOauthOnlyProvider] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -87,6 +91,13 @@ function LoginForm() {
     }
   }, [mfaRequired]);
 
+  // Pre-fill email from query param if present
+  useEffect(() => {
+    if (emailParam && !email) {
+      setEmail(emailParam);
+    }
+  }, [emailParam, email]);
+
   // Check if user is already authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -136,7 +147,20 @@ function LoginForm() {
 
       if (result.error) {
         // Handle specific error codes
-        if (result.error.code === "RATE_LIMITED") {
+        if (result.error.code === "OAUTH_ONLY_ACCOUNT") {
+          const provider = (result.error.details as { provider?: string })?.provider || "OAuth";
+          const providerDisplay = provider === "GOOGLE" ? "Google" : provider === "MICROSOFT" ? "Microsoft" : provider;
+          setOauthOnlyProvider(provider);
+          setErrors({
+            general: `This account was created with ${providerDisplay}. Please sign in with ${providerDisplay} instead.`,
+          });
+        } else if (result.error.code === "EMAIL_NOT_VERIFIED") {
+          setErrors({
+            general: "Please verify your email before logging in.",
+          });
+          // Show resend verification option
+          setShowResendVerification(true);
+        } else if (result.error.code === "RATE_LIMITED") {
           const retryAfter = (result.error.details as { retry_after_seconds?: number })
             ?.retry_after_seconds;
           setErrors({
@@ -182,6 +206,38 @@ function LoginForm() {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!email.trim()) return;
+
+    setResending(true);
+    setErrors({});
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrors({ general: data.error?.message || "Failed to resend verification email" });
+      } else {
+        setErrors({});
+        setShowResendVerification(false);
+        // Show success - you could use a toast here
+        setErrors({ general: "Verification email sent! Please check your inbox." });
+        setTimeout(() => setErrors({}), 5000);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
+      setErrors({ general: errorMessage });
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <AuthCardShell
       title="Sign in"
@@ -194,12 +250,25 @@ function LoginForm() {
       </div>
 
       {/* Divider */}
-      <div data-animate>
-        <DividerWithText text="or continue with email" />
-      </div>
+      {!oauthOnlyProvider && (
+        <div data-animate>
+          <DividerWithText text="or continue with email" />
+        </div>
+      )}
 
       {/* Email Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* OAuth-only message */}
+        {oauthOnlyProvider && (
+          <div data-animate className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 font-medium mb-1">
+              Use {oauthOnlyProvider === "GOOGLE" ? "Google" : oauthOnlyProvider === "MICROSOFT" ? "Microsoft" : oauthOnlyProvider} to sign in
+            </p>
+            <p className="text-xs text-blue-700">
+              This account was created with {oauthOnlyProvider === "GOOGLE" ? "Google" : oauthOnlyProvider === "MICROSOFT" ? "Microsoft" : oauthOnlyProvider}. Please use the button above to sign in.
+            </p>
+          </div>
+        )}
         {/* Email Field */}
         <div data-animate className="space-y-2">
           <Label htmlFor="email" className="text-slate-700 font-medium">
@@ -213,12 +282,16 @@ function LoginForm() {
             onChange={(e) => {
               setEmail(e.target.value);
               clearFieldError("email");
+              // Clear OAuth-only state when email changes
+              if (oauthOnlyProvider) {
+                setOauthOnlyProvider(null);
+              }
             }}
             autoComplete="email"
-            disabled={loading}
+            disabled={loading || !!oauthOnlyProvider}
             className={`h-11 rounded-lg border-slate-200 bg-white focus:border-primary focus:ring-primary ${
               errors.email ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""
-            }`}
+            } ${oauthOnlyProvider ? "opacity-50 cursor-not-allowed" : ""}`}
           />
           {errors.email && (
             <p className="text-sm text-red-600">{errors.email}</p>
@@ -238,19 +311,15 @@ function LoginForm() {
             placeholder="Enter your password"
             error={errors.password}
             autoComplete="current-password"
+            disabled={!!oauthOnlyProvider}
           />
         </div>
 
         {/* Forgot Password Link */}
         <div data-animate className="flex justify-end">
-          {/* TODO: Wire to /forgot-password when backend supports password reset */}
           <Link
-            href="#"
+            href="/forgot-password"
             className="text-sm text-primary hover:underline underline-offset-2"
-            onClick={(e) => {
-              e.preventDefault();
-              // Password reset not implemented yet
-            }}
           >
             Forgot password?
           </Link>
@@ -260,10 +329,38 @@ function LoginForm() {
         {errors.general && (
           <div data-animate>
             <InlineAlert
-              variant="error"
+              variant={errors.general.includes("sent!") ? "success" : "error"}
               message={errors.general}
-              onDismiss={() => setErrors((prev) => ({ ...prev, general: undefined }))}
+              onDismiss={() => {
+                setErrors((prev) => ({ ...prev, general: undefined }));
+                setShowResendVerification(false);
+              }}
             />
+          </div>
+        )}
+
+        {/* Resend Verification */}
+        {showResendVerification && (
+          <div data-animate className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+            <p className="text-sm text-blue-800">
+              Your email hasn't been verified yet. Check your inbox or spam folder.
+            </p>
+            <Button
+              onClick={handleResendVerification}
+              disabled={resending}
+              variant="outline"
+              size="sm"
+              className="w-full"
+            >
+              {resending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Resend verification email"
+              )}
+            </Button>
           </div>
         )}
 
@@ -271,8 +368,8 @@ function LoginForm() {
         <div data-animate>
           <Button
             type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-lg bg-primary font-semibold text-white hover:bg-primary/90 transition-all duration-200"
+            disabled={loading || !!oauthOnlyProvider}
+            className="w-full h-11 rounded-lg bg-primary font-semibold text-white hover:bg-primary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

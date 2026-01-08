@@ -1,4 +1,5 @@
 import { StudentSidebar } from "@/components/student/Sidebar";
+import { StudentHeader } from "@/components/student/Header";
 import { requireOnboardedUser } from "@/lib/server/authGuard";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
@@ -8,9 +9,12 @@ export default async function StudentLayout({ children }: { children: React.Reac
   await requireOnboardedUser();
 
   return (
-    <div className="flex min-h-screen">
-      <StudentSidebar />
-      <main className="flex-1 p-8">{children}</main>
+    <div className="flex min-h-screen flex-col">
+      <StudentHeader />
+      <div className="flex flex-1">
+        <StudentSidebar />
+        <main className="flex-1 p-8">{children}</main>
+      </div>
     </div>
   );
 }

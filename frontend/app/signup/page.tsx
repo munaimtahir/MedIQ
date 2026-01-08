@@ -27,6 +27,8 @@ export default function SignupPage() {
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
     email?: string;
@@ -68,6 +70,10 @@ export default function SignupPage() {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
       newErrors.password = "Password must be at least 8 characters";
+    } else if (!/[a-zA-Z]/.test(formData.password)) {
+      newErrors.password = "Password must contain at least one letter";
+    } else if (!/[0-9]/.test(formData.password)) {
+      newErrors.password = "Password must contain at least one number";
     }
 
     if (!formData.confirmPassword) {
@@ -104,7 +110,10 @@ export default function SignupPage() {
 
       if (result.error) {
         if (result.error.code === "CONFLICT") {
-          setErrors({ email: "An account with this email already exists" });
+          setErrors({ 
+            email: "An account with this email already exists",
+            general: "An account with this email already exists. Please log in instead."
+          });
         } else if (result.error.code === "RATE_LIMITED") {
           setErrors({
             general: "Too many signup attempts. Please try again later.",
@@ -118,8 +127,9 @@ export default function SignupPage() {
       }
 
       if (result.data?.user) {
-        // Success - route to onboarding (new users always go to onboarding)
-        await routeAfterAuth(router.push);
+        // Success - show verification message (don't route, user needs to verify email)
+        setSuccess(true);
+        setErrors({});
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred";
@@ -129,11 +139,115 @@ export default function SignupPage() {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email.trim()) return;
+
+    setResending(true);
+    setErrors({});
+
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrors({ general: data.error?.message || "Failed to resend verification email" });
+      } else {
+        // Show success message
+        setErrors({});
+        // You could show a toast here
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
+      setErrors({ general: errorMessage });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Show success state after signup
+  if (success) {
+    const isDev = process.env.NODE_ENV === "development";
+    return (
+      <AuthPageLayout>
+        <AuthCardShell
+          title="Check your email"
+          subtitle="We've sent a verification link to your email address."
+          footer={<AuthCardFooter />}
+        >
+          <div className="space-y-4">
+            <div data-animate>
+              <InlineAlert
+                variant="success"
+                message="Account created successfully! Please verify your email to continue."
+              />
+            </div>
+
+            <div data-animate className="space-y-3">
+              <p className="text-sm text-slate-600">
+                Click the link in the email to verify your account. The link will expire in 24 hours.
+              </p>
+
+              {isDev && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800 font-medium mb-1">Development Mode</p>
+                  <a
+                    href="http://localhost:8025"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Open Mailpit inbox →
+                  </a>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleResendVerification}
+                  disabled={resending}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {resending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Resend verification email"
+                  )}
+                </Button>
+
+                <p className="text-xs text-slate-500 text-center">
+                  Didn't receive the email? Check your spam folder.
+                </p>
+              </div>
+            </div>
+
+            <div data-animate className="text-center text-sm text-slate-600 pt-4 border-t">
+              <Link
+                href="/login"
+                className="font-medium text-primary hover:underline underline-offset-2"
+              >
+                Back to sign in
+              </Link>
+            </div>
+          </div>
+        </AuthCardShell>
+      </AuthPageLayout>
+    );
+  }
+
   return (
     <AuthPageLayout>
       <AuthCardShell
         title="Create your account"
-        subtitle="You'll set your year and blocks in the next step."
+        subtitle="You'll verify your email in the next step."
         footer={<AuthCardFooter />}
       >
         {/* OAuth Buttons */}
@@ -221,12 +335,22 @@ export default function SignupPage() {
 
           {/* Error Alert */}
           {errors.general && (
-            <div data-animate>
+            <div data-animate className="space-y-3">
               <InlineAlert
                 variant="error"
                 message={errors.general}
                 onDismiss={() => setErrors((prev) => ({ ...prev, general: undefined }))}
               />
+              {errors.general.includes("already exists") && (
+                <Button
+                  type="button"
+                  onClick={() => router.push(`/login?email=${encodeURIComponent(formData.email.trim())}`)}
+                  variant="default"
+                  className="w-full"
+                >
+                  Go to Login
+                </Button>
+              )}
             </div>
           )}
 

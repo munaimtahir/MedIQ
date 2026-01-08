@@ -75,6 +75,16 @@ services:
     networks:
       - exam_platform_network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: exam_platform_mailpit
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    restart: unless-stopped
+    networks:
+      - exam_platform_network
+
   backend:
     build:
       context: ../../../backend
@@ -107,6 +117,14 @@ services:
       - OAUTH_MICROSOFT_TENANT=${OAUTH_MICROSOFT_TENANT:-common}
       - OAUTH_ALLOWED_REDIRECT_URIS=${OAUTH_ALLOWED_REDIRECT_URIS:-http://localhost:3000,http://localhost:8000}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
+      # Email Configuration
+      - EMAIL_BACKEND=${EMAIL_BACKEND:-mailpit}
+      - EMAIL_HOST=${EMAIL_HOST:-mailpit}
+      - EMAIL_PORT=${EMAIL_PORT:-1025}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@local.test}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-false}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
     depends_on:
       postgres:
         condition: service_healthy

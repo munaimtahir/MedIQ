@@ -75,18 +75,49 @@ export interface UserProfile {
 // Existing Types
 // ============================================================================
 
-export interface Block {
-  id: string;
+// ============================================================================
+// Syllabus Types (New Structure)
+// ============================================================================
+
+export interface Year {
+  id: number;
   name: string;
-  year: number;
-  description?: string;
+  order_no: number;
+}
+
+export interface Block {
+  id: number;
+  year_id: number;
+  code: string;
+  name: string;
+  order_no: number;
 }
 
 export interface Theme {
   id: number;
-  block_id: string;
-  name: string;
+  block_id: number;
+  title: string;
+  order_no: number;
   description?: string;
+}
+
+// Admin types
+export interface YearAdmin extends Year {
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface BlockAdmin extends Block {
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ThemeAdmin extends Theme {
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Question {
@@ -156,10 +187,23 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
 }
 
-// Syllabus APIs
+// Syllabus APIs (Student)
 export const syllabusAPI = {
-  getBlocks: async (year?: number): Promise<Block[]> => {
-    const params = year ? `?year=${year}` : "";
+  getYears: async (): Promise<Year[]> => {
+    const response = await fetch(`/api/syllabus/years`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to load years");
+    }
+
+    return response.json();
+  },
+  getBlocks: async (year: string | number): Promise<Block[]> => {
+    const params = `?year=${encodeURIComponent(year)}`;
     const response = await fetch(`/api/syllabus/blocks${params}`, {
       method: "GET",
       credentials: "include",
@@ -172,8 +216,12 @@ export const syllabusAPI = {
 
     return response.json();
   },
-  getThemes: async (blockId?: string): Promise<Theme[]> => {
-    const params = blockId ? `?block_id=${blockId}` : "";
+  getThemes: async (blockId: number): Promise<Theme[]> => {
+    // Validate blockId - must be a valid positive integer
+    if (blockId === null || blockId === undefined || typeof blockId !== "number" || isNaN(blockId) || blockId <= 0) {
+      throw new Error("Valid block ID is required");
+    }
+    const params = `?block_id=${blockId}`;
     const response = await fetch(`/api/syllabus/themes${params}`, {
       method: "GET",
       credentials: "include",
@@ -181,9 +229,263 @@ export const syllabusAPI = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || "Failed to load themes");
+      const errorMessage = errorData.error?.message || `Failed to load themes (${response.status})`;
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).errorData = errorData;
+      throw error;
     }
 
+    return response.json();
+  },
+};
+
+// Admin Syllabus APIs
+export const adminSyllabusAPI = {
+  // Years
+  getYears: async (): Promise<YearAdmin[]> => {
+    const response = await fetch(`/api/admin/syllabus/years`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to load years");
+    }
+    return response.json();
+  },
+  createYear: async (data: { name: string; order_no: number; is_active?: boolean }): Promise<YearAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/years`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to create year");
+    }
+    return response.json();
+  },
+  updateYear: async (id: number, data: Partial<YearAdmin>): Promise<YearAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/years/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to update year");
+    }
+    return response.json();
+  },
+  enableYear: async (id: number): Promise<YearAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/years/${id}/enable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to enable year");
+    }
+    return response.json();
+  },
+  disableYear: async (id: number): Promise<YearAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/years/${id}/disable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to disable year");
+    }
+    return response.json();
+  },
+  // Blocks
+  getBlocks: async (yearId: number): Promise<BlockAdmin[]> => {
+    // Validate yearId - must be a valid positive integer
+    if (yearId === null || yearId === undefined || typeof yearId !== "number" || isNaN(yearId) || yearId <= 0) {
+      throw new Error("Valid year ID is required");
+    }
+    const response = await fetch(`/api/admin/syllabus/years/${yearId}/blocks`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || `Failed to load blocks (${response.status})`;
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).errorData = errorData;
+      throw error;
+    }
+    return response.json();
+  },
+  createBlock: async (data: { year_id: number; code: string; name: string; order_no: number; is_active?: boolean }): Promise<BlockAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/blocks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to create block");
+    }
+    return response.json();
+  },
+  updateBlock: async (id: number, data: Partial<BlockAdmin>): Promise<BlockAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/blocks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to update block");
+    }
+    return response.json();
+  },
+  enableBlock: async (id: number): Promise<BlockAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/blocks/${id}/enable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to enable block");
+    }
+    return response.json();
+  },
+  disableBlock: async (id: number): Promise<BlockAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/blocks/${id}/disable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to disable block");
+    }
+    return response.json();
+  },
+  reorderBlocks: async (yearId: number, orderedBlockIds: number[]): Promise<void> => {
+    const response = await fetch(`/api/admin/syllabus/years/${yearId}/blocks/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ordered_block_ids: orderedBlockIds }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to reorder blocks");
+    }
+  },
+  // Themes
+  getThemes: async (blockId: number): Promise<ThemeAdmin[]> => {
+    // Validate blockId - must be a valid positive integer
+    if (blockId === null || blockId === undefined || typeof blockId !== "number" || isNaN(blockId) || blockId <= 0) {
+      throw new Error("Valid block ID is required");
+    }
+    const response = await fetch(`/api/admin/syllabus/blocks/${blockId}/themes`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || `Failed to load themes (${response.status})`;
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).errorData = errorData;
+      throw error;
+    }
+    return response.json();
+  },
+  createTheme: async (data: { block_id: number; title: string; order_no: number; description?: string; is_active?: boolean }): Promise<ThemeAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/themes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to create theme");
+    }
+    return response.json();
+  },
+  updateTheme: async (id: number, data: Partial<ThemeAdmin>): Promise<ThemeAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/themes/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to update theme");
+    }
+    return response.json();
+  },
+  enableTheme: async (id: number): Promise<ThemeAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/themes/${id}/enable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to enable theme");
+    }
+    return response.json();
+  },
+  disableTheme: async (id: number): Promise<ThemeAdmin> => {
+    const response = await fetch(`/api/admin/syllabus/themes/${id}/disable`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to disable theme");
+    }
+    return response.json();
+  },
+  reorderThemes: async (blockId: number, orderedThemeIds: number[]): Promise<void> => {
+    const response = await fetch(`/api/admin/syllabus/blocks/${blockId}/themes/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ordered_theme_ids: orderedThemeIds }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to reorder themes");
+    }
+  },
+  // CSV Import/Export
+  downloadTemplate: async (type: "years" | "blocks" | "themes"): Promise<Blob> => {
+    const response = await fetch(`/api/admin/syllabus/import/templates/${type}`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to download template");
+    }
+    return response.blob();
+  },
+  importCSV: async (type: "years" | "blocks" | "themes", file: File, dryRun: boolean, autoCreate: boolean): Promise<any> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`/api/admin/syllabus/import/${type}?dry_run=${dryRun}&auto_create=${autoCreate}`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Failed to import CSV");
+    }
     return response.json();
   },
 };
@@ -203,7 +505,11 @@ export const adminAPI = {
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || "Failed to load questions");
+      const errorMessage = errorData.error?.message || `Failed to load questions (${response.status})`;
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).errorData = errorData;
+      throw error;
     }
     return response.json();
   },
@@ -424,3 +730,5 @@ export const onboardingAPI = {
     return response.json();
   },
 };
+
+// Allowed blocks API removed - platform is now fully self-paced

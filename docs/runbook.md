@@ -1,4 +1,24 @@
-# Runbook - Operations Guide
+# Runbook
+
+## Local Development Email (Mailpit)
+
+### Mailpit Inbox
+- **Web UI**: `http://localhost:8025`
+- **SMTP Port**: `1025` (inside docker network: `mailpit:1025`)
+
+### Configuration
+- Email backend is configured via `EMAIL_BACKEND` environment variable:
+  - `mailpit` or `smtp`: Uses SMTP provider (connects to Mailpit in dev)
+  - `console`: Falls back to console logging (if Mailpit is unavailable)
+
+### Testing Password Reset
+1. Start Mailpit: `docker compose up -d mailpit`
+2. Open Mailpit UI: `http://localhost:8025`
+3. Trigger password reset from frontend or admin panel
+4. Check Mailpit inbox for reset email with reset link
+
+### Fallback Behavior
+If Mailpit is not running or SMTP connection fails, the system automatically falls back to console provider, which logs emails to backend logs/console. - Operations Guide
 
 ## Overview
 

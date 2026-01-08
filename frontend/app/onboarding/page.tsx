@@ -7,6 +7,7 @@ import {
   onboardingAPI,
   type OnboardingYearOption,
 } from "@/lib/api";
+import { useUserStore } from "@/store/userStore";
 import { OnboardingWizardShell } from "@/components/auth/OnboardingWizardShell";
 import { StepContainer } from "@/components/auth/StepContainer";
 import { SelectableCard, SelectableChip } from "@/components/auth/SelectableCard";
@@ -25,6 +26,7 @@ interface OnboardingState {
 export default function OnboardingPage() {
   const router = useRouter();
   const contentRef = useRef<HTMLDivElement>(null);
+  const { fetchUser } = useUserStore();
 
   // Data state
   const [years, setYears] = useState<OnboardingYearOption[]>([]);
@@ -228,6 +230,9 @@ export default function OnboardingPage() {
             ? Array.from(selections.subjectIds)
             : undefined,
       });
+
+      // Refresh user store to get updated onboarding status
+      await fetchUser();
 
       // Success - route to dashboard
       router.push("/student/dashboard");

@@ -65,6 +65,34 @@ class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8, max_length=128)
 
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate password strength: at least 1 letter and 1 number."""
+        if not any(c.isalpha() for c in v):
+            raise ValueError("Password must contain at least one letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+class EmailVerificationRequest(BaseModel):
+    """Email verification request schema."""
+
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """Resend verification email request schema."""
+
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        """Normalize email to lowercase."""
+        return v.lower().strip()
+
 
 # Response schemas
 class UserResponse(BaseModel):
@@ -94,7 +122,7 @@ class SignupResponse(BaseModel):
     """Signup response schema."""
 
     user: UserResponse
-    tokens: TokensResponse
+    message: str = "Account created. Please verify your email."
 
 
 class LoginResponse(BaseModel):

@@ -74,6 +74,20 @@ class Settings(BaseSettings):
 
     # Frontend URL for OAuth redirects
     FRONTEND_URL: str = Field(default="http://localhost:3000")
+    FRONTEND_BASE_URL: str = Field(default="http://localhost:3000")  # For password reset links
+    EMAIL_VERIFY_PATH: str = Field(default="/verify-email")
+    RESET_PASSWORD_PATH: str = Field(default="/reset-password")
+    
+    # Email verification
+    EMAIL_VERIFICATION_EXPIRE_MINUTES: int = Field(default=1440)  # 24 hours
+
+    # Email Configuration
+    EMAIL_BACKEND: str = Field(default="console")  # console, mailpit, smtp
+    EMAIL_HOST: str = Field(default="localhost")
+    EMAIL_PORT: int = Field(default=1025)
+    EMAIL_FROM: str = Field(default="noreply@local.test")
+    EMAIL_USE_TLS: bool = Field(default=False)
+    EMAIL_USE_SSL: bool = Field(default=False)
 
     # MFA
     MFA_ENCRYPTION_KEY: str | None = Field(default=None)  # Fernet key for encrypting TOTP secrets

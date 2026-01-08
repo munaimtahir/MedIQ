@@ -19,15 +19,18 @@ from app.models import (  # noqa: F401
     AttemptSession,
     Block,
     MFABackupCode,
+    Notification,
     OAuthIdentity,
     PasswordResetToken,
     Question,
     RefreshToken,
     Theme,
     User,
+    # UserAllowedBlock,  # Deprecated - no longer used
     UserBlock,
     UserProfile,
     UserSubject,
+    Year,
 )
 
 # this is the Alembic Config object, which provides

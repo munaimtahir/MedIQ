@@ -18,8 +18,10 @@ from app.core.logging import setup_logging
 from app.core.redis_client import init_redis
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.seed_auth import seed_demo_accounts
+from app.core.seed_syllabus import seed_syllabus_structure
 from app.db.base import Base
 from app.db.engine import engine
+from app.db.session import SessionLocal
 
 
 @asynccontextmanager
@@ -34,6 +36,19 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
     # Seed demo accounts if enabled
     seed_demo_accounts()
+    # Seed syllabus structure (years and blocks) if empty
+    db = SessionLocal()
+    try:
+        from app.models.syllabus import Year
+        year_count = db.query(Year).count()
+        if year_count == 0:
+            print("No years found, seeding syllabus structure...")
+            seed_syllabus_structure(db)
+            print("Syllabus structure seeded successfully")
+    except Exception as e:
+        print(f"Error seeding syllabus structure: {e}")
+    finally:
+        db.close()
     yield
     # Shutdown
     pass
@@ -79,6 +94,12 @@ def create_app() -> FastAPI:
             "version": "1.0.0",
             "docs_url": "/docs" if settings.ENV != "prod" else None,
         }
+
+    # Health endpoint at root level (for convenience)
+    @app.get("/health", tags=["Health"])
+    async def health():
+        """Health check endpoint - returns 200 if the API is running."""
+        return {"status": "ok"}
 
     return app
 

@@ -90,3 +90,8 @@ def hash_token(token: str) -> str:
 def generate_password_reset_token() -> str:
     """Generate a password reset token (opaque random string)."""
     return secrets.token_urlsafe(32)
+
+
+def generate_email_verification_token() -> str:
+    """Generate an email verification token (opaque random string)."""
+    return secrets.token_urlsafe(32)

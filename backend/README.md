@@ -326,6 +326,34 @@ When `ENV=dev` and `SEED_DEMO_ACCOUNTS=true`, the following accounts are automat
 - **Admin**: `admin@example.com` / `Admin123!`
 - **Student**: `student@example.com` / `Student123!`
 
+### Creating Admin User Manually
+
+You can create an admin user manually using the provided script:
+
+**Via Docker (Recommended):**
+```bash
+# Using default credentials (admin@example.com / Admin123!)
+docker compose -f infra/docker/compose/docker-compose.dev.yml exec backend python scripts/create_admin.py
+
+# With custom credentials
+docker compose -f infra/docker/compose/docker-compose.dev.yml exec backend python scripts/create_admin.py --email admin@test.com --password MySecurePass123! --name "Admin Name"
+```
+
+**Directly (if running locally):**
+```bash
+cd backend
+python scripts/create_admin.py --email admin@test.com --password MySecurePass123! --name "Admin Name"
+```
+
+**Using helper scripts:**
+```bash
+# Windows
+backend\scripts\create_admin.bat
+
+# Linux/Mac
+bash backend/scripts/create_admin.sh
+```
+
 ### Using Authentication
 
 **Sign up:**

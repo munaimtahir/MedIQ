@@ -255,7 +255,10 @@ def get_published_questions(
 def create_session(
     session_data: SessionCreate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)
 ):
-    """Create a practice session"""
+    """
+    Create a practice session.
+    Platform is self-paced - no restrictions on block/theme selection.
+    """
     user = get_user(db, user_id)
     if user.role != "student":
         raise HTTPException(status_code=403, detail="Student access required")

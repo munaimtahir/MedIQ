@@ -13,7 +13,9 @@ from app.models.academic import (
     UserProfile,
     UserSubject,
 )
+from app.models.syllabus import Block, Year
 from app.models.user import User, UserRole
+# UserAllowedBlock model deprecated - no longer used for restrictions
 from app.schemas.academic import (
     OnboardingBlockOption,
     OnboardingOptionsResponse,
@@ -26,6 +28,7 @@ from app.schemas.academic import (
     UserProfileSubjectResponse,
     UserProfileYearResponse,
 )
+# Allowed blocks schemas deprecated - no longer used
 
 router = APIRouter(tags=["Onboarding"])
 
@@ -279,3 +282,54 @@ async def get_user_profile(
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
+
+
+@router.put(
+    "/users/me/profile",
+    response_model=UserProfileResponse,
+    summary="Update user profile",
+    description="Update the current user's profile (year selection).",
+)
+async def update_user_profile(
+    request: OnboardingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserProfileResponse:
+    """
+    Update user profile year selection.
+    Year selection is for navigation/organization only - no restrictions on practice.
+    """
+    # Validate year exists and is active
+    year = (
+        db.query(AcademicYear)
+        .filter(
+            AcademicYear.id == request.year_id,
+            AcademicYear.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not year:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or inactive academic year selected",
+        )
+
+    # Get or create user profile
+    profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    if not profile:
+        profile = UserProfile(user_id=current_user.id)
+        db.add(profile)
+
+    # Update profile
+    profile.selected_year_id = request.year_id
+    profile.onboarding_completed = True
+
+    db.commit()
+    db.refresh(profile)
+
+    # Return updated profile (reuse get_user_profile logic)
+    return await get_user_profile(db, current_user)
+
+
+# Allowed blocks endpoints removed - platform is now fully self-paced
+# Students can practice any block/theme without restrictions

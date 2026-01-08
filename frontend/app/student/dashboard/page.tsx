@@ -1,148 +1,123 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDashboardData } from "@/lib/dashboard/hooks";
+import { NextBestActionCard } from "@/components/student/dashboard/NextBestActionCard";
+import { StreakSummaryCard } from "@/components/student/dashboard/StreakSummaryCard";
+import { BlockProgressCard } from "@/components/student/dashboard/BlockProgressCard";
+import { WeakThemesCard } from "@/components/student/dashboard/WeakThemesCard";
+import { QuickPracticePresetsCard } from "@/components/student/dashboard/QuickPracticePresetsCard";
+import { RecentActivityCard } from "@/components/student/dashboard/RecentActivityCard";
+import { BrowseSyllabusCard } from "@/components/student/dashboard/BrowseSyllabusCard";
+import { AnnouncementsCard } from "@/components/student/dashboard/AnnouncementsCard";
+import { DashboardSkeleton } from "@/components/student/dashboard/DashboardSkeleton";
+import { useUserStore } from "@/store/userStore";
 import { Button } from "@/components/ui/button";
-import { onboardingAPI, UserProfile, UserProfileBlock } from "@/lib/api";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { BookOpen, TrendingUp, Clock, Target } from "lucide-react";
-import { SkeletonCardGrid } from "@/components/status/SkeletonCardGrid";
-import { EmptyState } from "@/components/status/EmptyState";
-import { ErrorState } from "@/components/status/ErrorState";
 
 export default function StudentDashboard() {
+  const { data, loading, error } = useDashboardData();
+  const { user } = useUserStore();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
 
-  const loadProfile = () => {
-    setLoading(true);
-    setError(null);
-    onboardingAPI
-      .getProfile()
-      .then(setProfile)
-      .catch((err) => {
-        console.error("Failed to load profile:", err);
-        setError(err instanceof Error ? err : new Error("Failed to load profile"));
-      })
-      .finally(() => setLoading(false));
-  };
+  // Show skeleton while loading (but not if there's an error)
+  if (loading && !error) {
+    return <DashboardSkeleton />;
+  }
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  // Show error state
+  if (error && !data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Welcome{user?.name ? ` ${user.name}` : ""}!
+          </p>
+        </div>
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              Failed to Load Dashboard
+            </CardTitle>
+            <CardDescription>
+              We encountered an error while loading your dashboard data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {error.message || "An unexpected error occurred"}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => router.refresh()}
+                variant="default"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+              <Button
+                onClick={() => router.push("/student/blocks")}
+                variant="outline"
+              >
+                Go to Blocks
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const blocks = profile?.selected_blocks || [];
-  const yearName = profile?.selected_year?.display_name || "Your";
+  // Show skeleton if we have an error but are still loading (shouldn't happen, but safety check)
+  if (!data) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Continue your practice.</p>
+        <p className="text-muted-foreground">
+          Welcome{user?.name ? ` ${user.name}` : ""}!
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Questions</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">30</div>
-            <p className="text-xs text-muted-foreground">Available for practice</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Accuracy</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">Complete a session to see</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Time Spent</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">This week</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Target</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">Questions per day</p>
-          </CardContent>
-        </Card>
+      {/* Row 1: Next Best Action + Streak Summary */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <NextBestActionCard
+          nextAction={data.nextAction}
+          loading={false}
+          error={error}
+        />
+        <StreakSummaryCard metrics={data.metrics} loading={false} error={null} />
       </div>
 
-      <div>
-        <h2 className="mb-4 text-2xl font-semibold">{yearName} Blocks</h2>
-        {loading ? (
-          <SkeletonCardGrid cards={3} />
-        ) : error ? (
-          <ErrorState
-            variant="card"
-            title="Failed to load profile"
-            description={error.message || "An error occurred while loading your profile."}
-            actionLabel="Retry"
-            onAction={loadProfile}
-          />
-        ) : blocks.length === 0 ? (
-          <EmptyState
-            variant="card"
-            title="No blocks selected"
-            description="Complete onboarding to select your blocks and start practicing."
-            icon={<BookOpen className="h-8 w-8 text-slate-400" />}
-            actionLabel="Go to Onboarding"
-            onAction={() => router.push("/onboarding")}
-          />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {blocks.map((block) => (
-              <Card key={block.id} className="cursor-pointer transition-shadow hover:shadow-lg">
-                <CardHeader>
-                  <CardTitle>{block.display_name}</CardTitle>
-                  <CardDescription>Block {block.code}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={() => router.push(`/student/blocks/${block.id}`)}
-                    className="w-full"
-                  >
-                    View Block
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+      {/* Row 2: Block Progress + Weak Themes */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <BlockProgressCard blocks={data.blocks} loading={false} error={null} />
+        <WeakThemesCard weakThemes={data.weakThemes} loading={false} error={null} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Start</CardTitle>
-          <CardDescription>Start a practice session</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => router.push("/student/practice/build")} size="lg">
-            Start Practice Session
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Row 3: Quick Practice Presets + Recent Activity */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <QuickPracticePresetsCard />
+        <RecentActivityCard recentSessions={data.recentSessions} loading={false} error={null} />
+      </div>
+
+      {/* Row 4: Browse Syllabus + Announcements */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <BrowseSyllabusCard
+          blocks={data.blocks}
+          themesByBlock={data.themesByBlock}
+          loading={false}
+          error={null}
+        />
+        <AnnouncementsCard announcements={data.announcements} loading={false} error={null} />
+      </div>
     </div>
   );
 }

@@ -1,98 +1,159 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { studentAPI, syllabusAPI } from "@/lib/api";
-import { Question, Theme } from "@/lib/api";
+import { AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { ThemeHeader } from "@/components/student/themes/ThemeHeader";
+import { ThemeOverviewCard } from "@/components/student/themes/ThemeOverviewCard";
+import { PracticeOptionsCard } from "@/components/student/themes/PracticeOptionsCard";
+import { ThemeSkeleton } from "@/components/student/themes/ThemeSkeleton";
+import {
+  useBlockData,
+  useThemes,
+} from "@/lib/blocks/hooks";
 
 export default function ThemeDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const blockId = Number(params.blockId);
   const themeId = Number(params.themeId);
-  const [theme, setTheme] = useState<Theme | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([
-      syllabusAPI.getThemes().then((themes) => themes.find((t) => t.id === themeId)),
-      studentAPI.getQuestions(themeId),
-    ])
-      .then(([foundTheme, qs]) => {
-        setTheme(foundTheme || null);
-        setQuestions(qs);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [themeId]);
+  // Fetch block and year data
+  const { block, year, loading: loadingBlock, error: blockError } = useBlockData(blockId);
 
-  const handleStartPractice = async () => {
-    try {
-      const session = await studentAPI.createSession({
-        theme_id: themeId,
-        question_count: Math.min(questions.length, 30),
-        time_limit_minutes: 60,
-      });
-      router.push(`/student/session/${session.id}`);
-    } catch (error) {
-      console.error("Failed to create session:", error);
-      alert("Failed to start practice session");
-    }
-  };
+  // Fetch themes for the block
+  const { themes, loading: loadingThemes, error: themesError } = useThemes(blockId);
+
+  // Find current theme
+  const currentTheme = themes.find((t) => t.id === themeId);
+
+  // Determine next theme
+  const sortedThemes = [...themes].sort((a, b) => a.order_no - b.order_no);
+  const currentIndex = sortedThemes.findIndex((t) => t.id === themeId);
+  const nextTheme = currentIndex >= 0 && currentIndex < sortedThemes.length - 1
+    ? sortedThemes[currentIndex + 1]
+    : null;
+
+  // Loading state
+  if (loadingBlock || loadingThemes) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <ThemeSkeleton />
+      </div>
+    );
+  }
+
+  // Error state - block not found
+  if (blockError || !block) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <Button variant="ghost" onClick={() => router.push("/student/blocks")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Blocks
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Block not found</p>
+                <p className="text-sm text-muted-foreground">
+                  The block you're looking for doesn't exist or is no longer available.
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => router.push("/student/blocks")} className="mt-4">
+              Back to Blocks
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Error state - theme not found
+  if (themesError || !currentTheme) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <Button variant="ghost" onClick={() => router.push(`/student/blocks/${blockId}`)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Block
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Theme not found</p>
+                <p className="text-sm text-muted-foreground">
+                  {themesError
+                    ? themesError.message
+                    : "The theme you're looking for doesn't exist or is no longer available."}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button
+                onClick={() => router.push(`/student/blocks/${blockId}`)}
+                variant="outline"
+              >
+                Back to Block
+              </Button>
+              <Button onClick={() => router.push("/student/blocks")}>
+                Back to Blocks
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Button variant="ghost" onClick={() => router.back()}>
-          ← Back
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header */}
+      <ThemeHeader
+        theme={currentTheme}
+        block={block}
+        yearName={year?.name || "Unknown Year"}
+        status="not_available"
+      />
+
+      {/* Overview Card */}
+      <ThemeOverviewCard theme={currentTheme} block={block} />
+
+      {/* Practice Options */}
+      <PracticeOptionsCard
+        themeId={currentTheme.id}
+        blockId={block.id}
+      />
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between pt-4 border-t">
+        <Button
+          variant="ghost"
+          onClick={() => router.push(`/student/blocks/${blockId}`)}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Block {block.code}
         </Button>
-        <h1 className="mt-4 text-3xl font-bold">{theme?.name || "Theme"}</h1>
-        <p className="text-muted-foreground">{theme?.description}</p>
+        {nextTheme && (
+          <Button
+            variant="ghost"
+            onClick={() =>
+              router.push(`/student/blocks/${blockId}/themes/${nextTheme.id}`)
+            }
+          >
+            Next theme
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
-
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Practice Options</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="mb-2 text-sm text-muted-foreground">
-                  {questions.length} questions available
-                </p>
-                <Button onClick={handleStartPractice} size="lg" className="w-full">
-                  Start Practice Session
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div>
-            <h2 className="mb-4 text-2xl font-semibold">Sample Questions</h2>
-            <div className="space-y-4">
-              {questions.slice(0, 3).map((q) => (
-                <Card key={q.id}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{q.question_text}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                      {q.options.map((opt, idx) => (
-                        <li key={idx}>{opt}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

@@ -17,15 +17,15 @@ export async function POST(request: NextRequest) {
     // Call backend signup
     const { data, headers } = await backendFetch<{
       user: unknown;
-      tokens: { access_token: string; refresh_token: string; token_type: string };
+      message: string;
     }>("/auth/signup", {
       method: "POST",
       body: { name, email, password },
     });
 
-    // Set cookies
+    // Signup no longer returns tokens - user must verify email first
     const response = NextResponse.json(
-      { user: data.user },
+      { user: data.user, message: data.message },
       {
         status: 201,
         headers: {
@@ -33,12 +33,6 @@ export async function POST(request: NextRequest) {
         },
       },
     );
-
-    // Set auth cookies using centralized helper
-    setAuthCookies(response, {
-      accessToken: data.tokens.access_token,
-      refreshToken: data.tokens.refresh_token,
-    });
 
     return response;
   } catch (error: any) {

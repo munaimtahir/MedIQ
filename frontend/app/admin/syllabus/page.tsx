@@ -1,114 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { syllabusAPI } from "@/lib/api";
-import { Block, Theme } from "@/lib/api";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Upload } from "lucide-react";
+import { SyllabusManager } from "@/components/admin/syllabus/SyllabusManager";
+import { CsvImportDialog } from "@/components/admin/syllabus/CsvImportDialog";
+import { TemplatesMenu } from "@/components/admin/syllabus/TemplatesMenu";
 
 export default function SyllabusPage() {
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(1);
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([syllabusAPI.getBlocks(selectedYear), syllabusAPI.getThemes()])
-      .then(([blks, thms]) => {
-        setBlocks(blks);
-        setThemes(thms);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [selectedYear]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Syllabus Management</h1>
-          <p className="text-muted-foreground">Manage blocks and themes</p>
+          <p className="text-muted-foreground">
+            Manage years, blocks, and themes
+          </p>
         </div>
-        <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">Year 1</SelectItem>
-            <SelectItem value="2">Year 2</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <TemplatesMenu />
+          <Button onClick={() => setImportDialogOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import (CSV)
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Blocks</CardTitle>
-            <CardDescription>Year {selectedYear} blocks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p>Loading...</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {blocks.map((block) => (
-                    <TableRow key={block.id}>
-                      <TableCell className="font-medium">{block.id}</TableCell>
-                      <TableCell>{block.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{block.description}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+      {/* Main Manager */}
+      <SyllabusManager />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Themes</CardTitle>
-            <CardDescription>All themes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p>Loading...</p>
-            ) : (
-              <div className="max-h-96 space-y-2 overflow-y-auto">
-                {themes.map((theme) => (
-                  <div key={theme.id} className="rounded border p-2">
-                    <p className="font-medium">{theme.name}</p>
-                    <p className="text-sm text-muted-foreground">Block {theme.block_id}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* CSV Import Dialog */}
+      <CsvImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onSuccess={() => {
+          // Refetch data will be handled by individual hooks
+          setImportDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
