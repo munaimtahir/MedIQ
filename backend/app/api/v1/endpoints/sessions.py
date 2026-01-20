@@ -304,6 +304,67 @@ async def submit_test_session(
         # Log but don't fail
         import logging
         logging.getLogger(__name__).warning(f"Mistake classification failed for session {session_id}: {e}")
+    
+    # 3. Update BKT mastery (Bayesian Knowledge Tracing)
+    # Note: This requires concept_id extraction from session questions
+    # For now, this is a placeholder - full integration requires concept mapping
+    try:
+        from datetime import datetime
+        from app.learning_engine.bkt.service import update_bkt_from_attempt
+        
+        # Get all answers for this session
+        answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session_id)
+        answers_result = await db.execute(answers_stmt)
+        answers = answers_result.scalars().all()
+        
+        # Get session questions to extract concept_ids
+        questions_stmt = (
+            select(SessionQuestion)
+            .where(SessionQuestion.session_id == session_id)
+        )
+        questions_result = await db.execute(questions_stmt)
+        questions = questions_result.scalars().all()
+        questions_map = {q.question_id: q for q in questions}
+        
+        # Update BKT for each answered question
+        for answer in answers:
+            if answer.is_correct is None:
+                continue  # Skip unanswered
+            
+            # Get concept_id from snapshot_json
+            session_question = questions_map.get(answer.question_id)
+            if not session_question or not session_question.snapshot_json:
+                continue
+            
+            concept_id_str = session_question.snapshot_json.get("concept_id")
+            if not concept_id_str:
+                continue  # No concept mapping
+            
+            try:
+                from uuid import UUID as UUIDType
+                concept_id = UUIDType(concept_id_str)
+                
+                # Update BKT mastery
+                await update_bkt_from_attempt(
+                    db,
+                    user_id=current_user.id,
+                    question_id=answer.question_id,
+                    concept_id=concept_id,
+                    correct=answer.is_correct,
+                    current_time=answer.answered_at or datetime.now(),
+                    snapshot_mastery=False,  # Don't create snapshots on every submit
+                )
+            except (ValueError, KeyError) as e:
+                # Invalid concept_id or BKT update failed for this question
+                pass
+        
+        # Commit BKT updates
+        await db.commit()
+        
+    except Exception as e:
+        # Log but don't fail
+        import logging
+        logging.getLogger(__name__).warning(f"BKT mastery update failed for session {session_id}: {e}")
 
     return SessionSubmitResponse(
         session_id=session.id,

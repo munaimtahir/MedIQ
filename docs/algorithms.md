@@ -18,17 +18,18 @@ The Learning Intelligence Engine is a versioned, auditable system for computing 
 
 ## Algorithm Keys
 
-The system includes five core algorithms:
+The system includes six core algorithms:
 
 | Algo Key | Purpose | Status |
 |----------|---------|--------|
-| `mastery` | Track student understanding levels per block/theme | v0 seeded (stub) |
-| `revision` | Schedule questions for spaced repetition | v0 seeded (stub) |
-| `difficulty` | Estimate question difficulty from performance data | v0 seeded (stub) |
-| `adaptive` | Select optimal questions for learning | v0 seeded (stub) |
-| `mistakes` | Identify common error patterns | v0 seeded (stub) |
+| `mastery` | Track student understanding levels per block/theme | v0 implemented |
+| `revision` | Schedule questions for spaced repetition | v0 implemented |
+| `difficulty` | Estimate question difficulty from performance data | v0 implemented |
+| `adaptive` | Select optimal questions for learning | v0 implemented |
+| `mistakes` | Identify common error patterns | v0 implemented |
+| `bkt` | Bayesian Knowledge Tracing for concept-level mastery | v1 implemented |
 
-**Note:** v0 implementations are stubs that raise `NotImplementedError`. Actual compute logic will be implemented in Tasks 103+ / 111+.
+**Note:** v0 implementations use simple rule-based approaches. BKT v1 uses a production-grade 4-parameter Bayesian model.
 
 ---
 
@@ -1831,6 +1832,316 @@ A: Query `algo_runs` table by `session_id`. The `algo_version_id` and `params_id
 - Registry helpers: `backend/app/learning_engine/registry.py`
 - Run logging: `backend/app/learning_engine/runs.py`
 - API endpoint: `backend/app/api/v1/endpoints/learning.py`
+
+---
+
+## BKT (Bayesian Knowledge Tracing) v1
+
+### Purpose
+
+BKT v1 provides **concept-level mastery tracking** using a standard 4-parameter Bayesian model. Unlike the theme-level Mastery v0, BKT tracks mastery at the **concept** (skill) level, which is more granular and allows for fine-grained knowledge state estimation.
+
+### Model
+
+BKT uses four parameters per concept:
+
+- **L0** (p_L0): Prior probability that the student has already mastered the concept before any observations
+- **T** (p_T): Probability of learning (transition from unmastered to mastered after an opportunity)
+- **S** (p_S): Probability of slip (student knows the concept but answers incorrectly)
+- **G** (p_G): Probability of guess (student doesn't know the concept but answers correctly)
+
+### Online Update Formula
+
+Given an observation (correct or incorrect answer), BKT updates the mastery probability:
+
+1. **Predict correctness:**
+   ```
+   P(Correct) = P(L) × (1 - S) + (1 - P(L)) × G
+   ```
+
+2. **Compute posterior given observation:**
+   ```
+   If correct:
+     P(L|Correct) = [P(L) × (1 - S)] / P(Correct)
+   
+   If incorrect:
+     P(L|Wrong) = [P(L) × S] / (1 - P(Correct))
+   ```
+
+3. **Apply learning transition:**
+   ```
+   P(L_next) = P(L|obs) + (1 - P(L|obs)) × T
+   ```
+
+### Database Schema
+
+#### `bkt_skill_params`
+
+Stores fitted BKT parameters per concept.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `concept_id` | UUID | Concept (skill) identifier |
+| `algo_version_id` | UUID | FK to `algo_versions` |
+| `p_L0` | float | Prior mastery probability |
+| `p_T` | float | Learning rate |
+| `p_S` | float | Slip probability |
+| `p_G` | float | Guess probability |
+| `constraints_applied` | jsonb | Constraints used during fitting |
+| `fitted_at` | timestamp | When parameters were fitted |
+| `fitted_on_data_from` | timestamp | Training data start date |
+| `fitted_on_data_to` | timestamp | Training data end date |
+| `metrics` | jsonb | AUC, RMSE, logloss, CV metrics |
+| `is_active` | boolean | Whether these params are active for this concept |
+
+**Constraints:**
+- Only one active parameter set per concept at a time
+- Parameters must satisfy: `0 < L0, T, S, G < 1`, `S + G < 1`, `(1 - S) > G`
+
+#### `bkt_user_skill_state`
+
+Tracks current mastery state per user-concept pair.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | UUID | Primary key (composite) |
+| `concept_id` | UUID | Primary key (composite) |
+| `p_mastery` | float | Current mastery probability [0, 1] |
+| `n_attempts` | int | Total attempts on this concept |
+| `last_attempt_at` | timestamp | Last attempt timestamp |
+| `last_seen_question_id` | UUID | Last question ID (for anti-repeat) |
+| `algo_version_id` | UUID | Version used for last update |
+| `updated_at` | timestamp | Last update timestamp |
+
+#### `mastery_snapshot`
+
+Optional historical snapshots for analytics.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | User identifier |
+| `concept_id` | UUID | Concept identifier |
+| `p_mastery` | float | Mastery probability at snapshot time |
+| `n_attempts` | int | Attempts at snapshot time |
+| `algo_version_id` | UUID | Algorithm version |
+| `created_at` | timestamp | Snapshot timestamp |
+
+### Training Pipeline
+
+BKT parameters are fitted using **Expectation-Maximization (EM)** via the `pyBKT` library.
+
+#### Training Dataset
+
+- **Source:** `session_answers` from SUBMITTED/EXPIRED sessions
+- **Format:** Sequences of correctness (0/1) per user per concept
+- **Minimum requirements:**
+  - At least 10 total attempts per concept
+  - At least 3 unique users per concept
+
+#### Fitting Process
+
+1. Build training dataset from historical attempts
+2. Fit parameters using EM algorithm (pyBKT)
+3. Apply parameter constraints:
+   - L0: [0.001, 0.5]
+   - T: [0.001, 0.5]
+   - S: [0.001, 0.4]
+   - G: [0.001, 0.4]
+4. Validate parameters (degeneracy checks)
+5. Compute metrics (AUC, RMSE, logloss)
+6. Persist to `bkt_skill_params`
+
+#### CLI Usage
+
+```bash
+# Fit parameters for a single concept
+python -m scripts.fit_bkt --concept-id <uuid>
+
+# Fit with custom date range and activate
+python -m scripts.fit_bkt --concept-id <uuid> \
+  --from-date 2025-01-01 \
+  --to-date 2026-01-01 \
+  --activate
+
+# Fit with custom constraints
+python -m scripts.fit_bkt --concept-id <uuid> \
+  --L0-min 0.01 --L0-max 0.3 \
+  --T-min 0.05 --T-max 0.4 \
+  --activate
+```
+
+### API Endpoints
+
+All endpoints are under `/v1/learning/bkt`.
+
+#### `POST /v1/learning/bkt/recompute`
+
+Recompute BKT parameters from historical data (Admin only).
+
+**Request:**
+```json
+{
+  "from_date": "2025-01-01T00:00:00Z",
+  "to_date": "2026-01-01T00:00:00Z",
+  "min_attempts": 10,
+  "concept_ids": ["<uuid1>", "<uuid2>"],
+  "activate_new_params": false
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "run_id": "<uuid>",
+  "algo": {
+    "key": "bkt",
+    "version": "v1"
+  },
+  "params_id": "<uuid>",
+  "summary": {
+    "concepts_processed": 2,
+    "params_fitted": 2,
+    "new_algo_version_id": "<uuid>",
+    "run_metrics": {},
+    "errors": {}
+  }
+}
+```
+
+#### `POST /v1/learning/bkt/update`
+
+Update BKT mastery for a single attempt.
+
+**Request:**
+```json
+{
+  "user_id": "<uuid>",  // Optional, defaults to current user
+  "question_id": "<uuid>",
+  "concept_id": "<uuid>",
+  "correct": true,
+  "current_time": "2026-01-21T12:00:00Z",  // Optional
+  "snapshot_mastery": false
+}
+```
+
+**Response:**
+```json
+{
+  "user_id": "<uuid>",
+  "concept_id": "<uuid>",
+  "p_mastery": 0.75,
+  "n_attempts": 5,
+  "algo_version_id": "<uuid>",
+  "params_id": "<uuid>"
+}
+```
+
+**RBAC:**
+- Students can only update their own mastery
+- Admins can update any user's mastery
+
+#### `GET /v1/learning/bkt/mastery`
+
+Get BKT mastery state for a user.
+
+**Query Params:**
+- `user_id` (optional): User ID (defaults to current user)
+- `concept_id` (optional): Filter by concept
+
+**Response:**
+```json
+[
+  {
+    "user_id": "<uuid>",
+    "concept_id": "<uuid>",
+    "p_mastery": 0.75,
+    "n_attempts": 5,
+    "last_attempt_at": "2026-01-21T12:00:00Z",
+    "last_seen_question_id": "<uuid>",
+    "updated_at": "2026-01-21T12:00:00Z"
+  }
+]
+```
+
+**RBAC:**
+- Students can only query their own mastery
+- Admins can query any user's mastery
+
+### Integration Points
+
+#### Session Submission
+
+BKT mastery is updated automatically when a session is submitted:
+
+1. Session is submitted and scored
+2. For each answered question:
+   - Extract `concept_id` from `session_questions.snapshot_json`
+   - Call `update_bkt_from_attempt()` with correctness
+3. Updates are best-effort (do not block submission)
+
+**Note:** Requires `concept_id` to be present in `snapshot_json` for each question.
+
+### Numerical Stability
+
+BKT core math includes guards for numerical stability:
+
+- **Probability clamping:** All probabilities are clamped to [MIN_PROB, MAX_PROB] where MIN_PROB=1e-6, MAX_PROB=1-1e-6
+- **Denominator guards:** Denominators in Bayes' rule are clamped to avoid division by zero
+- **Output clamping:** Final mastery probabilities are clamped to [0, 1]
+
+### Degeneracy Prevention
+
+BKT parameters are validated to prevent degeneracy:
+
+1. **Parameter range:** All params must be in (0, 1)
+2. **Sum constraint:** S + G < 1
+3. **Distinguishability:** (1 - S) > G (ensures P(Correct|Learned) > P(Correct|Unlearned))
+4. **Learning constraint:** T > ε (ensures learning actually occurs)
+
+### Default Parameters
+
+If no fitted parameters exist for a concept, the system uses defaults:
+
+```python
+DEFAULT_BKT_PARAMS = {
+    "p_L0": 0.1,  # 10% prior mastery
+    "p_T": 0.2,   # 20% learning rate
+    "p_S": 0.1,   # 10% slip rate
+    "p_G": 0.2    # 20% guess rate
+}
+```
+
+### Invariants
+
+1. **Mastery in range:** `0 ≤ p_mastery ≤ 1` always
+2. **Correct increases mastery:** `update(p_L, correct=True) ≥ update(p_L, correct=False)`
+3. **Convergence:** Consistent correct answers → high mastery; consistent wrong answers → low mastery
+4. **Reproducibility:** Same params + same sequence → same final mastery
+
+### Testing
+
+Tests cover:
+
+- Core math functions (predict, posterior, transition, update)
+- Parameter validation and constraint application
+- Training dataset builder
+- Property-based invariants (mastery always in [0,1], correct > wrong, convergence)
+- API endpoints with RBAC
+
+**Test file:** `backend/tests/test_bkt.py`
+
+### References
+
+- **Models:** `backend/app/models/bkt.py`
+- **Core math:** `backend/app/learning_engine/bkt/core.py`
+- **Service layer:** `backend/app/learning_engine/bkt/service.py`
+- **Training:** `backend/app/learning_engine/bkt/training.py`
+- **API:** `backend/app/api/v1/endpoints/bkt.py`
+- **CLI:** `backend/scripts/fit_bkt.py`
+- **Tests:** `backend/tests/test_bkt.py`
 
 ---
 
