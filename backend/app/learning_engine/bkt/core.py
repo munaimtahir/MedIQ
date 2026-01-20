@@ -14,22 +14,32 @@ ensure probabilities remain in valid range [0, 1].
 import math
 from typing import Tuple
 
-# Numerical stability constants
-EPSILON = 1e-10  # Minimum probability value
-MAX_PROB = 1.0 - EPSILON  # Maximum probability value
+from app.learning_engine.config import (
+    BKT_L0_MIN,
+    BKT_L0_MAX,
+    BKT_T_MIN,
+    BKT_T_MAX,
+    BKT_S_MIN,
+    BKT_S_MAX,
+    BKT_G_MIN,
+    BKT_G_MAX,
+    BKT_STABILITY_EPSILON,
+    BKT_MIN_PROB,
+    BKT_MAX_PROB,
+)
 
 
 def clamp_probability(p: float) -> float:
     """
-    Clamp a probability value to valid range [EPSILON, MAX_PROB].
+    Clamp a probability value to valid range [BKT_MIN_PROB, BKT_MAX_PROB].
     
     Args:
         p: Probability value
         
     Returns:
-        Clamped probability in [EPSILON, MAX_PROB]
+        Clamped probability in valid range
     """
-    return max(EPSILON, min(MAX_PROB, p))
+    return max(BKT_MIN_PROB.value, min(BKT_MAX_PROB.value, p))
 
 
 def predict_correct(p_L: float, p_S: float, p_G: float) -> float:
@@ -106,7 +116,7 @@ def posterior_given_obs(
         denominator = 1.0 - p_correct
     
     # Guard against division by zero
-    if denominator < EPSILON:
+    if denominator < BKT_STABILITY_EPSILON.value:
         # If denominator is too small, return prior (no update)
         return p_L
     
@@ -216,15 +226,15 @@ def validate_bkt_params(p_L0: float, p_T: float, p_S: float, p_G: float) -> Tupl
     Returns:
         Tuple of (is_valid, error_message)
     """
-    # Check range
-    if not (0 < p_L0 < 1):
-        return False, f"L0 must be in (0, 1), got {p_L0}"
-    if not (0 < p_T < 1):
-        return False, f"T must be in (0, 1), got {p_T}"
-    if not (0 < p_S < 1):
-        return False, f"S must be in (0, 1), got {p_S}"
-    if not (0 < p_G < 1):
-        return False, f"G must be in (0, 1), got {p_G}"
+    # Check range using configured constraints
+    if not (BKT_L0_MIN.value < p_L0 < BKT_L0_MAX.value):
+        return False, f"L0 must be in ({BKT_L0_MIN.value}, {BKT_L0_MAX.value}), got {p_L0}"
+    if not (BKT_T_MIN.value < p_T < BKT_T_MAX.value):
+        return False, f"T must be in ({BKT_T_MIN.value}, {BKT_T_MAX.value}), got {p_T}"
+    if not (BKT_S_MIN.value < p_S < BKT_S_MAX.value):
+        return False, f"S must be in ({BKT_S_MIN.value}, {BKT_S_MAX.value}), got {p_S}"
+    if not (BKT_G_MIN.value < p_G < BKT_G_MAX.value):
+        return False, f"G must be in ({BKT_G_MIN.value}, {BKT_G_MAX.value}), got {p_G}"
     
     # Check conceptual constraint: learned should be better than unlearned
     p_correct_learned = 1.0 - p_S
@@ -236,11 +246,11 @@ def validate_bkt_params(p_L0: float, p_T: float, p_S: float, p_G: float) -> Tupl
             f"unlearned performance (G={p_correct_unlearned:.3f})"
         )
     
-    # Check slip and guess are reasonable
-    if p_S > 0.5:
-        return False, f"Slip probability too high: {p_S} > 0.5"
-    if p_G > 0.5:
-        return False, f"Guess probability too high: {p_G} > 0.5"
+    # Check slip and guess are reasonable (upper bounds from config)
+    if p_S > BKT_S_MAX.value:
+        return False, f"Slip probability too high: {p_S} > {BKT_S_MAX.value}"
+    if p_G > BKT_G_MAX.value:
+        return False, f"Guess probability too high: {p_G} > {BKT_G_MAX.value}"
     
     return True, ""
 
@@ -264,9 +274,9 @@ def check_degeneracy(p_L0: float, p_T: float, p_S: float, p_G: float, min_learni
     Returns:
         Tuple of (is_non_degenerate, warning_message)
     """
-    # Check if learning rate is too small
-    if p_T < 0.01:
-        return False, f"Learning rate too small: T={p_T} < 0.01 (no learning)"
+    # Check if learning rate is too small (lower bound from config)
+    if p_T < BKT_T_MIN.value:
+        return False, f"Learning rate too small: T={p_T} < {BKT_T_MIN.value} (no learning)"
     
     # Check if slip and guess are too close
     performance_gap = (1.0 - p_S) - p_G

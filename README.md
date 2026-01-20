@@ -138,6 +138,60 @@ pytest -v               # Run tests
 - **Frontend**: Prettier (with Tailwind plugin) + ESLint
 - **Backend**: Black (formatting) + Ruff (linting)
 
+## Constants and Configuration Management
+
+### Philosophy
+
+This project enforces strict provenance for all algorithmic constants to ensure scientific rigor and maintainability.
+
+**Core Principles:**
+1. **No Magic Numbers:** All constants centralized in `backend/app/learning_engine/config.py`
+2. **Source Attribution:** Every constant documents its origin (research paper, library default, or heuristic)
+3. **Import-time Validation:** Invalid constants fail at startup, not in production
+4. **Calibration Tracking:** Heuristic constants have explicit improvement plans
+
+### Adding New Constants
+
+```python
+# In backend/app/learning_engine/config.py
+
+from dataclasses import dataclass
+
+MY_NEW_THRESHOLD = SourcedValue(
+    value=42,
+    sources=[
+        "Smith et al. (2024) - Optimal threshold for X was empirically determined as 42",
+        "Validated on 10,000+ student attempts with 95% confidence interval [40, 44]"
+    ]
+)
+```
+
+**Requirements:**
+- Must use `SourcedValue` wrapper
+- Must include at least one source explaining the value
+- Sources must be specific (not just "set to 42")
+- For heuristics, mention "placeholder" or "needs calibration"
+
+### Documentation
+
+- **Constants Audit:** `docs/constants-audit.md` - inventory of all 23 constants
+- **Calibration Plan:** `docs/calibration-plan.md` - roadmap for tuning heuristic constants
+- **Algorithm Docs:** `docs/algorithms.md` - detailed descriptions of all learning algorithms
+
+### Testing
+
+```bash
+cd backend
+pytest tests/test_constants_provenance.py -v
+```
+
+This test suite enforces:
+- All constants have non-empty source attribution
+- Sources explain reasoning (not just "value is X")
+- Heuristic constants mention calibration plans
+- FSRS weights have exactly 19 parameters
+- BKT constraints satisfy non-degeneracy (S + G < 1)
+
 ## Next Steps
 
 See `docs/architecture.md` for detailed architecture and `docs/api-contracts.md` for API specifications.

@@ -14,18 +14,14 @@ from typing import Optional, Tuple
 
 from fsrs import FSRS, Card, Rating, ReviewLog
 
+from app.learning_engine.config import (
+    FSRS_DEFAULT_WEIGHTS,
+    FSRS_DESIRED_RETENTION,
+    FSRS_RETENTION_MIN,
+    FSRS_RETENTION_MAX,
+)
+
 logger = logging.getLogger(__name__)
-
-# FSRS-6 default weights (19 parameters)
-# These are the global defaults from the FSRS paper
-DEFAULT_FSRS_6_WEIGHTS = [
-    0.4072, 1.1829, 3.1262, 15.4722, 7.2102,
-    0.5316, 1.0651, 0.0234, 1.616, 0.1544,
-    1.0824, 1.9813, 0.0953, 0.2975, 2.2042,
-    0.2407, 2.9466, 0.5034, 0.6567
-]
-
-DEFAULT_DESIRED_RETENTION = 0.90
 
 
 def get_default_parameters(fsrs_version: str = "fsrs-6") -> dict:
@@ -42,8 +38,8 @@ def get_default_parameters(fsrs_version: str = "fsrs-6") -> dict:
         logger.warning(f"Unknown FSRS version '{fsrs_version}', using fsrs-6 defaults")
     
     return {
-        "weights": DEFAULT_FSRS_6_WEIGHTS,
-        "desired_retention": DEFAULT_DESIRED_RETENTION,
+        "weights": FSRS_DEFAULT_WEIGHTS.value,
+        "desired_retention": FSRS_DESIRED_RETENTION.value,
     }
 
 
@@ -77,7 +73,7 @@ def compute_next_state_and_due(
     
     # Use default weights if not provided
     if weights is None:
-        weights = DEFAULT_FSRS_6_WEIGHTS
+        weights = FSRS_DEFAULT_WEIGHTS.value
     
     # Validate weights length
     if len(weights) != 19:
@@ -206,8 +202,8 @@ def validate_weights(weights: list[float]) -> Tuple[bool, str]:
 def compute_optimal_retention(
     review_logs: list[ReviewLog],
     weights: list[float],
-    max_retention: float = 0.95,
-    min_retention: float = 0.70,
+    max_retention: Optional[float] = None,
+    min_retention: Optional[float] = None,
 ) -> float:
     """
     Compute optimal retention target for a user.
@@ -228,8 +224,14 @@ def compute_optimal_retention(
     Returns:
         Optimal retention probability
     """
+    # Use configured defaults if not provided
+    if max_retention is None:
+        max_retention = FSRS_RETENTION_MAX.value
+    if min_retention is None:
+        min_retention = FSRS_RETENTION_MIN.value
+    
     if len(review_logs) < 10:
-        return DEFAULT_DESIRED_RETENTION
+        return FSRS_DESIRED_RETENTION.value
     
     # Count reviews by rating
     rating_counts = {1: 0, 2: 0, 3: 0, 4: 0}

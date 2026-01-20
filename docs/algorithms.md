@@ -33,6 +33,106 @@ The system includes six core algorithms:
 
 ---
 
+## Constants and Configuration
+
+### Philosophy
+
+All algorithmic constants in this system follow strict provenance rules:
+
+1. **No Magic Numbers:** Every constant is centralized in `backend/app/learning_engine/config.py`
+2. **Source Attribution:** Every constant includes documentation of its origin (research paper, library default, or heuristic reasoning)
+3. **Calibration Tracking:** Constants marked as heuristic have explicit calibration plans
+4. **Import-time Validation:** Invalid constants fail fast at startup, not during production
+
+### Constants Registry
+
+All constants are defined as `SourcedValue` objects in `config.py`:
+
+```python
+from app.learning_engine.config import FSRS_DEFAULT_WEIGHTS, BKT_L0_MIN
+
+# Access value
+weights = FSRS_DEFAULT_WEIGHTS.value
+
+# Check provenance
+print(FSRS_DEFAULT_WEIGHTS.sources)
+# ["FSRS-6 default parameters from py-fsrs library", ...]
+```
+
+### Constant Categories
+
+**1. FSRS (Spaced Repetition System)**
+- `FSRS_DEFAULT_WEIGHTS`: 19 parameters for FSRS-6 scheduler
+- `FSRS_DESIRED_RETENTION`: Target retention rate (0.90)
+- `FSRS_RETENTION_MIN/MAX`: Bounds for retention optimization
+- `FSRS_TRAINING_MIN_LOGS`: Minimum review logs required for per-user tuning
+
+**Source:** py-fsrs library defaults, FSRS-6 paper (2024)
+
+**2. BKT (Bayesian Knowledge Tracing)**
+- `BKT_L0_MIN/MAX`: Prior knowledge bounds
+- `BKT_T_MIN/MAX`: Learning rate bounds
+- `BKT_S_MIN/MAX`: Slip probability bounds
+- `BKT_G_MIN/MAX`: Guess probability bounds
+- `BKT_STABILITY_EPSILON`: Numerical stability threshold
+
+**Source:** Baker et al. (2008), pyBKT defaults, empirical literature
+
+**3. Rating Mapper (MCQ → FSRS Rating)**
+- `RATING_FAST_ANSWER_MS`: Threshold for "fast" answer (15 seconds)
+- `RATING_SLOW_ANSWER_MS`: Threshold for "slow" answer (90 seconds)
+- `RATING_MAX_CHANGES_FOR_CONFIDENT`: Max answer changes for "easy" rating
+
+**Source:** Heuristic - marked for calibration (see `docs/calibration-plan.md`)
+
+**4. Telemetry Validation**
+- `TELEMETRY_MIN_TIME_MS/MAX_TIME_MS`: Bounds for valid attempt durations
+- `TELEMETRY_MAX_CHANGES`: Cap for answer change count
+
+**Source:** Heuristic sanity bounds
+
+**5. Mastery Computation**
+- `MASTERY_LOOKBACK_DAYS`: Recency window for mastery calculation
+- `MASTERY_MIN_ATTEMPTS`: Minimum attempts before reporting mastery
+- `MASTERY_DIFFICULTY_WEIGHTS`: Weights for difficulty buckets
+
+**Source:** Heuristic - marked for calibration
+
+**6. Training Pipelines**
+- `TRAINING_BKT_MIN_ATTEMPTS`: Minimum attempts for BKT EM fitting
+- `TRAINING_DIFFICULTY_MIN_ATTEMPTS`: Minimum attempts for difficulty calibration
+
+**Source:** pyBKT documentation, heuristic minimum for statistical significance
+
+### Calibration Status
+
+**Authoritative (16/23 constants):**
+- FSRS defaults
+- BKT constraints (from literature)
+- Numerical stability thresholds
+
+**Heuristic - Needs Calibration (7/23 constants):**
+- Rating thresholds (FAST_ANSWER_MS, SLOW_ANSWER_MS, MAX_CHANGES_FOR_CONFIDENT)
+- Difficulty weights (MASTERY_DIFFICULTY_WEIGHTS)
+- Training thresholds (some)
+
+See `docs/calibration-plan.md` for prioritization and timeline.
+
+### Validation
+
+Constants are validated at import time via `_validate_all_constants()`:
+- FSRS weights: Must have exactly 19 parameters
+- Retention bounds: Must be in (0, 1) and properly ordered
+- BKT constraints: S + G < 1 (non-degeneracy), learned > unlearned
+- Timing thresholds: FAST < SLOW, all positive
+
+**Tests:** `backend/tests/test_constants_provenance.py` enforces:
+- All constants have non-empty source attribution
+- Sources explain reasoning (not just "set to X")
+- Heuristic constants mention calibration plans
+
+---
+
 ## Versioning Rules
 
 ### Algorithm Versions

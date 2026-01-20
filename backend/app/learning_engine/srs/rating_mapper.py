@@ -17,12 +17,16 @@ Mapping Rules:
 import logging
 from typing import Optional, Tuple
 
-logger = logging.getLogger(__name__)
+from app.learning_engine.config import (
+    RATING_FAST_ANSWER_MS,
+    RATING_SLOW_ANSWER_MS,
+    RATING_MAX_CHANGES_FOR_CONFIDENT,
+    TELEMETRY_MAX_TIME_MS,
+    TELEMETRY_MIN_TIME_MS,
+    TELEMETRY_MAX_CHANGES,
+)
 
-# Thresholds for rating classification
-FAST_ANSWER_MS = 15000  # 15 seconds
-SLOW_ANSWER_MS = 90000  # 90 seconds
-MAX_CHANGES_FOR_CONFIDENT = 0  # No answer changes
+logger = logging.getLogger(__name__)
 
 
 def map_attempt_to_rating(
@@ -62,19 +66,19 @@ def map_attempt_to_rating(
     
     # Rule 3: Many answer changes -> "Hard" (2)
     # Multiple changes indicate uncertainty
-    if change_count is not None and change_count > MAX_CHANGES_FOR_CONFIDENT:
+    if change_count is not None and change_count > RATING_MAX_CHANGES_FOR_CONFIDENT.value:
         return 2  # Hard
     
     # Rule 4: Very slow answer -> "Hard" (2)
     # Taking too long indicates struggle even if correct
-    if time_spent_ms is not None and time_spent_ms > SLOW_ANSWER_MS:
+    if time_spent_ms is not None and time_spent_ms > RATING_SLOW_ANSWER_MS.value:
         return 2  # Hard
     
     # Rule 5: Fast and confident -> "Easy" (4)
     # Quick answer with no changes indicates mastery
     if (
         time_spent_ms is not None
-        and time_spent_ms < FAST_ANSWER_MS
+        and time_spent_ms < RATING_FAST_ANSWER_MS.value
         and (change_count is None or change_count == 0)
     ):
         return 4  # Easy
@@ -115,7 +119,7 @@ def explain_rating(
             reasons.append("marked for review")
         if change_count is not None and change_count > 0:
             reasons.append(f"{change_count} answer changes")
-        if time_spent_ms is not None and time_spent_ms > SLOW_ANSWER_MS:
+        if time_spent_ms is not None and time_spent_ms > RATING_SLOW_ANSWER_MS.value:
             reasons.append(f"slow ({time_spent_ms/1000:.0f}s)")
         
         if reasons:
@@ -139,9 +143,9 @@ def get_rating_thresholds() -> dict:
         Dict of threshold values
     """
     return {
-        "fast_answer_ms": FAST_ANSWER_MS,
-        "slow_answer_ms": SLOW_ANSWER_MS,
-        "max_changes_for_confident": MAX_CHANGES_FOR_CONFIDENT,
+        "fast_answer_ms": RATING_FAST_ANSWER_MS.value,
+        "slow_answer_ms": RATING_SLOW_ANSWER_MS.value,
+        "max_changes_for_confident": RATING_MAX_CHANGES_FOR_CONFIDENT.value,
     }
 
 
@@ -166,10 +170,10 @@ def validate_telemetry(
         if time_spent_ms < 0:
             warnings.append(f"Negative time_spent_ms: {time_spent_ms}")
             time_spent_ms = None
-        elif time_spent_ms > 3600000:  # > 1 hour
+        elif time_spent_ms > TELEMETRY_MAX_TIME_MS.value:
             warnings.append(f"Suspiciously long time_spent_ms: {time_spent_ms}")
             # Keep it but flag
-        elif time_spent_ms < 500:  # < 0.5 seconds
+        elif time_spent_ms < TELEMETRY_MIN_TIME_MS.value:
             warnings.append(f"Suspiciously short time_spent_ms: {time_spent_ms}")
             # Keep it but flag
     
@@ -178,35 +182,15 @@ def validate_telemetry(
         if change_count < 0:
             warnings.append(f"Negative change_count: {change_count}")
             change_count = 0
-        elif change_count > 20:
+        elif change_count > TELEMETRY_MAX_CHANGES.value:
             warnings.append(f"Suspiciously high change_count: {change_count}")
-            # Cap at 20
-            change_count = 20
+            # Cap at max
+            change_count = TELEMETRY_MAX_CHANGES.value
     
     return time_spent_ms, change_count, warnings
 
 
-# For testing and configuration
-def set_rating_thresholds(
-    fast_answer_ms: Optional[int] = None,
-    slow_answer_ms: Optional[int] = None,
-    max_changes_for_confident: Optional[int] = None,
-):
-    """
-    Override default rating thresholds (mainly for testing).
-    
-    Args:
-        fast_answer_ms: Threshold for "fast" answer
-        slow_answer_ms: Threshold for "slow" answer
-        max_changes_for_confident: Max changes to still be "confident"
-    """
-    global FAST_ANSWER_MS, SLOW_ANSWER_MS, MAX_CHANGES_FOR_CONFIDENT
-    
-    if fast_answer_ms is not None:
-        FAST_ANSWER_MS = fast_answer_ms
-    if slow_answer_ms is not None:
-        SLOW_ANSWER_MS = slow_answer_ms
-    if max_changes_for_confident is not None:
-        MAX_CHANGES_FOR_CONFIDENT = max_changes_for_confident
-    
-    logger.info(f"Updated rating thresholds: fast={FAST_ANSWER_MS}ms, slow={SLOW_ANSWER_MS}ms, max_changes={MAX_CHANGES_FOR_CONFIDENT}")
+# Note: set_rating_thresholds() has been removed.
+# Thresholds are now managed centrally in config.py
+# To override thresholds, update the SourcedValue constants in config.py
+# This ensures all threshold changes are documented with provenance.
