@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AccountCard } from "@/components/student/settings/AccountCard";
+import { MFACard } from "@/components/student/settings/MFACard";
 import { AcademicYearCard } from "@/components/student/settings/AcademicYearCard";
 import { PracticePreferencesCard } from "@/components/student/settings/PracticePreferencesCard";
 import { NotificationsCard } from "@/components/student/settings/NotificationsCard";
@@ -118,7 +119,10 @@ export default function SettingsPage() {
         loading={userInfoLoading}
       />
 
-      {/* Section 2: Academic Context */}
+      {/* Section 2: Security */}
+      <MFACard />
+
+      {/* Section 3: Academic Context */}
       <AcademicYearCard
         years={years}
         currentYearId={currentYearId}
@@ -127,13 +131,13 @@ export default function SettingsPage() {
         onYearChange={handleYearChange}
       />
 
-      {/* Section 3: Practice Preferences */}
+      {/* Section 4: Practice Preferences */}
       <PracticePreferencesCard />
 
-      {/* Section 4: Notifications */}
+      {/* Section 5: Notifications */}
       <NotificationsCard />
 
-      {/* Section 5: Danger Zone */}
+      {/* Section 6: Danger Zone */}
       <DangerZoneCard />
     </div>
   );

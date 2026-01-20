@@ -83,47 +83,140 @@ Block (1) ──< (N) Theme ──< (N) Question
 
 ---
 
-### Question
+### Question (Legacy)
+
+**Table:** `questions_legacy` (renamed from `questions` in CMS migration)
+
+Legacy question model with Integer ID. See CMS Question below for new structure.
+
+### Question (CMS - Tasks 67-72)
 
 **Table:** `questions`
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | Integer (PK) | AUTO_INCREMENT | Unique question identifier |
-| theme_id | Integer (FK) | NOT NULL → themes.id | Parent theme |
-| question_text | Text | NOT NULL | Question stem |
-| options | JSON | NOT NULL | Array of 5 strings |
-| correct_option_index | Integer | NOT NULL, 0-4 | Index of correct answer |
-| explanation | Text | NULL | Answer explanation |
-| tags | JSON | NULL | Array of tag strings |
-| difficulty | String | NULL | "easy", "medium", "hard" |
-| is_published | Boolean | DEFAULT false | Publication status |
+| id | UUID (PK) | NOT NULL | Unique question identifier |
+| stem | Text | NULL | Question stem (supports markdown/latex) |
+| option_a | Text | NULL | Option A |
+| option_b | Text | NULL | Option B |
+| option_c | Text | NULL | Option C |
+| option_d | Text | NULL | Option D |
+| option_e | Text | NULL | Option E |
+| correct_index | SmallInteger | NULL, 0-4 | Index of correct option |
+| explanation_md | Text | NULL | Explanation in markdown |
+| status | Enum | NOT NULL, DEFAULT DRAFT | Workflow status: DRAFT, IN_REVIEW, APPROVED, PUBLISHED |
+| year_id | Integer (FK) | NULL → years.id | Year anchor |
+| block_id | Integer (FK) | NULL → blocks.id | Block anchor |
+| theme_id | Integer (FK) | NULL → themes.id | Theme anchor |
+| topic_id | Integer | NULL | Topic anchor (no FK yet) |
+| concept_id | Integer | NULL | Concept anchor (no FK yet) |
+| cognitive_level | String(50) | NULL | Cognitive level |
+| difficulty | String(50) | NULL | Difficulty level |
+| source_book | String(200) | NULL | Source book |
+| source_page | String(50) | NULL | Source page (e.g., "p. 12-13") |
+| source_ref | String(100) | NULL | Source reference |
+| created_by | UUID (FK) | NOT NULL → users.id | Creator |
+| updated_by | UUID (FK) | NOT NULL → users.id | Last updater |
+| approved_by | UUID (FK) | NULL → users.id | Approver |
+| approved_at | DateTime | NULL | Approval timestamp |
+| published_at | DateTime | NULL | Publication timestamp |
 | created_at | DateTime | DEFAULT now() | Creation timestamp |
 | updated_at | DateTime | NULL | Last update timestamp |
 
 **Relationships:**
-- Many-to-One: `Theme` (question belongs to one theme)
-- One-to-Many: `AttemptAnswer` (question can have multiple attempts)
+- Many-to-One: `Year`, `Block`, `Theme`
+- One-to-Many: `QuestionVersion`, `QuestionMedia`
 
 **Constraints:**
-- `options` must contain exactly 5 elements
-- `correct_option_index` must be 0-4
-- `tags` required before `is_published = true`
+- `correct_index` must be 0-4 (check constraint)
+- Status transitions enforced in application layer
+- Required fields vary by status (enforced in workflow)
 
 **Indexes:**
 - Primary Key: `id`
-- Foreign Key: `theme_id`
-- Index: `is_published` (for published question queries)
-- Index: `theme_id` (for theme-based queries)
-- Index: `created_at` (for chronological queries)
+- Index: `status`, `updated_at`, `theme_id`, `block_id`, `year_id`
 
-**Example JSON:**
-```json
-{
-  "options": ["Option A", "Option B", "Option C", "Option D", "Option E"],
-  "tags": ["cardiovascular", "anatomy", "physiology"]
-}
-```
+**Workflow:**
+- DRAFT → IN_REVIEW (submit): requires stem, 5 options, correct_index, year_id, block_id, theme_id, difficulty, cognitive_level
+- IN_REVIEW → APPROVED (approve): all submit checks + explanation_md
+- IN_REVIEW → DRAFT (reject): requires reason
+- APPROVED → PUBLISHED (publish): all approve checks + source_book, source_page
+- PUBLISHED → APPROVED (unpublish)
+
+### QuestionVersion
+
+**Table:** `question_versions`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID (PK) | NOT NULL | Version identifier |
+| question_id | UUID (FK) | NOT NULL → questions.id | Question reference |
+| version_no | Integer | NOT NULL | Version number (starts at 1) |
+| snapshot | JSONB | NOT NULL | Full snapshot of question fields |
+| change_kind | Enum | NOT NULL | CREATE, EDIT, STATUS_CHANGE, PUBLISH, UNPUBLISH, IMPORT |
+| change_reason | String(500) | NULL | Reason for change |
+| changed_by | UUID (FK) | NOT NULL → users.id | User who made change |
+| changed_at | DateTime | DEFAULT now() | Change timestamp |
+
+**Indexes:**
+- Primary Key: `id`
+- Unique: `(question_id, version_no)`
+- Index: `question_id`, `version_no`
+
+### MediaAsset
+
+**Table:** `media_assets`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID (PK) | NOT NULL | Media identifier |
+| storage_provider | Enum | NOT NULL, DEFAULT LOCAL | LOCAL or S3 |
+| path | String(500) | NOT NULL | Storage path |
+| mime_type | String(100) | NOT NULL | MIME type |
+| size_bytes | Integer | NOT NULL | File size |
+| sha256 | String(64) | NULL | SHA256 hash (for deduplication) |
+| created_by | UUID (FK) | NOT NULL → users.id | Creator |
+| created_at | DateTime | DEFAULT now() | Creation timestamp |
+
+**Indexes:**
+- Primary Key: `id`
+- Index: `sha256` (for deduplication)
+
+### QuestionMedia
+
+**Table:** `question_media`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID (PK) | NOT NULL | Attachment identifier |
+| question_id | UUID (FK) | NOT NULL → questions.id | Question reference |
+| media_id | UUID (FK) | NOT NULL → media_assets.id | Media reference |
+| role | Enum | NOT NULL | STEM, EXPLANATION, OPTION_A-E |
+| created_at | DateTime | DEFAULT now() | Creation timestamp |
+
+**Indexes:**
+- Primary Key: `id`
+- Index: `question_id`, `media_id`
+
+### AuditLog
+
+**Table:** `audit_log`
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID (PK) | NOT NULL | Audit entry identifier |
+| actor_user_id | UUID (FK) | NOT NULL → users.id | User who performed action |
+| action | String(100) | NOT NULL | Action name (e.g., "question.create") |
+| entity_type | String(50) | NOT NULL | Entity type (QUESTION, MEDIA) |
+| entity_id | UUID | NOT NULL | Entity identifier |
+| before | JSONB | NULL | State before change |
+| after | JSONB | NULL | State after change |
+| meta | JSONB | NULL | Additional metadata (IP, user-agent, request-id) |
+| created_at | DateTime | DEFAULT now() | Timestamp |
+
+**Indexes:**
+- Primary Key: `id`
+- Index: `entity_type`, `entity_id`, `created_at`, `actor_user_id`
 
 ---
 

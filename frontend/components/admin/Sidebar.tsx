@@ -17,6 +17,9 @@ import {
   FileSearch,
   Settings,
   LogOut,
+  Upload,
+  Database,
+  Clock,
 } from "lucide-react";
 
 const adminNavItems = [
@@ -29,6 +32,12 @@ const adminNavItems = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/audit", label: "Audit", icon: FileSearch },
   { href: "/admin/settings", label: "Settings", icon: Settings },
+];
+
+const importNavItems = [
+  { href: "/admin/import/questions", label: "Upload Questions", icon: Upload },
+  { href: "/admin/import/schemas", label: "Import Schemas", icon: Database },
+  { href: "/admin/import/jobs", label: "Recent Jobs", icon: Clock },
 ];
 
 export function AdminSidebar() {
@@ -49,10 +58,34 @@ export function AdminSidebar() {
   return (
     <div className="flex min-h-screen w-64 flex-col border-r bg-card p-4">
       <h2 className="mb-6 text-xl font-bold">Admin Portal</h2>
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto">
         {adminNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+                isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+        
+        {/* Import Section */}
+        <div className="pt-4 pb-2">
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Import
+          </h3>
+        </div>
+        {importNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

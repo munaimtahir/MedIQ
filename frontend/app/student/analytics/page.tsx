@@ -1,216 +1,205 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, TrendingUp, Target, Clock, Info } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-
-interface AnalyticsData {
-  total_sessions?: number;
-  average_score?: number;
-  questions_answered?: number;
-  study_time_hours?: number;
-}
+import { AccuracyTrendChart } from "@/components/student/analytics/AccuracyTrendChart";
+import { BlockAccuracyChart } from "@/components/student/analytics/BlockAccuracyChart";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { getOverview } from "@/lib/api/analyticsApi";
+import type { AnalyticsOverview } from "@/lib/types/analytics";
+import { BarChart3, BookOpen, CheckCircle2, Target } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export default function AnalyticsPage() {
+  const [data, setData] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAnalytics();
-  }, []);
-
-  async function loadAnalytics() {
-    setLoading(true);
-
-    try {
-      // TODO: Replace with actual analytics endpoint when available
-      // For now, check if endpoint exists
-      const response = await fetch("/api/analytics/overview", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const result = await response.json();
+    async function fetchData() {
+      try {
+        setLoading(true);
+        const result = await getOverview();
         setData(result);
-      } else if (response.status === 404) {
-        // Endpoint not implemented yet - this is expected
-        setData(null);
-      } else {
-        throw new Error("Failed to load analytics");
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load analytics");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      // Endpoint doesn't exist yet - this is fine
-      setData(null);
-    } finally {
-      setLoading(false);
     }
-  }
+
+    fetchData();
+  }, []);
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="container max-w-7xl py-8">
+        <div className="mb-6">
+          <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32" />
+            <Card key={i} className="p-6">
+              <div className="h-24 animate-pulse rounded bg-muted" />
+            </Card>
           ))}
         </div>
       </div>
     );
   }
 
-  const hasData =
-    data &&
-    (data.total_sessions !== undefined ||
-      data.average_score !== undefined ||
-      data.questions_answered !== undefined ||
-      data.study_time_hours !== undefined);
+  if (error) {
+    return (
+      <div className="container max-w-7xl py-8">
+        <Card className="p-6">
+          <div className="text-center">
+            <p className="mb-4 text-destructive">{error}</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data || data.sessions_completed === 0) {
+    return (
+      <div className="container max-w-7xl py-8">
+        <h1 className="mb-6 text-3xl font-bold">Analytics</h1>
+        <Card className="p-12">
+          <div className="text-center">
+            <BarChart3 className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+            <h2 className="mb-2 text-xl font-semibold">No Analytics Yet</h2>
+            <p className="mb-6 text-muted-foreground">
+              Complete your first practice session to see your performance analytics
+            </p>
+            <Button asChild>
+              <Link href="/student/practice/build">Start Practicing</Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground">Track your progress and performance</p>
+    <div className="container max-w-7xl py-8">
+      <h1 className="mb-6 text-3xl font-bold">Analytics</h1>
+
+      {/* Stats Cards */}
+      <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <Target className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Overall Accuracy</p>
+              <p className="text-2xl font-bold">{data.accuracy_pct.toFixed(1)}%</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <BookOpen className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Questions Seen</p>
+              <p className="text-2xl font-bold">{data.questions_seen}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Correct Answers</p>
+              <p className="text-2xl font-bold">{data.correct}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <BarChart3 className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Sessions Completed</p>
+              <p className="text-2xl font-bold">{data.sessions_completed}</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* No Data State */}
-      {!hasData && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Info className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="mb-2 text-lg font-semibold">Analytics will appear here</h3>
-              <p className="max-w-md text-sm text-muted-foreground">
-                Once you start attempting questions and completing practice sessions, your
-                performance metrics will be displayed here.
-              </p>
-            </div>
-          </CardContent>
+      {/* Charts */}
+      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+        <AccuracyTrendChart data={data.trend} title="Accuracy Over Time" />
+        <BlockAccuracyChart data={data.by_block} />
+      </div>
+
+      {/* Weakest Themes */}
+      {data.weakest_themes.length > 0 && (
+        <Card className="mb-6 p-6">
+          <h3 className="mb-4 text-lg font-semibold">Areas for Improvement</h3>
+          <div className="space-y-3">
+            {data.weakest_themes.slice(0, 5).map((theme) => (
+              <div
+                key={theme.theme_id}
+                className="flex items-center justify-between rounded-lg border p-4"
+              >
+                <div className="flex-1">
+                  <p className="font-medium">{theme.theme_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {theme.correct} / {theme.attempted} correct
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">{theme.accuracy_pct.toFixed(1)}%</p>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={`/student/practice/build?themes=${theme.theme_id}`}
+                    >
+                      Practice
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="by-block" disabled={!hasData}>
-            By Block
-          </TabsTrigger>
-          <TabsTrigger value="by-theme" disabled={!hasData}>
-            By Theme
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          {hasData ? (
-            <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{data.total_sessions ?? 0}</div>
-                    <p className="text-xs text-muted-foreground">Practice sessions completed</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Average Score</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {data.average_score !== undefined
-                        ? `${Math.round(data.average_score)}%`
-                        : "N/A"}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Across all sessions</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Questions Answered</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{data.questions_answered ?? 0}</div>
-                    <p className="text-xs text-muted-foreground">Total practice questions</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Study Time</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {data.study_time_hours !== undefined
-                        ? `${data.study_time_hours.toFixed(1)}h`
-                        : "0h"}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Hours this month</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Performance Chart</CardTitle>
-                  <CardDescription>Score trends over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex h-64 items-center justify-center text-muted-foreground">
-                    <p>Chart visualization will appear here once more data is available</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="py-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Analytics data will appear here once you start practicing.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="by-block">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Block-level analytics will be available once the analytics engine is enabled.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="by-theme">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="py-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Theme-level analytics will be available once the analytics engine is enabled.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Last Session */}
+      {data.last_session && (
+        <Card className="p-6">
+          <h3 className="mb-4 text-lg font-semibold">Last Session</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Score</p>
+              <p className="text-2xl font-bold">{data.last_session.score_pct.toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="font-medium">
+                {new Date(data.last_session.submitted_at).toLocaleDateString()}
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href={`/student/session/${data.last_session.session_id}/review`}>
+                View Review
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

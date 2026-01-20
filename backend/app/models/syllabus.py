@@ -68,6 +68,6 @@ class Theme(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     block = relationship("Block", back_populates="themes")
-    questions = relationship("Question", back_populates="theme")
+    # Note: CMS questions use Question model from question_cms.py, not legacy Question
 
     __table_args__ = (UniqueConstraint("block_id", "title", name="uq_theme_block_title"),)

@@ -828,6 +828,109 @@ if curl -f http://localhost:3000 > /dev/null 2>&1; then
 else
   echo "✗ Frontend is down"
 fi
+```
+
+---
+
+## CMS Smoke Test: OpenAPI Verification
+
+### Accessing OpenAPI Docs
+
+**Swagger UI:** `http://localhost:8000/docs`  
+**ReDoc:** `http://localhost:8000/redoc`  
+**OpenAPI JSON:** `http://localhost:8000/openapi.json`
+
+**Note:** OpenAPI docs are only available when `ENV != "prod"`.
+
+### Required Endpoints in OpenAPI
+
+The following CMS endpoints must appear in the OpenAPI documentation:
+
+#### Questions CMS (`/v1/admin/questions`)
+- `GET /v1/admin/questions` - List questions
+- `POST /v1/admin/questions` - Create question
+- `GET /v1/admin/questions/{question_id}` - Get question
+- `PUT /v1/admin/questions/{question_id}` - Update question
+- `DELETE /v1/admin/questions/{question_id}` - Delete question
+- `POST /v1/admin/questions/{question_id}/submit` - Submit for review
+- `POST /v1/admin/questions/{question_id}/approve` - Approve question
+- `POST /v1/admin/questions/{question_id}/reject` - Reject question
+- `POST /v1/admin/questions/{question_id}/publish` - Publish question
+- `POST /v1/admin/questions/{question_id}/unpublish` - Unpublish question
+- `GET /v1/admin/questions/{question_id}/versions` - List versions
+- `GET /v1/admin/questions/{question_id}/versions/{version_id}` - Get version
+
+#### Media (`/v1/admin/media`)
+- `POST /v1/admin/media` - Upload media
+- `GET /v1/admin/media/{media_id}` - Get media
+- `POST /v1/admin/media/questions/{question_id}/attach` - Attach media
+- `DELETE /v1/admin/media/questions/{question_id}/detach/{media_id}` - Detach media
+
+#### Audit (`/v1/admin/audit`) - Dev Only
+- `GET /v1/admin/audit` - Query audit log
+
+### Example Request Bodies
+
+#### Create Question
+```json
+{
+  "stem": "What is 2+2?",
+  "option_a": "3",
+  "option_b": "4",
+  "option_c": "5",
+  "option_d": "6",
+  "option_e": "7",
+  "correct_index": 1,
+  "explanation_md": "2+2 equals 4",
+  "year_id": 1,
+  "block_id": 1,
+  "theme_id": 1,
+  "difficulty": "easy",
+  "cognitive_level": "recall"
+}
+```
+
+#### Update Question
+```json
+{
+  "stem": "Updated question stem",
+  "explanation_md": "Updated explanation"
+}
+```
+
+#### Reject Question
+```json
+{
+  "reason": "Needs more explanation and better options"
+}
+```
+
+#### Attach Media
+```json
+{
+  "media_id": "550e8400-e29b-41d4-a716-446655440000",
+  "role": "STEM"
+}
+```
+
+### Verification Checklist
+
+When checking OpenAPI docs, verify:
+
+1. ✅ All endpoints listed above are present
+2. ✅ Request/response schemas match the examples
+3. ✅ Authentication requirement is shown (lock icon)
+4. ✅ Required vs optional fields are clearly marked
+5. ✅ Error response schemas are documented (400, 403, 404, 422)
+6. ✅ Enum values are shown (QuestionStatus, MediaRole, ChangeKind)
+7. ✅ UUID format is correctly specified for IDs
+
+### Testing via OpenAPI UI
+
+1. Click "Authorize" button
+2. Enter Bearer token: `Bearer <your_access_token>`
+3. Try "Try it out" on each endpoint
+4. Verify responses match expected schemas
 
 # Database
 if docker-compose exec -T postgres pg_isready -U examplatform > /dev/null 2>&1; then

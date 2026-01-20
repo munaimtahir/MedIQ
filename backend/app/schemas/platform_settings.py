@@ -1,5 +1,7 @@
 """Schemas for platform settings."""
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 
@@ -63,7 +65,7 @@ class PlatformSettingsResponse(BaseModel):
 
     data: PlatformSettingsData
     updated_at: str | None = None
-    updated_by_user_id: int | None = None
+    updated_by_user_id: UUID | None = None
 
 
 class PlatformSettingsUpdate(BaseModel):

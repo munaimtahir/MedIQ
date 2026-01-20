@@ -1,206 +1,123 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { adminAPI } from "@/lib/api";
-import { Theme } from "@/lib/api";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuestionEditor } from "@/components/admin/questions/QuestionEditor";
+import { adminQuestionsApi } from "@/lib/admin/questionsApi";
+import type { QuestionCreate } from "@/lib/types/question-cms";
+import { notify } from "@/lib/notify";
+import { ArrowLeft, Save } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function NewQuestionPage() {
   const router = useRouter();
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [formData, setFormData] = useState({
-    theme_id: "",
-    question_text: "",
-    options: ["", "", "", "", ""],
-    correct_option_index: "",
-    explanation: "",
-    tags: "",
-    difficulty: "",
-  });
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<QuestionCreate>({});
+  const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    // TODO: Load themes when a block is selected
-    // For now, themes will be loaded when needed
-    setThemes([]);
-  }, []);
+  const validateDraft = (): boolean => {
+    const errors: Record<string, string> = {};
 
-  const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...formData.options];
-    newOptions[index] = value;
-    setFormData({ ...formData, options: newOptions });
+    // For draft, only require minimal fields
+    if (!formData.stem || formData.stem.trim() === "") {
+      errors.stem = "Question stem is required";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSaveDraft = async () => {
+    if (!validateDraft()) {
+      notify.error("Validation Error", "Please fix the errors before saving");
+      return;
+    }
 
+    setSaving(true);
     try {
-      const tags = formData.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-      await adminAPI.createQuestion({
-        theme_id: Number(formData.theme_id),
-        question_text: formData.question_text,
-        options: formData.options,
-        correct_option_index: Number(formData.correct_option_index),
-        explanation: formData.explanation || undefined,
-        tags: tags.length > 0 ? tags : undefined,
-        difficulty: formData.difficulty || undefined,
-      });
-      router.push("/admin/questions");
-    } catch (error: unknown) {
+      const created = await adminQuestionsApi.createQuestion(formData);
+      notify.success("Draft Created", "Question has been saved as draft");
+      router.push(`/admin/questions/${created.id}`);
+    } catch (error) {
       console.error("Failed to create question:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to create question";
-      alert(errorMessage);
+      notify.error(
+        "Create Failed",
+        error instanceof Error ? error.message : "Failed to create question",
+      );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <Button variant="ghost" onClick={() => router.back()}>
-          ← Back
-        </Button>
-        <h1 className="mt-4 text-3xl font-bold">Create New Question</h1>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Create New Question</h1>
+            <p className="text-muted-foreground">Start with a draft and refine later</p>
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Question Details</CardTitle>
-            <CardDescription>Fill in all required fields</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="theme">Theme *</Label>
-              <Select
-                value={formData.theme_id}
-                onValueChange={(v) => setFormData({ ...formData, theme_id: v })}
-              >
-                <SelectTrigger id="theme">
-                  <SelectValue placeholder="Select a theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {themes.map((theme) => (
-                    <SelectItem key={theme.id} value={theme.id.toString()}>
-                      {theme.title} (Block {theme.block_id})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {Object.keys(validationErrors).length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please fix validation errors before saving: {Object.values(validationErrors).join(", ")}
+          </AlertDescription>
+        </Alert>
+      )}
 
-            <div className="space-y-2">
-              <Label htmlFor="question_text">Question Text *</Label>
-              <Textarea
-                id="question_text"
-                value={formData.question_text}
-                onChange={(e) => setFormData({ ...formData, question_text: e.target.value })}
-                rows={4}
-                required
-              />
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>New Question (Draft)</CardTitle>
+          <CardDescription>
+            Fill in the question details. You can save as draft with minimal information and
+            complete it later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <QuestionEditor
+            onChange={setFormData}
+            errors={validationErrors}
+          />
 
-            <div className="space-y-2">
-              <Label>Options * (exactly 5)</Label>
-              {formData.options.map((option, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="w-6 font-medium">{String.fromCharCode(65 + idx)}.</span>
-                  <Input
-                    value={option}
-                    onChange={(e) => handleOptionChange(idx, e.target.value)}
-                    placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                    required
-                  />
-                </div>
-              ))}
-            </div>
+          <div className="mt-6 flex gap-4 justify-end border-t pt-6">
+            <Button variant="outline" onClick={() => router.back()} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDraft} disabled={saving}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? "Saving..." : "Save as Draft"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="correct_option_index">Correct Answer *</Label>
-              <Select
-                value={formData.correct_option_index}
-                onValueChange={(v) => setFormData({ ...formData, correct_option_index: v })}
-              >
-                <SelectTrigger id="correct_option_index">
-                  <SelectValue placeholder="Select correct option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {formData.options.map((_, idx) => (
-                    <SelectItem key={idx} value={idx.toString()}>
-                      {String.fromCharCode(65 + idx)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="explanation">Explanation</Label>
-              <Textarea
-                id="explanation"
-                value={formData.explanation}
-                onChange={(e) => setFormData({ ...formData, explanation: e.target.value })}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input
-                  id="tags"
-                  value={formData.tags}
-                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                  placeholder="tag1, tag2, tag3"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="difficulty">Difficulty</Label>
-                <Select
-                  value={formData.difficulty}
-                  onValueChange={(v) => setFormData({ ...formData, difficulty: v })}
-                >
-                  <SelectTrigger id="difficulty">
-                    <SelectValue placeholder="Select difficulty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <Button type="submit" disabled={loading}>
-                {loading ? "Creating..." : "Create Question"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => router.back()}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </form>
+      <Card className="bg-muted/50">
+        <CardHeader>
+          <CardTitle className="text-base">Tips for Creating Questions</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+            <li>Start with a clear, concise question stem</li>
+            <li>Provide exactly 5 options (A-E)</li>
+            <li>Mark the correct answer</li>
+            <li>Add a detailed explanation (helpful for students)</li>
+            <li>Tag with Year, Block, and Theme for organization</li>
+            <li>Reference source materials when available</li>
+            <li>You can save as draft now and complete required fields before submitting for review</li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

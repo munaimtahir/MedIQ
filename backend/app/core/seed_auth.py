@@ -53,6 +53,21 @@ def seed_demo_accounts() -> None:
             db.add(student)
             logger.info("Created demo student account: student@example.com / Student123!")
 
+        # Create reviewer account
+        reviewer_exists = db.query(User).filter(User.email == "reviewer@example.com").first()
+        if not reviewer_exists:
+            reviewer = User(
+                name="Reviewer User",
+                email="reviewer@example.com",
+                password_hash=hash_password("Reviewer123!"),
+                role=UserRole.REVIEWER.value,
+                onboarding_completed=True,
+                is_active=True,
+                email_verified=True,
+            )
+            db.add(reviewer)
+            logger.info("Created demo reviewer account: reviewer@example.com / Reviewer123!")
+
         db.commit()
         logger.info("Demo accounts seeded successfully")
 

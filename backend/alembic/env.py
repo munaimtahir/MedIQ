@@ -11,6 +11,9 @@ from app.db.engine import engine
 
 # Import all models so Alembic can detect them
 from app.models import (  # noqa: F401
+    AuditLog,
+    ChangeKind,
+    CMSQuestion,
     MFATOTP,
     AcademicBlock,
     AcademicSubject,
@@ -18,12 +21,17 @@ from app.models import (  # noqa: F401
     AttemptAnswer,
     AttemptSession,
     Block,
+    MediaAsset,
     MFABackupCode,
     Notification,
     OAuthIdentity,
     PasswordResetToken,
-    Question,
+    # Question,  # Legacy model - disabled to avoid conflicts
+    QuestionMedia,
+    QuestionStatus,
+    QuestionVersion,
     RefreshToken,
+    StorageProvider,
     Theme,
     User,
     # UserAllowedBlock,  # Deprecated - no longer used

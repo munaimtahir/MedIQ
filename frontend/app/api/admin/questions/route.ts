@@ -15,14 +15,35 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
 
+    // Build query params for CMS endpoints (supports all filter params)
     const params = new URLSearchParams();
-    const skip = searchParams.get("skip");
-    const limit = searchParams.get("limit");
-    const published = searchParams.get("published");
+    
+    // CMS filters
+    const status = searchParams.get("status");
+    const year_id = searchParams.get("year_id");
+    const block_id = searchParams.get("block_id");
+    const theme_id = searchParams.get("theme_id");
+    const difficulty = searchParams.get("difficulty");
+    const cognitive_level = searchParams.get("cognitive_level");
+    const source_book = searchParams.get("source_book");
+    const q = searchParams.get("q");
+    const page = searchParams.get("page");
+    const page_size = searchParams.get("page_size");
+    const sort = searchParams.get("sort");
+    const order = searchParams.get("order");
 
-    if (skip) params.set("skip", skip);
-    if (limit) params.set("limit", limit);
-    if (published) params.set("published", published);
+    if (status) params.set("status", status);
+    if (year_id) params.set("year_id", year_id);
+    if (block_id) params.set("block_id", block_id);
+    if (theme_id) params.set("theme_id", theme_id);
+    if (difficulty) params.set("difficulty", difficulty);
+    if (cognitive_level) params.set("cognitive_level", cognitive_level);
+    if (source_book) params.set("source_book", source_book);
+    if (q) params.set("q", q);
+    if (page) params.set("page", page);
+    if (page_size) params.set("page_size", page_size);
+    if (sort) params.set("sort", sort);
+    if (order) params.set("order", order);
 
     const queryString = params.toString() ? `?${params.toString()}` : "";
 

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_roles
 from app.db.session import get_db
-from app.models.question import Question
+from app.models.question_cms import Question, QuestionStatus
 from app.models.syllabus import Block, Theme, Year
 from app.models.user import User, UserRole
 
@@ -31,13 +31,25 @@ async def get_dashboard_summary(
     blocks_count = db.query(func.count(Block.id)).filter(Block.is_active.is_(True)).scalar() or 0
     themes_count = db.query(func.count(Theme.id)).filter(Theme.is_active.is_(True)).scalar() or 0
 
-    # Question counts (if available)
+    # Question counts (CMS questions)
     published_count = (
-        db.query(func.count(Question.id)).filter(Question.is_published.is_(True)).scalar() or 0
+        db.query(func.count(Question.id))
+        .filter(Question.status == QuestionStatus.PUBLISHED)
+        .scalar()
+        or 0
     )
-    # In review and draft counts can be added when those statuses are implemented
-    in_review_count = None
-    draft_count = None
+    in_review_count = (
+        db.query(func.count(Question.id))
+        .filter(Question.status == QuestionStatus.IN_REVIEW)
+        .scalar()
+        or 0
+    )
+    draft_count = (
+        db.query(func.count(Question.id))
+        .filter(Question.status == QuestionStatus.DRAFT)
+        .scalar()
+        or 0
+    )
 
     return {
         "syllabus": {

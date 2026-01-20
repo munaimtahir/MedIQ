@@ -1,279 +1,377 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { studentAPI } from "@/lib/api";
-import { Session, Question } from "@/lib/api";
-import { Clock, Flag } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { AlertCircle, Menu } from "lucide-react";
+import { notify } from "@/lib/notify";
+import { getSession, submitAnswer, submitSession } from "@/lib/api/sessionsApi";
+import type { SessionState, SubmitAnswerRequest } from "@/lib/types/session";
+import { SessionTopBar } from "@/components/student/session/SessionTopBar";
+import { QuestionNavigator } from "@/components/student/session/QuestionNavigator";
+import { QuestionView } from "@/components/student/session/QuestionView";
+import { SubmitConfirmDialog } from "@/components/student/session/SubmitConfirmDialog";
+import { InlineAlert } from "@/components/auth/InlineAlert";
+import { useTelemetry } from "@/lib/hooks/useTelemetry";
 
-export default function TestPlayerPage() {
-  const params = useParams();
+export default function SessionPlayerPage() {
   const router = useRouter();
-  const sessionId = Number(params.sessionId);
-  const [session, setSession] = useState<Session | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [markedForReview, setMarkedForReview] = useState(false);
-  const [answers, setAnswers] = useState<Record<number, { option: number; marked: boolean }>>({});
-  const [timeRemaining, setTimeRemaining] = useState(3600); // seconds
-  const [loading, setLoading] = useState(true);
+  const params = useParams();
+  const sessionId = params.sessionId as string;
+  
+  // Telemetry
+  const { track, flush } = useTelemetry(sessionId);
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [currentPosition, setCurrentPosition] = useState(1);
+  const [savingAnswer, setSavingAnswer] = useState(false);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
+
+  // Local answer state for optimistic updates
+  const [localAnswers, setLocalAnswers] = useState<Map<string, { selected_index: number | null; marked_for_review: boolean }>>(new Map());
+
+  // Load session
   useEffect(() => {
-    Promise.all([
-      studentAPI.getSession(sessionId),
-      studentAPI.getQuestions(undefined, undefined, 100),
-    ])
-      .then(([sess, qs]) => {
-        setSession(sess);
-        // Filter questions to only those in session
-        const sessionQuestions = qs.filter((q) => sess.question_ids.includes(q.id));
-        setQuestions(sessionQuestions);
-        // Load existing answers
-        const existingAnswers: Record<number, { option: number; marked: boolean }> = {};
-        sessionQuestions.forEach((q) => {
-          existingAnswers[q.id] = { option: -1, marked: false };
-        });
-        setAnswers(existingAnswers);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    loadSession();
   }, [sessionId]);
 
+  // Update current position from progress
   useEffect(() => {
-    if (timeRemaining > 0 && !session?.is_submitted) {
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => Math.max(0, prev - 1));
-      }, 1000);
-      return () => clearInterval(timer);
+    if (sessionState) {
+      setCurrentPosition(sessionState.progress.current_position);
     }
-  }, [timeRemaining, session?.is_submitted]);
+  }, [sessionState]);
 
-  const currentQuestion = questions[currentIndex];
-
-  const handleOptionSelect = (optionIndex: number) => {
-    setSelectedOption(optionIndex);
-    if (currentQuestion) {
-      const newAnswers = {
-        ...answers,
-        [currentQuestion.id]: { option: optionIndex, marked: markedForReview },
-      };
-      setAnswers(newAnswers);
+  // Track question view when position changes
+  useEffect(() => {
+    if (sessionState && currentPosition > 0) {
+      const currentQuestion = sessionState.questions.find((q) => q.position === currentPosition);
+      if (currentQuestion) {
+        track("QUESTION_VIEWED", { position: currentPosition }, currentQuestion.question_id);
+      }
     }
-  };
+  }, [currentPosition, sessionState, track]);
 
-  const handleMarkForReview = () => {
-    const newMarked = !markedForReview;
-    setMarkedForReview(newMarked);
-    if (currentQuestion) {
-      const newAnswers = {
-        ...answers,
-        [currentQuestion.id]: {
-          option: selectedOption ?? -1,
-          marked: newMarked,
-        },
-      };
-      setAnswers(newAnswers);
-    }
-  };
+  // Track blur/focus
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const handleSaveAnswer = async () => {
-    if (!currentQuestion || selectedOption === null) return;
+    const handleVisibilityChange = () => {
+      const state = document.visibilityState === "hidden" ? "blur" : "focus";
+      track("PAUSE_BLUR", { state });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [track]);
+
+  async function loadSession() {
+    setLoading(true);
+    setError(null);
 
     try {
-      await studentAPI.submitAnswer(sessionId, {
-        question_id: currentQuestion.id,
-        selected_option_index: selectedOption,
-        is_marked_for_review: markedForReview,
+      const state = await getSession(sessionId);
+
+      // Check if session is no longer active
+      if (state.session.status !== "ACTIVE") {
+        router.push(`/student/session/${sessionId}/review`);
+        return;
+      }
+
+      setSessionState(state);
+
+      // Initialize local answers from questions
+      const answers = new Map<string, { selected_index: number | null; marked_for_review: boolean }>();
+      state.questions.forEach((q) => {
+        answers.set(q.question_id, {
+          selected_index: null, // Will be populated by backend if exists
+          marked_for_review: q.marked_for_review,
+        });
       });
-    } catch (error) {
-      console.error("Failed to save answer:", error);
+      setLocalAnswers(answers);
+    } catch (err: any) {
+      console.error("Failed to load session:", err);
+      
+      if (err?.status === 404) {
+        setError("Session not found");
+      } else if (err?.status === 403) {
+        setError("You don't have permission to access this session");
+      } else {
+        setError(err?.message || "Failed to load session");
+      }
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const handleNext = () => {
-    handleSaveAnswer();
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      const nextQ = questions[currentIndex + 1];
-      const nextAnswer = answers[nextQ.id];
-      setSelectedOption(nextAnswer?.option !== -1 ? nextAnswer.option : null);
-      setMarkedForReview(nextAnswer?.marked || false);
-    }
-  };
+  function handleExpire() {
+    notify.info("Time's up!", "Your session has expired and will be submitted automatically");
+    handleSubmitConfirmed();
+  }
 
-  const handlePrevious = () => {
-    handleSaveAnswer();
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      const prevQ = questions[currentIndex - 1];
-      const prevAnswer = answers[prevQ.id];
-      setSelectedOption(prevAnswer?.option !== -1 ? prevAnswer.option : null);
-      setMarkedForReview(prevAnswer?.marked || false);
-    }
-  };
+  async function handleSelectOption(questionId: string, index: number) {
+    // Optimistic update
+    setLocalAnswers((prev) => {
+      const newMap = new Map(prev);
+      const current = newMap.get(questionId) || { selected_index: null, marked_for_review: false };
+      newMap.set(questionId, { ...current, selected_index: index });
+      return newMap;
+    });
 
-  const handleSubmit = async () => {
-    if (!confirm("Are you sure you want to submit? This cannot be undone.")) return;
+    setSavingAnswer(true);
 
     try {
-      await studentAPI.submitSession(sessionId);
-      router.push(`/student/session/${sessionId}/review`);
-    } catch (error) {
-      console.error("Failed to submit session:", error);
-      alert("Failed to submit session");
-    }
-  };
+      const payload: SubmitAnswerRequest = {
+        question_id: questionId,
+        selected_index: index,
+      };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+      const response = await submitAnswer(sessionId, payload);
+
+      // Update session state with new progress
+      if (sessionState) {
+        setSessionState({
+          ...sessionState,
+          progress: response.progress,
+          questions: sessionState.questions.map((q) =>
+            q.question_id === questionId ? { ...q, has_answer: true } : q
+          ),
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to save answer:", err);
+      notify.error("Failed to save answer", err?.message || "Please try again");
+
+      // Revert optimistic update
+      setLocalAnswers((prev) => {
+        const newMap = new Map(prev);
+        const current = newMap.get(questionId);
+        if (current) {
+          newMap.set(questionId, { ...current, selected_index: null });
+        }
+        return newMap;
+      });
+    } finally {
+      setSavingAnswer(false);
+    }
+  }
+
+  async function handleToggleMarkForReview(questionId: string, marked: boolean) {
+    // Optimistic update
+    setLocalAnswers((prev) => {
+      const newMap = new Map(prev);
+      const current = newMap.get(questionId) || { selected_index: null, marked_for_review: false };
+      newMap.set(questionId, { ...current, marked_for_review: marked });
+      return newMap;
+    });
+
+    try {
+      const payload: SubmitAnswerRequest = {
+        question_id: questionId,
+        marked_for_review: marked,
+      };
+
+      const response = await submitAnswer(sessionId, payload);
+
+      // Update session state
+      if (sessionState) {
+        setSessionState({
+          ...sessionState,
+          progress: response.progress,
+          questions: sessionState.questions.map((q) =>
+            q.question_id === questionId ? { ...q, marked_for_review: marked } : q
+          ),
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to update mark for review:", err);
+
+      // Revert optimistic update
+      setLocalAnswers((prev) => {
+        const newMap = new Map(prev);
+        const current = newMap.get(questionId);
+        if (current) {
+          newMap.set(questionId, { ...current, marked_for_review: !marked });
+        }
+        return newMap;
+      });
+    }
+  }
+
+  function handleNavigate(position: number) {
+    track("NAVIGATE_JUMP", { from_position: currentPosition, to_position: position });
+    setCurrentPosition(position);
+    setShowMobileNav(false);
+  }
+
+  function handlePrevious() {
+    if (currentPosition > 1) {
+      track("NAVIGATE_PREV", { from_position: currentPosition, to_position: currentPosition - 1 });
+      setCurrentPosition(currentPosition - 1);
+    }
+  }
+
+  function handleNext() {
+    if (sessionState && currentPosition < sessionState.session.total_questions) {
+      track("NAVIGATE_NEXT", { from_position: currentPosition, to_position: currentPosition + 1 });
+      setCurrentPosition(currentPosition + 1);
+    }
+  }
+
+  function handleSubmitClick() {
+    setShowSubmitDialog(true);
+  }
+
+  async function handleSubmitConfirmed() {
+    setSubmitting(true);
+
+    try {
+      // Flush telemetry before submit
+      await flush();
+      
+      await submitSession(sessionId);
+      notify.success("Session submitted", "Your test has been submitted successfully");
+      router.push(`/student/session/${sessionId}/review`);
+    } catch (err: any) {
+      console.error("Failed to submit session:", err);
+      notify.error("Failed to submit session", err?.message || "Please try again");
+    } finally {
+      setSubmitting(false);
+      setShowSubmitDialog(false);
+    }
+  }
 
   if (loading) {
-    return <div>Loading session...</div>;
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-96 w-full" />
+            </div>
+            <div className="hidden lg:block">
+              <Skeleton className="h-96 w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (!currentQuestion) {
-    return <div>No questions found</div>;
+  if (error || !sessionState) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <InlineAlert
+          variant="error"
+          message={error || "Session not found"}
+        />
+        <Button onClick={() => router.push("/student/dashboard")} className="mt-4">
+          Back to Dashboard
+        </Button>
+      </div>
+    );
   }
 
-  const answeredCount = Object.values(answers).filter((a) => a.option !== -1).length;
+  const currentQuestion = sessionState.current_question || sessionState.questions.find((q) => q.position === currentPosition);
+  if (!currentQuestion || !sessionState.current_question) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <InlineAlert
+          variant="error"
+          message="Current question not found"
+        />
+      </div>
+    );
+  }
+
+  const localAnswer = localAnswers.get(currentQuestion.question_id);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Practice Session</h1>
-          <p className="text-muted-foreground">
-            Question {currentIndex + 1} of {questions.length}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            <span className="text-lg font-semibold">{formatTime(timeRemaining)}</span>
+    <div className="min-h-screen flex flex-col">
+      {/* Top Bar */}
+      <SessionTopBar
+        mode={sessionState.session.mode}
+        expiresAt={sessionState.session.expires_at}
+        progress={sessionState.progress}
+        totalQuestions={sessionState.session.total_questions}
+        onSubmit={handleSubmitClick}
+        onExpire={handleExpire}
+      />
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Question View (Left) */}
+          <div className="lg:col-span-2">
+            {/* Mobile Nav Toggle */}
+            <div className="lg:hidden mb-4">
+              <Sheet open={showMobileNav} onOpenChange={setShowMobileNav}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="w-full">
+                    <Menu className="mr-2 h-4 w-4" />
+                    Question Navigator
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80">
+                  <SheetHeader>
+                    <SheetTitle>Questions</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    <QuestionNavigator
+                      questions={sessionState.questions}
+                      currentPosition={currentPosition}
+                      onNavigate={handleNavigate}
+                    />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <QuestionView
+              question={sessionState.current_question}
+              selectedIndex={localAnswer?.selected_index ?? null}
+              isMarkedForReview={localAnswer?.marked_for_review ?? false}
+              isSaving={savingAnswer}
+              totalQuestions={sessionState.session.total_questions}
+              onSelectOption={(index) => handleSelectOption(currentQuestion.question_id, index)}
+              onToggleMarkForReview={(marked) => handleToggleMarkForReview(currentQuestion.question_id, marked)}
+              onPrevious={handlePrevious}
+              onNext={handleNext}
+              canGoPrevious={currentPosition > 1}
+              canGoNext={currentPosition < sessionState.session.total_questions}
+            />
           </div>
-          <Badge variant="secondary">{answeredCount} answered</Badge>
+
+          {/* Navigator (Right) - Desktop Only */}
+          <div className="hidden lg:block">
+            <div className="sticky top-24">
+              <QuestionNavigator
+                questions={sessionState.questions}
+                currentPosition={currentPosition}
+                onNavigate={handleNavigate}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-6">
-        <div className="col-span-3">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Question {currentIndex + 1}</CardTitle>
-                {markedForReview && (
-                  <Badge variant="outline">
-                    <Flag className="mr-1 h-3 w-3" />
-                    Marked for Review
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-lg">{currentQuestion.question_text}</p>
-              <div className="space-y-2">
-                {currentQuestion.options.map((option, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleOptionSelect(idx)}
-                    className={`w-full rounded-md border-2 p-4 text-left transition-colors ${
-                      selectedOption === idx
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                          selectedOption === idx ? "border-primary bg-primary" : "border-gray-300"
-                        }`}
-                      >
-                        {selectedOption === idx && (
-                          <div className="h-2 w-2 rounded-full bg-white" />
-                        )}
-                      </div>
-                      <span>
-                        {String.fromCharCode(65 + idx)}. {option}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handleMarkForReview}
-                  className={markedForReview ? "bg-yellow-100" : ""}
-                >
-                  <Flag className="mr-2 h-4 w-4" />
-                  {markedForReview ? "Unmark" : "Mark"} for Review
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between">
-            <Button onClick={handlePrevious} disabled={currentIndex === 0}>
-              Previous
-            </Button>
-            {currentIndex === questions.length - 1 ? (
-              <Button onClick={handleSubmit} variant="default">
-                Submit Session
-              </Button>
-            ) : (
-              <Button onClick={handleNext}>Next</Button>
-            )}
-          </div>
-        </div>
-
-        <div className="col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Question Map</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-5 gap-2">
-                {questions.map((q, idx) => {
-                  const answer = answers[q.id];
-                  const isAnswered = answer?.option !== -1;
-                  const isMarked = answer?.marked;
-                  const isCurrent = idx === currentIndex;
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => {
-                        handleSaveAnswer();
-                        setCurrentIndex(idx);
-                        const ans = answers[q.id];
-                        setSelectedOption(ans?.option !== -1 ? ans.option : null);
-                        setMarkedForReview(ans?.marked || false);
-                      }}
-                      className={`h-8 w-8 rounded text-xs font-semibold ${
-                        isCurrent
-                          ? "bg-primary text-primary-foreground"
-                          : isAnswered
-                            ? isMarked
-                              ? "bg-yellow-500 text-white"
-                              : "bg-green-500 text-white"
-                            : "bg-muted"
-                      }`}
-                    >
-                      {idx + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Submit Confirmation Dialog */}
+      <SubmitConfirmDialog
+        open={showSubmitDialog}
+        onOpenChange={setShowSubmitDialog}
+        onConfirm={handleSubmitConfirmed}
+        answeredCount={sessionState.progress.answered_count}
+        totalQuestions={sessionState.session.total_questions}
+        markedCount={sessionState.progress.marked_for_review_count}
+      />
     </div>
   );
 }

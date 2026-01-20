@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_roles
 from app.db.session import get_db
-from app.models.question import Question
+from app.models.question import QuestionLegacy as Question
 from app.models.syllabus import Theme
 from app.models.user import User, UserRole
 from app.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
