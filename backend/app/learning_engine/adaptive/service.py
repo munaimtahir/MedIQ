@@ -27,7 +27,7 @@ async def adaptive_select_v0(
 ) -> dict[str, Any]:
     """
     Select questions using adaptive algorithm with run logging.
-    
+
     Args:
         db: Database session
         user_id: User ID
@@ -37,7 +37,7 @@ async def adaptive_select_v0(
         count: Number of questions
         mode: Session mode
         trigger: Run trigger source
-    
+
     Returns:
         Dictionary with question_ids and metadata
     """
@@ -51,9 +51,9 @@ async def adaptive_select_v0(
                 "count": 0,
                 "error": "no_active_algo",
             }
-        
+
         params = params_obj.params_json
-        
+
         # Start run logging
         run = await log_run_start(
             db,
@@ -71,7 +71,7 @@ async def adaptive_select_v0(
                 "mode": mode,
             },
         )
-        
+
         # Call selection algorithm
         question_ids = await select_questions_v0(
             db,
@@ -83,11 +83,11 @@ async def adaptive_select_v0(
             mode=mode,
             params=params,
         )
-        
+
         # Compute distribution for output summary
         # (Would need to query questions again to get theme/difficulty distribution)
         # For now, keep it simple
-        
+
         # Log success
         await log_run_success(
             db,
@@ -97,20 +97,20 @@ async def adaptive_select_v0(
                 "requested": count,
             },
         )
-        
+
         return {
             "question_ids": question_ids,
             "count": len(question_ids),
             "run_id": str(run.id),
         }
-    
+
     except Exception as e:
         logger.error(f"Adaptive selection failed for user {user_id}: {e}")
-        
+
         # Log failure if run was started
-        if 'run' in locals():
+        if "run" in locals():
             await log_run_failure(db, run_id=run.id, error_message=str(e))
-        
+
         return {
             "question_ids": [],
             "count": 0,

@@ -16,7 +16,9 @@ class Bookmark(Base):
     __tablename__ = "bookmarks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False, index=True
+    )
     question_id = Column(
         UUID(as_uuid=True),
         ForeignKey("questions.id", onupdate="CASCADE", ondelete="CASCADE"),
@@ -31,6 +33,4 @@ class Bookmark(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "question_id", name="uq_user_question_bookmark"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "question_id", name="uq_user_question_bookmark"),)

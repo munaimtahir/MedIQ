@@ -23,7 +23,9 @@ class AlgoVersion(Base):
     description = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     # Relationships
     params = relationship("AlgoParams", back_populates="algo_version", cascade="all, delete-orphan")
@@ -51,7 +53,9 @@ class AlgoParams(Base):
     is_active = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
     created_by_user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", onupdate="CASCADE"),

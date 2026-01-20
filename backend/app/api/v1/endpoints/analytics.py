@@ -29,7 +29,7 @@ async def get_analytics_overview(
 ):
     """
     Get student analytics overview.
-    
+
     Returns overall performance metrics, block/theme breakdowns,
     trends, and weakest areas.
     """
@@ -45,15 +45,15 @@ async def get_block_analytics_endpoint(
 ):
     """
     Get block-specific analytics.
-    
+
     Returns performance metrics for a specific block,
     theme breakdowns, and trends.
     """
     analytics = await get_block_analytics(db, current_user.id, block_id)
-    
+
     if analytics is None:
         raise HTTPException(status_code=404, detail="Block not found")
-    
+
     return analytics
 
 
@@ -65,12 +65,12 @@ async def get_theme_analytics_endpoint(
 ):
     """
     Get theme-specific analytics.
-    
+
     Returns performance metrics for a specific theme and trends.
     """
     analytics = await get_theme_analytics(db, current_user.id, theme_id)
-    
+
     if analytics is None:
         raise HTTPException(status_code=404, detail="Theme not found")
-    
+
     return analytics

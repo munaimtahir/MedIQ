@@ -34,7 +34,9 @@ def print_step(step: str, total: int):
     print(f"{YELLOW}[{step}/{total}] {step}{NC}")
 
 
-def check_response(response: httpx.Response, expected_status: int = 200, error_msg: str = "Request failed"):
+def check_response(
+    response: httpx.Response, expected_status: int = 200, error_msg: str = "Request failed"
+):
     """Check response and raise on error."""
     if response.status_code != expected_status:
         print(f"{RED}✗ {error_msg} (status: {response.status_code}){NC}")
@@ -142,7 +144,9 @@ def main():
 
     # Step 5: Try submit too early (should fail)
     print_step("5/19", 19)
-    submit_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/submit", headers=headers)
+    submit_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/submit", headers=headers
+    )
     if submit_resp.status_code in [400, 422]:
         print(f"{GREEN}✓ Submit correctly rejected (missing required fields){NC}")
     else:
@@ -165,13 +169,17 @@ def main():
         "difficulty": "easy",
         "cognitive_level": "recall",
     }
-    update_resp = client.put(f"{BASE_URL}/v1/admin/questions/{question_id}", json=update_data, headers=headers)
+    update_resp = client.put(
+        f"{BASE_URL}/v1/admin/questions/{question_id}", json=update_data, headers=headers
+    )
     check_response(update_resp, 200, "Failed to update question")
     print(f"{GREEN}✓ Question updated{NC}")
 
     # Step 7: Submit success
     print_step("7/19", 19)
-    submit_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/submit", headers=headers)
+    submit_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/submit", headers=headers
+    )
     submit_json = check_response(submit_resp, 200, "Submit failed")
     new_status = submit_json.get("new_status")
     if new_status != "IN_REVIEW":
@@ -181,7 +189,9 @@ def main():
 
     # Step 8: Login as REVIEWER
     print_step("8/19", 19)
-    reviewer_login = client.post(f"{BASE_URL}/v1/auth/login", json={"email": REVIEWER_EMAIL, "password": REVIEWER_PASSWORD})
+    reviewer_login = client.post(
+        f"{BASE_URL}/v1/auth/login", json={"email": REVIEWER_EMAIL, "password": REVIEWER_PASSWORD}
+    )
     reviewer_json = check_response(reviewer_login, 200, "Reviewer login failed")
     reviewer_token = reviewer_json.get("tokens", {}).get("access_token")
     if not reviewer_token:
@@ -192,7 +202,9 @@ def main():
 
     # Step 9: Approve should fail (missing explanation)
     print_step("9/19", 19)
-    approve_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/approve", headers=reviewer_headers)
+    approve_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/approve", headers=reviewer_headers
+    )
     if approve_resp.status_code in [400, 422]:
         print(f"{GREEN}✓ Approve correctly rejected (missing explanation){NC}")
     else:
@@ -211,7 +223,9 @@ def main():
 
     # Step 11: Approve success
     print_step("11/19", 19)
-    approve_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/approve", headers=reviewer_headers)
+    approve_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/approve", headers=reviewer_headers
+    )
     approve_json = check_response(approve_resp, 200, "Approve failed")
     new_status = approve_json.get("new_status")
     if new_status != "APPROVED":
@@ -221,7 +235,9 @@ def main():
 
     # Step 12: Publish should fail (missing source)
     print_step("12/19", 19)
-    publish_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/publish", headers=headers)
+    publish_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/publish", headers=headers
+    )
     if publish_resp.status_code in [400, 422]:
         print(f"{GREEN}✓ Publish correctly rejected (missing source){NC}")
     else:
@@ -232,7 +248,11 @@ def main():
     print_step("13/19", 19)
     update_resp = client.put(
         f"{BASE_URL}/v1/admin/questions/{question_id}",
-        json={"source_book": "Test Mathematics Book", "source_page": "p. 42", "source_ref": "TEST-001"},
+        json={
+            "source_book": "Test Mathematics Book",
+            "source_page": "p. 42",
+            "source_ref": "TEST-001",
+        },
         headers=headers,
     )
     check_response(update_resp, 200, "Failed to add source fields")
@@ -240,7 +260,9 @@ def main():
 
     # Step 14: Publish success
     print_step("14/19", 19)
-    publish_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/publish", headers=headers)
+    publish_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/publish", headers=headers
+    )
     publish_json = check_response(publish_resp, 200, "Publish failed")
     new_status = publish_json.get("new_status")
     if new_status != "PUBLISHED":
@@ -250,15 +272,21 @@ def main():
 
     # Step 15: RBAC test - REVIEWER cannot unpublish
     print_step("15/19", 19)
-    unpublish_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/unpublish", headers=reviewer_headers)
+    unpublish_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/unpublish", headers=reviewer_headers
+    )
     if unpublish_resp.status_code == 403:
         print(f"{GREEN}✓ Reviewer correctly denied unpublish (403){NC}")
     else:
-        print(f"{YELLOW}⚠ Reviewer denied but with unexpected status: {unpublish_resp.status_code}{NC}")
+        print(
+            f"{YELLOW}⚠ Reviewer denied but with unexpected status: {unpublish_resp.status_code}{NC}"
+        )
 
     # Step 16: Unpublish success (ADMIN)
     print_step("16/19", 19)
-    unpublish_resp = client.post(f"{BASE_URL}/v1/admin/questions/{question_id}/unpublish", headers=headers)
+    unpublish_resp = client.post(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/unpublish", headers=headers
+    )
     unpublish_json = check_response(unpublish_resp, 200, "Unpublish failed")
     new_status = unpublish_json.get("new_status")
     if new_status != "APPROVED":
@@ -268,7 +296,9 @@ def main():
 
     # Step 17: Check versions
     print_step("17/19", 19)
-    versions_resp = client.get(f"{BASE_URL}/v1/admin/questions/{question_id}/versions", headers=headers)
+    versions_resp = client.get(
+        f"{BASE_URL}/v1/admin/questions/{question_id}/versions", headers=headers
+    )
     versions = check_response(versions_resp, 200, "Failed to get versions")
     version_count = len(versions)
     if version_count >= 5:
@@ -281,12 +311,15 @@ def main():
         first_version = versions[0].get("version_no", 0)
         last_version = versions[-1].get("version_no", 0)
         if first_version > last_version:
-            print(f"{GREEN}✓ Version numbers increment correctly (latest: {first_version}, first: {last_version}){NC}")
+            print(
+                f"{GREEN}✓ Version numbers increment correctly (latest: {first_version}, first: {last_version}){NC}"
+            )
 
     # Step 18: Check audit log
     print_step("18/19", 19)
     audit_resp = client.get(
-        f"{BASE_URL}/v1/admin/audit?entity_type=QUESTION&entity_id={question_id}&limit=20", headers=headers
+        f"{BASE_URL}/v1/admin/audit?entity_type=QUESTION&entity_id={question_id}&limit=20",
+        headers=headers,
     )
     if audit_resp.status_code == 200:
         audits = audit_resp.json()
@@ -300,12 +333,14 @@ def main():
         else:
             print(f"{YELLOW}⚠ Expected at least 5 audit entries, got {audit_count}{NC}")
     else:
-        print(f"{YELLOW}⚠ Audit endpoint not available (dev-only) or returned {audit_resp.status_code}{NC}")
+        print(
+            f"{YELLOW}⚠ Audit endpoint not available (dev-only) or returned {audit_resp.status_code}{NC}"
+        )
 
     # Step 19: Media upload (skip if not critical)
     print_step("19/19", 19)
     print(f"{YELLOW}⚠ Media upload test skipped (requires file handling){NC}")
-    
+
     client.close()
 
     # Final summary

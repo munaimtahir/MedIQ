@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.question_cms import Question, QuestionVersion
 
 
-async def freeze_question(db: AsyncSession, question_id: UUID) -> tuple[UUID | None, dict[str, Any] | None]:
+async def freeze_question(
+    db: AsyncSession, question_id: UUID
+) -> tuple[UUID | None, dict[str, Any] | None]:
     """
     Freeze question content for a session.
 

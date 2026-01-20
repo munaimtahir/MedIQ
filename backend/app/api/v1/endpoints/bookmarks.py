@@ -35,7 +35,7 @@ async def list_bookmarks(
 ):
     """
     List all bookmarks for the current user with question details.
-    
+
     Returns bookmarks ordered by most recent first.
     """
     # Get bookmarks with question details
@@ -47,10 +47,10 @@ async def list_bookmarks(
         .offset(skip)
         .limit(limit)
     )
-    
+
     result = await db.execute(stmt)
     rows = result.all()
-    
+
     # Transform to BookmarkWithQuestion
     bookmarks = []
     for bookmark, question in rows:
@@ -71,7 +71,7 @@ async def list_bookmarks(
                 cognitive_level=question.cognitive_level,
             )
         )
-    
+
     return bookmarks
 
 
@@ -83,7 +83,7 @@ async def create_bookmark(
 ):
     """
     Create a new bookmark for a question.
-    
+
     If bookmark already exists, returns the existing bookmark.
     """
     # Check if bookmark already exists
@@ -93,7 +93,7 @@ async def create_bookmark(
     )
     existing_result = await db.execute(existing_stmt)
     existing = existing_result.scalar_one_or_none()
-    
+
     if existing:
         # Update notes if provided
         if bookmark_data.notes is not None:
@@ -101,15 +101,15 @@ async def create_bookmark(
             await db.commit()
             await db.refresh(existing)
         return existing
-    
+
     # Verify question exists
     question_stmt = select(Question).where(Question.id == bookmark_data.question_id)
     question_result = await db.execute(question_stmt)
     question = question_result.scalar_one_or_none()
-    
+
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    
+
     # Create bookmark
     bookmark = Bookmark(
         user_id=current_user.id,
@@ -119,7 +119,7 @@ async def create_bookmark(
     db.add(bookmark)
     await db.commit()
     await db.refresh(bookmark)
-    
+
     return bookmark
 
 
@@ -133,13 +133,13 @@ async def get_bookmark(
     stmt = select(Bookmark).where(Bookmark.id == bookmark_id)
     result = await db.execute(stmt)
     bookmark = result.scalar_one_or_none()
-    
+
     if not bookmark:
         raise HTTPException(status_code=404, detail="Bookmark not found")
-    
+
     if bookmark.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this bookmark")
-    
+
     return bookmark
 
 
@@ -154,17 +154,17 @@ async def update_bookmark(
     stmt = select(Bookmark).where(Bookmark.id == bookmark_id)
     result = await db.execute(stmt)
     bookmark = result.scalar_one_or_none()
-    
+
     if not bookmark:
         raise HTTPException(status_code=404, detail="Bookmark not found")
-    
+
     if bookmark.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this bookmark")
-    
+
     bookmark.notes = bookmark_data.notes
     await db.commit()
     await db.refresh(bookmark)
-    
+
     return bookmark
 
 
@@ -178,16 +178,16 @@ async def delete_bookmark(
     stmt = select(Bookmark).where(Bookmark.id == bookmark_id)
     result = await db.execute(stmt)
     bookmark = result.scalar_one_or_none()
-    
+
     if not bookmark:
         raise HTTPException(status_code=404, detail="Bookmark not found")
-    
+
     if bookmark.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this bookmark")
-    
+
     await db.delete(bookmark)
     await db.commit()
-    
+
     return None
 
 
@@ -199,7 +199,7 @@ async def check_bookmark(
 ):
     """
     Check if a question is bookmarked by the current user.
-    
+
     Returns: {"is_bookmarked": bool, "bookmark_id": UUID | None}
     """
     stmt = select(Bookmark).where(
@@ -208,7 +208,7 @@ async def check_bookmark(
     )
     result = await db.execute(stmt)
     bookmark = result.scalar_one_or_none()
-    
+
     return {
         "is_bookmarked": bookmark is not None,
         "bookmark_id": str(bookmark.id) if bookmark else None,

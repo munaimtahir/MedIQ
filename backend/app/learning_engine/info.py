@@ -11,18 +11,18 @@ from app.learning_engine.registry import resolve_active
 async def get_learning_engine_info(db: AsyncSession) -> LearningEngineInfo:
     """
     Assemble comprehensive learning engine information.
-    
+
     Args:
         db: Database session
-    
+
     Returns:
         LearningEngineInfo with all algorithm states
     """
     algorithms = []
-    
+
     for algo_key in AlgoKey:
         version, params = await resolve_active(db, algo_key.value)
-        
+
         if version and params:
             algorithms.append(
                 AlgorithmInfo(
@@ -33,5 +33,5 @@ async def get_learning_engine_info(db: AsyncSession) -> LearningEngineInfo:
                     updated_at=version.updated_at,
                 )
             )
-    
+
     return LearningEngineInfo(algorithms=algorithms)

@@ -5,6 +5,7 @@ Revises: 011_revision_queue
 Create Date: 2026-01-21 18:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '012_difficulty_adaptive'
-down_revision: Union[str, None] = '011_revision_queue'
+revision: str = "012_difficulty_adaptive"
+down_revision: Union[str, None] = "011_revision_queue"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -21,42 +22,48 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Create question_difficulty table
     op.create_table(
-        'question_difficulty',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('question_id', postgresql.UUID(as_uuid=True), nullable=False, unique=True),
-        
+        "question_difficulty",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("question_id", postgresql.UUID(as_uuid=True), nullable=False, unique=True),
         # Difficulty metrics
-        sa.Column('rating', sa.Numeric(8, 2), nullable=False, server_default='1000'),
-        sa.Column('attempts', sa.Integer(), nullable=False, server_default='0'),
-        sa.Column('correct', sa.Integer(), nullable=False, server_default='0'),
-        sa.Column('p_correct', sa.Numeric(5, 4), nullable=True),
-        
+        sa.Column("rating", sa.Numeric(8, 2), nullable=False, server_default="1000"),
+        sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("correct", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("p_correct", sa.Numeric(5, 4), nullable=True),
         # Audit
-        sa.Column('last_updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('now()')),
-        
+        sa.Column(
+            "last_updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         # Provenance
-        sa.Column('algo_version_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('params_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('run_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('breakdown_json', postgresql.JSONB, nullable=False, server_default='{}'),
-        
+        sa.Column("algo_version_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("params_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("run_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("breakdown_json", postgresql.JSONB, nullable=False, server_default="{}"),
         # Foreign keys
-        sa.ForeignKeyConstraint(['question_id'], ['questions.id'], onupdate='CASCADE', ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['algo_version_id'], ['algo_versions.id'], onupdate='CASCADE'),
-        sa.ForeignKeyConstraint(['params_id'], ['algo_params.id'], onupdate='CASCADE'),
-        sa.ForeignKeyConstraint(['run_id'], ['algo_runs.id'], onupdate='CASCADE'),
+        sa.ForeignKeyConstraint(
+            ["question_id"], ["questions.id"], onupdate="CASCADE", ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(["algo_version_id"], ["algo_versions.id"], onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["params_id"], ["algo_params.id"], onupdate="CASCADE"),
+        sa.ForeignKeyConstraint(["run_id"], ["algo_runs.id"], onupdate="CASCADE"),
     )
-    
+
     # Create indexes
-    op.create_index('ix_question_difficulty_question_id', 'question_difficulty', ['question_id'])
-    op.create_index('ix_question_difficulty_rating', 'question_difficulty', ['rating'])
-    op.create_index('ix_question_difficulty_attempts', 'question_difficulty', ['attempts'])
-    op.create_index('ix_question_difficulty_algo_version_id', 'question_difficulty', ['algo_version_id'])
-    op.create_index('ix_question_difficulty_params_id', 'question_difficulty', ['params_id'])
-    op.create_index('ix_question_difficulty_run_id', 'question_difficulty', ['run_id'])
-    
+    op.create_index("ix_question_difficulty_question_id", "question_difficulty", ["question_id"])
+    op.create_index("ix_question_difficulty_rating", "question_difficulty", ["rating"])
+    op.create_index("ix_question_difficulty_attempts", "question_difficulty", ["attempts"])
+    op.create_index(
+        "ix_question_difficulty_algo_version_id", "question_difficulty", ["algo_version_id"]
+    )
+    op.create_index("ix_question_difficulty_params_id", "question_difficulty", ["params_id"])
+    op.create_index("ix_question_difficulty_run_id", "question_difficulty", ["run_id"])
+
     # Update difficulty v0 parameters
-    op.execute("""
+    op.execute(
+        """
         UPDATE algo_params
         SET params_json = '{
             "baseline_rating": 1000,
@@ -73,10 +80,12 @@ def upgrade() -> None:
             SELECT id FROM algo_versions WHERE algo_key = 'difficulty' AND version = 'v0'
         )
         AND is_active = true
-    """)
-    
+    """
+    )
+
     # Update adaptive v0 parameters
-    op.execute("""
+    op.execute(
+        """
         UPDATE algo_params
         SET params_json = '{
             "anti_repeat_days": 14,
@@ -111,17 +120,18 @@ def upgrade() -> None:
             SELECT id FROM algo_versions WHERE algo_key = 'adaptive' AND version = 'v0'
         )
         AND is_active = true
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
     # Drop indexes
-    op.drop_index('ix_question_difficulty_run_id')
-    op.drop_index('ix_question_difficulty_params_id')
-    op.drop_index('ix_question_difficulty_algo_version_id')
-    op.drop_index('ix_question_difficulty_attempts')
-    op.drop_index('ix_question_difficulty_rating')
-    op.drop_index('ix_question_difficulty_question_id')
-    
+    op.drop_index("ix_question_difficulty_run_id")
+    op.drop_index("ix_question_difficulty_params_id")
+    op.drop_index("ix_question_difficulty_algo_version_id")
+    op.drop_index("ix_question_difficulty_attempts")
+    op.drop_index("ix_question_difficulty_rating")
+    op.drop_index("ix_question_difficulty_question_id")
+
     # Drop table
-    op.drop_table('question_difficulty')
+    op.drop_table("question_difficulty")

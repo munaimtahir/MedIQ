@@ -14,12 +14,14 @@ from pydantic import BaseModel, Field
 
 class BlockInfo(BaseModel):
     """Block information."""
+
     id: UUID
     name: str
 
 
 class ThemeInfo(BaseModel):
     """Theme information."""
+
     id: UUID
     name: str
 
@@ -31,6 +33,7 @@ class ThemeInfo(BaseModel):
 
 class RevisionQueueItem(BaseModel):
     """Revision queue item with joined data."""
+
     id: UUID
     due_date: date
     status: str
@@ -43,15 +46,17 @@ class RevisionQueueItem(BaseModel):
 
 class RevisionQueueListResponse(BaseModel):
     """List of revision queue items."""
+
     items: list[RevisionQueueItem]
     total: int
 
 
 class RevisionQueueUpdateRequest(BaseModel):
     """Request to update revision queue item."""
+
     action: str = Field(..., pattern="^(DONE|SNOOZE|SKIP)$")
     snooze_days: int | None = Field(None, ge=1, le=3)
-    
+
     def validate_snooze(self):
         """Validate that snooze_days is provided for SNOOZE action."""
         if self.action == "SNOOZE" and self.snooze_days is None:

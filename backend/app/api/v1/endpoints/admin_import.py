@@ -5,12 +5,29 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_roles
 from app.db.session import get_db
-from app.models.import_schema import ImportFileType, ImportJob, ImportJobRow, ImportJobStatus, ImportSchema
+from app.models.import_schema import (
+    ImportFileType,
+    ImportJob,
+    ImportJobRow,
+    ImportJobStatus,
+    ImportSchema,
+)
 from app.models.user import User, UserRole
 from app.schemas.import_schema import (
     ActivateSchemaResponse,
@@ -81,7 +98,11 @@ async def create_schema(
     return ImportSchemaOut.model_validate(schema)
 
 
-@router.post("/schemas/{schema_id}/new-version", response_model=ImportSchemaOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/schemas/{schema_id}/new-version",
+    response_model=ImportSchemaOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_new_version(
     schema_id: UUID,
     updates: ImportSchemaUpdate,
@@ -112,7 +133,9 @@ async def create_new_version(
         quote_char=updates.quote_char if updates.quote_char is not None else base_schema.quote_char,
         has_header=updates.has_header if updates.has_header is not None else base_schema.has_header,
         encoding=updates.encoding if updates.encoding is not None else base_schema.encoding,
-        mapping_json=updates.mapping_json if updates.mapping_json is not None else base_schema.mapping_json,
+        mapping_json=(
+            updates.mapping_json if updates.mapping_json is not None else base_schema.mapping_json
+        ),
         rules_json=updates.rules_json if updates.rules_json is not None else base_schema.rules_json,
         created_by=current_user.id,
     )
@@ -340,12 +363,7 @@ async def list_jobs(
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> list[ImportJobListOut]:
     """List import jobs."""
-    jobs = (
-        db.query(ImportJob)
-        .order_by(ImportJob.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+    jobs = db.query(ImportJob).order_by(ImportJob.created_at.desc()).limit(limit).all()
 
     return [ImportJobListOut.model_validate(j) for j in jobs]
 

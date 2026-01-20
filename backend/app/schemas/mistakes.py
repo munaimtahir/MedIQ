@@ -14,30 +14,35 @@ from pydantic import BaseModel, Field
 
 class BlockInfo(BaseModel):
     """Block information."""
+
     id: UUID
     name: str
 
 
 class ThemeInfo(BaseModel):
     """Theme information."""
+
     id: UUID
     name: str
 
 
 class QuestionInfo(BaseModel):
     """Question information."""
+
     id: UUID
     stem_preview: str
 
 
 class ThemeCount(BaseModel):
     """Theme with count."""
+
     theme: ThemeInfo
     wrong: int
 
 
 class BlockCount(BaseModel):
     """Block with count."""
+
     block: BlockInfo
     wrong: int
 
@@ -49,6 +54,7 @@ class BlockCount(BaseModel):
 
 class MistakesSummaryResponse(BaseModel):
     """Summary of mistakes."""
+
     range_days: int
     total_wrong: int
     counts_by_type: dict[str, int]
@@ -63,6 +69,7 @@ class MistakesSummaryResponse(BaseModel):
 
 class MistakeItem(BaseModel):
     """Single mistake item."""
+
     created_at: datetime
     mistake_type: str
     severity: int
@@ -74,6 +81,7 @@ class MistakeItem(BaseModel):
 
 class MistakesListResponse(BaseModel):
     """Paginated list of mistakes."""
+
     page: int
     page_size: int
     total: int

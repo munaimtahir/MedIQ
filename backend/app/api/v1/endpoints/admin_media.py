@@ -145,7 +145,11 @@ async def attach_media_to_question(
 
     db.commit()
 
-    return {"message": "Media attached successfully", "question_id": str(question_id), "media_id": str(attach_data.media_id)}
+    return {
+        "message": "Media attached successfully",
+        "question_id": str(question_id),
+        "media_id": str(attach_data.media_id),
+    }
 
 
 @router.delete(

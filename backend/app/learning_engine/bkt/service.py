@@ -34,7 +34,7 @@ DEFAULT_BKT_PARAMS = {
 
 class BKTParams:
     """Container for BKT parameters."""
-    
+
     def __init__(
         self,
         p_L0: float,
@@ -43,7 +43,7 @@ class BKTParams:
         p_G: float,
         concept_id: Optional[UUID] = None,
         algo_version_id: Optional[UUID] = None,
-        is_default: bool = False
+        is_default: bool = False,
     ):
         self.p_L0 = p_L0
         self.p_T = p_T
@@ -52,7 +52,7 @@ class BKTParams:
         self.concept_id = concept_id
         self.algo_version_id = algo_version_id
         self.is_default = is_default
-    
+
     def to_dict(self) -> dict:
         return {
             "p_L0": self.p_L0,
@@ -68,31 +68,26 @@ class BKTParams:
 async def get_active_params(db: AsyncSession, concept_id: UUID) -> BKTParams:
     """
     Get active BKT parameters for a concept.
-    
+
     Falls back to global default if no concept-specific parameters exist.
-    
+
     Args:
         db: Database session
         concept_id: Concept ID
-        
+
     Returns:
         BKTParams instance
     """
     # Try to get concept-specific parameters
     result = await db.execute(
         select(BKTSkillParams)
-        .where(
-            and_(
-                BKTSkillParams.concept_id == concept_id,
-                BKTSkillParams.is_active == True
-            )
-        )
+        .where(and_(BKTSkillParams.concept_id == concept_id, BKTSkillParams.is_active == True))
         .order_by(BKTSkillParams.fitted_at.desc())
         .limit(1)
     )
-    
+
     skill_params = result.scalar_one_or_none()
-    
+
     if skill_params:
         logger.debug(f"Using concept-specific BKT params for concept {concept_id}")
         return BKTParams(
@@ -102,41 +97,33 @@ async def get_active_params(db: AsyncSession, concept_id: UUID) -> BKTParams:
             p_G=skill_params.p_G,
             concept_id=concept_id,
             algo_version_id=skill_params.algo_version_id,
-            is_default=False
+            is_default=False,
         )
-    
+
     # Fall back to global default parameters
     logger.debug(f"Using default BKT params for concept {concept_id}")
-    
+
     # Get BKT algo version
     result = await db.execute(
         select(AlgoVersion)
-        .where(
-            and_(
-                AlgoVersion.algo_key == AlgoKey.BKT.value,
-                AlgoVersion.status == "ACTIVE"
-            )
-        )
+        .where(and_(AlgoVersion.algo_key == AlgoKey.BKT.value, AlgoVersion.status == "ACTIVE"))
         .limit(1)
     )
-    
+
     algo_version = result.scalar_one_or_none()
-    
+
     if algo_version:
         # Get default params from algo_params
         result = await db.execute(
             select(AlgoParams)
             .where(
-                and_(
-                    AlgoParams.algo_version_id == algo_version.id,
-                    AlgoParams.is_active == True
-                )
+                and_(AlgoParams.algo_version_id == algo_version.id, AlgoParams.is_active == True)
             )
             .limit(1)
         )
-        
+
         algo_params = result.scalar_one_or_none()
-        
+
         if algo_params and algo_params.params_json:
             params_json = algo_params.params_json
             return BKTParams(
@@ -146,9 +133,9 @@ async def get_active_params(db: AsyncSession, concept_id: UUID) -> BKTParams:
                 p_G=params_json.get("default_G", DEFAULT_BKT_PARAMS["p_G"]),
                 concept_id=concept_id,
                 algo_version_id=algo_version.id,
-                is_default=True
+                is_default=True,
             )
-    
+
     # Ultimate fallback
     return BKTParams(
         p_L0=DEFAULT_BKT_PARAMS["p_L0"],
@@ -156,65 +143,60 @@ async def get_active_params(db: AsyncSession, concept_id: UUID) -> BKTParams:
         p_S=DEFAULT_BKT_PARAMS["p_S"],
         p_G=DEFAULT_BKT_PARAMS["p_G"],
         concept_id=concept_id,
-        is_default=True
+        is_default=True,
     )
 
 
 async def get_or_create_user_state(
-    db: AsyncSession,
-    user_id: UUID,
-    concept_id: UUID,
-    default_from_L0: Optional[float] = None
+    db: AsyncSession, user_id: UUID, concept_id: UUID, default_from_L0: Optional[float] = None
 ) -> BKTUserSkillState:
     """
     Get or create user skill state for a concept.
-    
+
     If state doesn't exist, creates it with p_mastery = L0 (prior).
-    
+
     Args:
         db: Database session
         user_id: User ID
         concept_id: Concept ID
         default_from_L0: Optional L0 value for initialization
-        
+
     Returns:
         BKTUserSkillState instance
     """
     # Try to get existing state
     result = await db.execute(
-        select(BKTUserSkillState)
-        .where(
-            and_(
-                BKTUserSkillState.user_id == user_id,
-                BKTUserSkillState.concept_id == concept_id
-            )
+        select(BKTUserSkillState).where(
+            and_(BKTUserSkillState.user_id == user_id, BKTUserSkillState.concept_id == concept_id)
         )
     )
-    
+
     state = result.scalar_one_or_none()
-    
+
     if state:
         return state
-    
+
     # Create new state with L0 as initial mastery
     if default_from_L0 is None:
         params = await get_active_params(db, concept_id)
         default_from_L0 = params.p_L0
-    
+
     state = BKTUserSkillState(
         user_id=user_id,
         concept_id=concept_id,
         p_mastery=default_from_L0,
         n_attempts=0,
         created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC)
+        updated_at=datetime.now(UTC),
     )
-    
+
     db.add(state)
     await db.flush()  # Flush to get the state persisted but don't commit yet
-    
-    logger.info(f"Created new BKT state for user {user_id}, concept {concept_id} with L0={default_from_L0:.3f}")
-    
+
+    logger.info(
+        f"Created new BKT state for user {user_id}, concept {concept_id} with L0={default_from_L0:.3f}"
+    )
+
     return state
 
 
@@ -225,18 +207,18 @@ async def update_from_attempt(
     concept_id: UUID,
     correct: bool,
     create_snapshot: bool = False,
-    meta: Optional[dict] = None
+    meta: Optional[dict] = None,
 ) -> dict:
     """
     Update user mastery from a single attempt.
-    
+
     Steps:
     1. Get active BKT parameters for concept
     2. Get or create user skill state
     3. Apply BKT update
     4. Persist updated state
     5. Optionally create historical snapshot
-    
+
     Args:
         db: Database session
         user_id: User ID
@@ -245,7 +227,7 @@ async def update_from_attempt(
         correct: Whether the answer was correct
         create_snapshot: Whether to create a historical snapshot
         meta: Optional metadata (e.g., response time, confidence)
-        
+
     Returns:
         Dict with:
             - p_mastery_prior: Mastery before update
@@ -257,22 +239,18 @@ async def update_from_attempt(
     """
     # Get BKT parameters
     params = await get_active_params(db, concept_id)
-    
+
     # Get or create user state
     state = await get_or_create_user_state(db, user_id, concept_id, params.p_L0)
-    
+
     # Store prior mastery
     p_mastery_prior = state.p_mastery
-    
+
     # Apply BKT update
     p_mastery_new, bkt_metadata = update_mastery(
-        p_L_current=state.p_mastery,
-        correct=correct,
-        p_T=params.p_T,
-        p_S=params.p_S,
-        p_G=params.p_G
+        p_L_current=state.p_mastery, correct=correct, p_T=params.p_T, p_S=params.p_S, p_G=params.p_G
     )
-    
+
     # Update state
     state.p_mastery = p_mastery_new
     state.n_attempts += 1
@@ -280,15 +258,15 @@ async def update_from_attempt(
     state.last_seen_question_id = question_id
     state.algo_version_id = params.algo_version_id
     state.updated_at = datetime.now(UTC)
-    
+
     # Commit the state update
     await db.flush()
-    
+
     logger.info(
         f"Updated BKT mastery for user {user_id}, concept {concept_id}: "
         f"{p_mastery_prior:.3f} -> {p_mastery_new:.3f} (correct={correct})"
     )
-    
+
     # Optionally create snapshot
     if create_snapshot:
         snapshot = MasterySnapshot(
@@ -297,11 +275,11 @@ async def update_from_attempt(
             p_mastery=p_mastery_new,
             n_attempts=state.n_attempts,
             algo_version_id=params.algo_version_id,
-            created_at=datetime.now(UTC)
+            created_at=datetime.now(UTC),
         )
         db.add(snapshot)
         await db.flush()
-    
+
     # Return summary
     return {
         "user_id": str(user_id),
@@ -319,29 +297,27 @@ async def update_from_attempt(
 
 
 async def get_user_mastery(
-    db: AsyncSession,
-    user_id: UUID,
-    concept_ids: Optional[list[UUID]] = None
+    db: AsyncSession, user_id: UUID, concept_ids: Optional[list[UUID]] = None
 ) -> list[dict]:
     """
     Get current mastery states for a user.
-    
+
     Args:
         db: Database session
         user_id: User ID
         concept_ids: Optional list of concept IDs to filter
-        
+
     Returns:
         List of mastery state dicts
     """
     query = select(BKTUserSkillState).where(BKTUserSkillState.user_id == user_id)
-    
+
     if concept_ids:
         query = query.where(BKTUserSkillState.concept_id.in_(concept_ids))
-    
+
     result = await db.execute(query.order_by(BKTUserSkillState.p_mastery.desc()))
     states = result.scalars().all()
-    
+
     return [
         {
             "concept_id": str(state.concept_id),
@@ -356,15 +332,13 @@ async def get_user_mastery(
 
 
 async def batch_update_from_attempts(
-    db: AsyncSession,
-    user_id: UUID,
-    attempts: list[dict]
+    db: AsyncSession, user_id: UUID, attempts: list[dict]
 ) -> list[dict]:
     """
     Batch update mastery from multiple attempts.
-    
+
     Useful for recomputing mastery from historical data.
-    
+
     Args:
         db: Database session
         user_id: User ID
@@ -373,18 +347,15 @@ async def batch_update_from_attempts(
             - concept_id
             - correct
             - timestamp (optional)
-            
+
     Returns:
         List of update result dicts
     """
     results = []
-    
+
     # Sort attempts by timestamp if available
-    sorted_attempts = sorted(
-        attempts,
-        key=lambda x: x.get("timestamp", datetime.now(UTC))
-    )
-    
+    sorted_attempts = sorted(attempts, key=lambda x: x.get("timestamp", datetime.now(UTC)))
+
     for attempt in sorted_attempts:
         result = await update_from_attempt(
             db=db,
@@ -393,8 +364,8 @@ async def batch_update_from_attempts(
             concept_id=attempt["concept_id"],
             correct=attempt["correct"],
             create_snapshot=False,  # Don't create snapshots in batch mode
-            meta=attempt.get("meta")
+            meta=attempt.get("meta"),
         )
         results.append(result)
-    
+
     return results

@@ -24,7 +24,7 @@ async def log_run_start(
 ) -> AlgoRun:
     """
     Log the start of an algorithm run.
-    
+
     Args:
         db: Database session
         algo_version_id: Algorithm version ID
@@ -33,7 +33,7 @@ async def log_run_start(
         session_id: Optional session ID (if session-triggered run)
         trigger: Run trigger source
         input_summary: Optional input summary dictionary
-    
+
     Returns:
         Created AlgoRun instance
     """
@@ -49,15 +49,13 @@ async def log_run_start(
         input_summary_json=input_summary or {},
         output_summary_json={},
     )
-    
+
     db.add(run)
     await db.commit()
     await db.refresh(run)
-    
-    logger.info(
-        f"Started algo run: {run.id} (version: {algo_version_id}, params: {params_id})"
-    )
-    
+
+    logger.info(f"Started algo run: {run.id} (version: {algo_version_id}, params: {params_id})")
+
     return run
 
 
@@ -68,7 +66,7 @@ async def log_run_success(
 ) -> None:
     """
     Mark an algorithm run as successful.
-    
+
     Args:
         db: Database session
         run_id: Run ID to update
@@ -78,14 +76,14 @@ async def log_run_success(
     if not run:
         logger.error(f"Run not found: {run_id}")
         return
-    
+
     run.status = RunStatus.SUCCESS
     run.completed_at = datetime.utcnow()
     if output_summary:
         run.output_summary_json = output_summary
-    
+
     await db.commit()
-    
+
     logger.info(f"Completed algo run successfully: {run_id}")
 
 
@@ -96,7 +94,7 @@ async def log_run_failure(
 ) -> None:
     """
     Mark an algorithm run as failed.
-    
+
     Args:
         db: Database session
         run_id: Run ID to update
@@ -106,11 +104,11 @@ async def log_run_failure(
     if not run:
         logger.error(f"Run not found: {run_id}")
         return
-    
+
     run.status = RunStatus.FAILED
     run.completed_at = datetime.utcnow()
     run.error_message = error_message
-    
+
     await db.commit()
-    
+
     logger.error(f"Algo run failed: {run_id} - {error_message}")

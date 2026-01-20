@@ -55,8 +55,7 @@ async def get_active_bkt_version(db: AsyncSession) -> Optional[AlgoVersion]:
     """Get the active BKT algorithm version."""
     result = await db.execute(
         select(AlgoVersion).where(
-            AlgoVersion.algo_key == AlgoKey.BKT,
-            AlgoVersion.status == AlgoStatus.ACTIVE
+            AlgoVersion.algo_key == AlgoKey.BKT, AlgoVersion.status == AlgoStatus.ACTIVE
         )
     )
     return result.scalar_one_or_none()
@@ -73,17 +72,17 @@ async def fit_concept(
 ) -> tuple[bool, str]:
     """
     Fit BKT parameters for a single concept.
-    
+
     Returns:
         Tuple of (success, message)
     """
     logger.info(f"Fitting BKT parameters for concept {concept_id}")
-    
+
     # Get active BKT version
     algo_version = await get_active_bkt_version(db)
     if not algo_version:
         return False, "No active BKT algorithm version found"
-    
+
     # Build training dataset
     logger.info(f"Building training dataset...")
     dataset = await build_training_dataset(
@@ -93,7 +92,7 @@ async def fit_concept(
         to_date=to_date,
         min_attempts_per_user=1,
     )
-    
+
     # Check if sufficient data
     if not dataset.is_sufficient(min_attempts=min_attempts):
         summary = dataset.summary()
@@ -101,9 +100,9 @@ async def fit_concept(
             f"Insufficient data: {summary['total_attempts']} attempts "
             f"from {summary['unique_users']} users (min={min_attempts})"
         )
-    
+
     logger.info(f"Dataset: {dataset.summary()}")
-    
+
     # Fit parameters
     logger.info("Fitting BKT parameters using EM...")
     params, metrics, is_valid, message = await fit_bkt_parameters(
@@ -111,10 +110,10 @@ async def fit_concept(
         constraints=constraints,
         use_cross_validation=False,
     )
-    
+
     if not is_valid:
         return False, f"Fitting failed: {message}"
-    
+
     # Persist parameters
     logger.info("Persisting fitted parameters...")
     skill_params = await persist_fitted_params(
@@ -128,9 +127,9 @@ async def fit_concept(
         constraints_applied=constraints or {},
         activate=activate,
     )
-    
+
     await db.commit()
-    
+
     success_msg = (
         f"Successfully fitted BKT parameters for concept {concept_id}\n"
         f"  L0={params['p_L0']:.3f}, T={params['p_T']:.3f}, "
@@ -139,7 +138,7 @@ async def fit_concept(
         f"  Active: {activate}\n"
         f"  ID: {skill_params.id}"
     )
-    
+
     return True, success_msg
 
 
@@ -153,14 +152,14 @@ async def fit_all_concepts(
 ) -> dict:
     """
     Fit BKT parameters for all concepts with sufficient data.
-    
+
     Returns:
         Dict with success/failure counts and details
     """
     # TODO: Get all concept IDs from a concepts table
     # For now, this is a placeholder
     logger.warning("--all-concepts not yet implemented: requires concepts table")
-    
+
     return {
         "total": 0,
         "success": 0,
@@ -176,7 +175,7 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    
+
     # Target selection
     target_group = parser.add_mutually_exclusive_group(required=True)
     target_group.add_argument(
@@ -189,7 +188,7 @@ async def main():
         action="store_true",
         help="Fit parameters for all concepts with sufficient data",
     )
-    
+
     # Data selection
     parser.add_argument(
         "--from-date",
@@ -207,7 +206,7 @@ async def main():
         default=10,
         help="Minimum total attempts required for fitting (default: 10)",
     )
-    
+
     # Parameter constraints
     parser.add_argument(
         "--L0-min",
@@ -257,34 +256,34 @@ async def main():
         default=0.4,
         help="Maximum value for G parameter (default: 0.4)",
     )
-    
+
     # Actions
     parser.add_argument(
         "--activate",
         action="store_true",
         help="Mark fitted parameters as active (will deactivate previous params)",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Parse dates
     from_date = None
     to_date = None
-    
+
     if args.from_date:
         try:
             from_date = datetime.fromisoformat(args.from_date)
         except ValueError:
             logger.error(f"Invalid from-date format: {args.from_date}")
             return 1
-    
+
     if args.to_date:
         try:
             to_date = datetime.fromisoformat(args.to_date)
         except ValueError:
             logger.error(f"Invalid to-date format: {args.to_date}")
             return 1
-    
+
     # Build constraints dict
     constraints = {
         "L0_min": args.L0_min,
@@ -296,7 +295,7 @@ async def main():
         "G_min": args.G_min,
         "G_max": args.G_max,
     }
-    
+
     # Run fitting
     async with AsyncSessionLocal() as db:
         if args.concept_id:
@@ -305,7 +304,7 @@ async def main():
             except ValueError:
                 logger.error(f"Invalid concept ID: {args.concept_id}")
                 return 1
-            
+
             success, message = await fit_concept(
                 db,
                 concept_id=concept_id,
@@ -315,14 +314,14 @@ async def main():
                 activate=args.activate,
                 constraints=constraints,
             )
-            
+
             if success:
                 logger.info(message)
                 return 0
             else:
                 logger.error(message)
                 return 1
-        
+
         else:  # --all-concepts
             results = await fit_all_concepts(
                 db,
@@ -332,18 +331,16 @@ async def main():
                 activate=args.activate,
                 constraints=constraints,
             )
-            
-            logger.info(
-                f"Fitted parameters for {results['success']}/{results['total']} concepts"
-            )
-            
-            if results['failed'] > 0:
+
+            logger.info(f"Fitted parameters for {results['success']}/{results['total']} concepts")
+
+            if results["failed"] > 0:
                 logger.warning(f"{results['failed']} concepts failed")
-                for detail in results['details']:
-                    if not detail['success']:
+                for detail in results["details"]:
+                    if not detail["success"]:
                         logger.warning(f"  {detail['concept_id']}: {detail['message']}")
-            
-            return 0 if results['failed'] == 0 else 1
+
+            return 0 if results["failed"] == 0 else 1
 
 
 if __name__ == "__main__":

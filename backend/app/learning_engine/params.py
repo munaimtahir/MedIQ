@@ -8,7 +8,7 @@ from typing import Any
 def normalize_params(params: dict[str, Any]) -> dict[str, Any]:
     """
     Normalize parameters to canonical form for checksum computation.
-    
+
     Sorts keys, converts to stable JSON representation.
     """
     return json.loads(json.dumps(params, sort_keys=True))
@@ -17,10 +17,10 @@ def normalize_params(params: dict[str, Any]) -> dict[str, Any]:
 def compute_checksum(params: dict[str, Any]) -> str:
     """
     Compute SHA256 checksum of normalized parameters.
-    
+
     Args:
         params: Parameter dictionary
-    
+
     Returns:
         Hex digest of SHA256 hash
     """
@@ -32,10 +32,10 @@ def compute_checksum(params: dict[str, Any]) -> str:
 def get_default_params(algo_key: str) -> dict[str, Any]:
     """
     Get default parameters for an algorithm.
-    
+
     Args:
         algo_key: Algorithm key (e.g., "mastery")
-    
+
     Returns:
         Default parameter dictionary
     """
@@ -101,18 +101,18 @@ def get_default_params(algo_key: str) -> dict[str, Any]:
 def validate_params(algo_key: str, params: dict[str, Any]) -> tuple[bool, str | None]:
     """
     Validate parameters for an algorithm.
-    
+
     Args:
         algo_key: Algorithm key
         params: Parameter dictionary to validate
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     # Basic validation - can be extended per algorithm
     if not isinstance(params, dict):
         return False, "Parameters must be a dictionary"
-    
+
     # Algorithm-specific validation
     if algo_key == "mastery":
         if "lookback_days" in params and params["lookback_days"] < 1:
@@ -155,5 +155,5 @@ def validate_params(algo_key: str, params: dict[str, Any]) -> tuple[bool, str | 
     elif algo_key == "mistakes":
         if "min_frequency" in params and params["min_frequency"] < 1:
             return False, "mistakes.min_frequency must be >= 1"
-    
+
     return True, None

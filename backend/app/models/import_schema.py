@@ -64,7 +64,9 @@ class ImportSchema(Base):
     rules_json = Column(JSONB, nullable=False)  # {required: [...], defaults: {...}, ...}
 
     # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=True)
+    created_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
@@ -95,7 +97,9 @@ class ImportJob(Base):
     schema_version = Column(Integer, nullable=False)
 
     # Job metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
+    created_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
     filename = Column(String(500), nullable=False)
     file_type = Column(
         Enum(ImportFileType, name="import_file_type", create_type=False),

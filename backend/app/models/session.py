@@ -84,7 +84,9 @@ class TestSession(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     # Relationships
-    questions = relationship("SessionQuestion", back_populates="session", cascade="all, delete-orphan")
+    questions = relationship(
+        "SessionQuestion", back_populates="session", cascade="all, delete-orphan"
+    )
     answers = relationship("SessionAnswer", back_populates="session", cascade="all, delete-orphan")
     events = relationship("AttemptEvent", back_populates="session", cascade="all, delete-orphan")
 
@@ -121,7 +123,9 @@ class SessionQuestion(Base):
         ForeignKey("question_versions.id", onupdate="CASCADE"),
         nullable=True,
     )
-    snapshot_json = Column(JSONB, nullable=True)  # Fallback freeze: {stem, options, correct_index, explanation_md, ...}
+    snapshot_json = Column(
+        JSONB, nullable=True
+    )  # Fallback freeze: {stem, options, correct_index, explanation_md, ...}
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -177,7 +181,7 @@ class SessionAnswer(Base):
 
 class AttemptEvent(Base):
     """Telemetry events for test sessions (append-only log).
-    
+
     IMPORTANT: This is an append-only table. Do NOT update or delete events.
     Events are stored for analytics and must remain immutable.
     """
@@ -185,14 +189,14 @@ class AttemptEvent(Base):
     __tablename__ = "attempt_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
+
     # Event envelope fields
     event_version = Column(Integer, nullable=False, default=1)
     event_type = Column(String(100), nullable=False, index=True)
     event_ts = Column(DateTime(timezone=True), nullable=False, default=func.now(), index=True)
     client_ts = Column(DateTime(timezone=True), nullable=True)  # Client-reported timestamp
     seq = Column(Integer, nullable=True)  # Client sequence number
-    
+
     # Entity references
     session_id = Column(
         UUID(as_uuid=True),
@@ -200,17 +204,19 @@ class AttemptEvent(Base):
         nullable=False,
         index=True,
     )
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False, index=True
+    )
     question_id = Column(
         UUID(as_uuid=True),
         ForeignKey("questions.id", onupdate="CASCADE"),
         nullable=True,
         index=True,
     )
-    
+
     # Metadata
     source = Column(String(50), nullable=True)  # "web", "mobile", "api"
-    payload_json = Column(JSONB, nullable=False, server_default='{}')  # Event-specific data
+    payload_json = Column(JSONB, nullable=False, server_default="{}")  # Event-specific data
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

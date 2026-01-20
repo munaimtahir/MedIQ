@@ -34,11 +34,11 @@ async def get_srs_queue(
 ):
     """
     Get SRS queue - concepts due for review.
-    
+
     Query params:
     - scope: "today" (due now) or "week" (due in next 7 days)
     - limit: Max concepts to return (default 100)
-    
+
     Returns concepts ordered by due_at (most overdue first).
     Priority score is computed from retrievability (lower = higher priority).
     """
@@ -49,7 +49,7 @@ async def get_srs_queue(
             scope=scope,
             limit=limit,
         )
-        
+
         # Convert to response format
         items = [
             SRSQueueItemResponse(
@@ -65,23 +65,20 @@ async def get_srs_queue(
             )
             for c in due_concepts
         ]
-        
+
         return SRSQueueResponse(
             scope=scope,
             total_due=len(items),
             items=items,
         )
-        
+
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to get SRS queue: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get SRS queue: {str(e)}"
+            detail=f"Failed to get SRS queue: {str(e)}",
         )
 
 
@@ -92,13 +89,13 @@ async def get_srs_stats(
 ):
     """
     Get user's SRS statistics.
-    
+
     Returns summary of concepts tracked, due counts, review counts, and
     personalization status.
     """
     try:
         stats = await get_user_stats(db, current_user.id)
-        
+
         return SRSUserStatsResponse(
             total_concepts=stats["total_concepts"],
             due_today=stats["due_today"],
@@ -107,12 +104,12 @@ async def get_srs_stats(
             has_personalized_weights=stats["has_personalized_weights"],
             last_trained_at=stats["last_trained_at"],
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to get SRS stats: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get SRS stats: {str(e)}"
+            detail=f"Failed to get SRS stats: {str(e)}",
         )
 
 
@@ -124,36 +121,36 @@ async def get_concept_state(
 ):
     """
     Get SRS state for a specific concept.
-    
+
     Returns current stability, difficulty, due date, and retrievability.
     """
     from sqlalchemy import select, and_
     from app.models.srs import SRSConceptState
-    
+
     try:
         result = await db.execute(
             select(SRSConceptState).where(
                 and_(
                     SRSConceptState.user_id == current_user.id,
-                    SRSConceptState.concept_id == concept_id
+                    SRSConceptState.concept_id == concept_id,
                 )
             )
         )
         state = result.scalar_one_or_none()
-        
+
         if not state:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No SRS state found for concept {concept_id}"
+                detail=f"No SRS state found for concept {concept_id}",
             )
-        
+
         return SRSConceptStateResponse.model_validate(state)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get concept state: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get concept state: {str(e)}"
+            detail=f"Failed to get concept state: {str(e)}",
         )

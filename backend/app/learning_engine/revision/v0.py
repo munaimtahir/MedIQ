@@ -15,18 +15,18 @@ async def compute_revision_v0(
 ) -> RevisionOutput:
     """
     Compute revision schedule for a user using spaced repetition.
-    
+
     This implementation:
     - Uses mastery scores to determine spacing
     - Prioritizes weak themes
     - Stores revision queue in database
     - Provides recommended question counts
-    
+
     Args:
         db: Database session
         input_data: Revision scheduling input
         params: Algorithm parameters
-    
+
     Returns:
         Revision schedule output with due questions
     """
@@ -35,7 +35,7 @@ async def compute_revision_v0(
         user_id=input_data.user_id,
         trigger="api",
     )
-    
+
     # Return in contract format
     return RevisionOutput(
         user_id=input_data.user_id,

@@ -47,7 +47,7 @@ class BookmarkWithQuestion(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime | None
-    
+
     # Question details
     question_stem: str
     question_status: str

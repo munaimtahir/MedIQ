@@ -107,7 +107,10 @@ def validate_status_transition(
     # RBAC checks
     if new_status == QuestionStatus.PUBLISHED and user_role not in [UserRole.ADMIN]:
         raise QuestionWorkflowError("Only ADMIN can publish questions")
-    if new_status == QuestionStatus.APPROVED and user_role not in [UserRole.ADMIN, UserRole.REVIEWER]:
+    if new_status == QuestionStatus.APPROVED and user_role not in [
+        UserRole.ADMIN,
+        UserRole.REVIEWER,
+    ]:
         raise QuestionWorkflowError("Only ADMIN or REVIEWER can approve questions")
 
 
@@ -466,7 +469,9 @@ def unpublish_question(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
     if question.status != QuestionStatus.PUBLISHED:
-        raise QuestionWorkflowError(f"Cannot unpublish question with status {question.status.value}")
+        raise QuestionWorkflowError(
+            f"Cannot unpublish question with status {question.status.value}"
+        )
 
     validate_status_transition(question.status, QuestionStatus.APPROVED, UserRole(user.role))
 

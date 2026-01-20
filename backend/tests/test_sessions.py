@@ -111,7 +111,9 @@ def test_session_create_selects_published_only(db, test_user, published_question
 
     # Verify PUBLISHED questions count
     published_count = (
-        db.query(Question).filter(Question.status == QuestionStatus.PUBLISHED, Question.year_id == 1).count()
+        db.query(Question)
+        .filter(Question.status == QuestionStatus.PUBLISHED, Question.year_id == 1)
+        .count()
     )
     assert published_count == 30  # Only published, not draft
 
@@ -265,9 +267,11 @@ def test_session_submit_computes_score(db, test_user, published_questions):
     db.flush()
 
     # Compute score (simulate submit)
-    score_correct = db.query(SessionAnswer).filter(
-        SessionAnswer.session_id == session.id, SessionAnswer.is_correct == True
-    ).count()
+    score_correct = (
+        db.query(SessionAnswer)
+        .filter(SessionAnswer.session_id == session.id, SessionAnswer.is_correct == True)
+        .count()
+    )
     score_total = session.total_questions
     score_pct = round((score_correct / score_total) * 100, 2)
 

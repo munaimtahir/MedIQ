@@ -53,7 +53,9 @@ class TestProvenanceEnforcement:
     def test_all_constants_have_sources(self):
         """Every constant must have at least one source."""
         for const in all_constants():
-            assert const.sources, f"{const.value!r} has no sources. All constants must document their origin."
+            assert (
+                const.sources
+            ), f"{const.value!r} has no sources. All constants must document their origin."
             assert len(const.sources) > 0, f"{const.value!r} has empty sources list"
 
     def test_sources_are_non_empty_strings(self):
@@ -62,17 +64,29 @@ class TestProvenanceEnforcement:
             for source in const.sources:
                 assert isinstance(source, str), f"{const.value!r} has non-string source: {source}"
                 assert source.strip(), f"{const.value!r} has empty/whitespace-only source"
-                assert len(source) > 10, f"{const.value!r} source too short (< 10 chars): '{source}'"
+                assert (
+                    len(source) > 10
+                ), f"{const.value!r} source too short (< 10 chars): '{source}'"
 
     def test_sources_contain_reasoning(self):
         """Sources should explain why the value was chosen."""
         # Keywords that indicate proper provenance
         good_keywords = [
-            "paper", "study", "pyBKT", "py-fsrs", "Baker",
-            "empirical", "literature", "standard", "default",
-            "heuristic", "placeholder", "calibration", "typical"
+            "paper",
+            "study",
+            "pyBKT",
+            "py-fsrs",
+            "Baker",
+            "empirical",
+            "literature",
+            "standard",
+            "default",
+            "heuristic",
+            "placeholder",
+            "calibration",
+            "typical",
         ]
-        
+
         for const in all_constants():
             sources_text = " ".join(const.sources).lower()
             has_reasoning = any(keyword in sources_text for keyword in good_keywords)
@@ -84,17 +98,18 @@ class TestProvenanceEnforcement:
     def test_no_naked_numbers_in_sources(self):
         """Sources should not just say 'set to X' without explanation."""
         banned_patterns = ["set to", "value of", "equals", "is set", "hardcoded"]
-        
+
         for const in all_constants():
             sources_text = " ".join(const.sources).lower()
-            
+
             # If source contains a banned pattern, it should also have more context
             for pattern in banned_patterns:
                 if pattern in sources_text:
                     # Should also mention why/where this value comes from
-                    assert any(kw in sources_text for kw in ["paper", "default", "standard", "heuristic", "typical"]), (
-                        f"{const.value!r} source uses '{pattern}' but lacks proper justification"
-                    )
+                    assert any(
+                        kw in sources_text
+                        for kw in ["paper", "default", "standard", "heuristic", "typical"]
+                    ), f"{const.value!r} source uses '{pattern}' but lacks proper justification"
 
 
 class TestFSRSConstants:
@@ -117,7 +132,11 @@ class TestFSRSConstants:
 
     def test_fsrs_training_thresholds(self):
         """Training thresholds must be ordered."""
-        assert FSRS_SHRINKAGE_MIN_LOGS.value < FSRS_SHRINKAGE_TARGET_LOGS.value < FSRS_TRAINING_MIN_LOGS.value
+        assert (
+            FSRS_SHRINKAGE_MIN_LOGS.value
+            < FSRS_SHRINKAGE_TARGET_LOGS.value
+            < FSRS_TRAINING_MIN_LOGS.value
+        )
         assert FSRS_TRAINING_MIN_LOGS.value >= 300, "Need enough data for reliable training"
         assert 0 < FSRS_TRAINING_VAL_RATIO.value < 0.5, "Validation split should be reasonable"
 
@@ -134,15 +153,17 @@ class TestBKTConstants:
 
     def test_bkt_non_degeneracy_constraint(self):
         """S_max + G_max must be < 1 to prevent degeneracy."""
-        assert BKT_S_MAX.value + BKT_G_MAX.value < 1.0, "S + G >= 1 would make learned/unlearned indistinguishable"
+        assert (
+            BKT_S_MAX.value + BKT_G_MAX.value < 1.0
+        ), "S + G >= 1 would make learned/unlearned indistinguishable"
 
     def test_bkt_learned_better_than_unlearned(self):
         """At max slip and max guess, learned should still be better."""
         p_correct_learned_worst = 1.0 - BKT_S_MAX.value
         p_correct_unlearned_best = BKT_G_MAX.value
-        assert p_correct_learned_worst > p_correct_unlearned_best, (
-            "Even in worst case, learned performance must exceed unlearned"
-        )
+        assert (
+            p_correct_learned_worst > p_correct_unlearned_best
+        ), "Even in worst case, learned performance must exceed unlearned"
 
     def test_bkt_stability_constants(self):
         """Numerical stability constants must be sensible."""
@@ -206,7 +227,9 @@ class TestTrainingConstants:
 
     def test_difficulty_training_threshold(self):
         """Difficulty calibration needs multiple observations."""
-        assert TRAINING_DIFFICULTY_MIN_ATTEMPTS.value >= 10, "Difficulty needs enough attempts per question"
+        assert (
+            TRAINING_DIFFICULTY_MIN_ATTEMPTS.value >= 10
+        ), "Difficulty needs enough attempts per question"
 
 
 class TestConstantsIntegrity:
@@ -215,7 +238,7 @@ class TestConstantsIntegrity:
     def test_no_duplicate_values_with_different_sources(self):
         """Same value should not have conflicting provenance."""
         value_to_sources = {}
-        
+
         for const in all_constants():
             val = const.value
             # Skip complex types (dicts, lists) - only check simple values
@@ -227,10 +250,7 @@ class TestConstantsIntegrity:
                     new_sources_set = set(const.sources)
                     if not existing_sources_set & new_sources_set:
                         # No overlap in sources - potential issue
-                        pytest.warns(
-                            UserWarning,
-                            match=f"Value {val} has conflicting provenance"
-                        )
+                        pytest.warns(UserWarning, match=f"Value {val} has conflicting provenance")
                 else:
                     value_to_sources[val] = const.sources
 
@@ -238,12 +258,12 @@ class TestConstantsIntegrity:
         """SourcedValue constants should be immutable after creation."""
         # Can't directly test immutability, but can verify they're not being modified
         initial_values = {const.value: const.sources[:] for const in all_constants()}
-        
+
         # Try to access again (should be same instances)
         for const in all_constants():
-            assert const.sources == initial_values[const.value], (
-                f"Constant {const.value!r} sources changed!"
-            )
+            assert (
+                const.sources == initial_values[const.value]
+            ), f"Constant {const.value!r} sources changed!"
 
 
 class TestCalibrationFlag:
@@ -257,12 +277,14 @@ class TestCalibrationFlag:
             RATING_SLOW_ANSWER_MS,
             RATING_MAX_CHANGES_FOR_CONFIDENT,
         ]
-        
+
         for const in rating_constants:
             sources_text = " ".join(const.sources).lower()
-            assert "heuristic" in sources_text or "calibration" in sources_text or "placeholder" in sources_text, (
-                f"{const.value!r} is a heuristic but doesn't mention calibration plan"
-            )
+            assert (
+                "heuristic" in sources_text
+                or "calibration" in sources_text
+                or "placeholder" in sources_text
+            ), f"{const.value!r} is a heuristic but doesn't mention calibration plan"
 
     def test_difficulty_weights_need_calibration(self):
         """Difficulty weights are marked as heuristic."""

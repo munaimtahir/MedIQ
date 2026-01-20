@@ -34,8 +34,7 @@ async def export_attempt_events_to_warehouse(since_ts: datetime) -> None:
         "but export is not yet implemented. This will be added in tasks 138-141."
     )
     raise NotImplementedError(
-        "Telemetry export to data warehouse not yet implemented. "
-        "Planned for tasks 138-141."
+        "Telemetry export to data warehouse not yet implemented. " "Planned for tasks 138-141."
     )
 
 

@@ -41,16 +41,16 @@ async def get_revision_queue(
 ):
     """
     Get revision queue items for the current user.
-    
+
     Query Parameters:
     - scope: "today" (due_date == today) or "week" (due_date in next 7 days)
     - status: Filter by status (DUE, DONE, SNOOZED, SKIPPED, ALL)
-    
+
     Returns list of revision items with theme/block info and reason.
     """
     # Determine date range
     today = date.today()
-    
+
     if scope == "today":
         date_filter = RevisionQueue.due_date == today
     else:  # week
@@ -59,7 +59,7 @@ async def get_revision_queue(
             RevisionQueue.due_date >= today,
             RevisionQueue.due_date <= week_end,
         )
-    
+
     # Build query
     stmt = (
         select(RevisionQueue)
@@ -75,14 +75,14 @@ async def get_revision_queue(
         )
         .order_by(RevisionQueue.priority_score.desc(), RevisionQueue.due_date.asc())
     )
-    
+
     # Apply status filter
     if status != "ALL":
         stmt = stmt.where(RevisionQueue.status == status)
-    
+
     result = await db.execute(stmt)
     queue_items = result.scalars().all()
-    
+
     # Build response
     items = []
     for item in queue_items:
@@ -98,7 +98,7 @@ async def get_revision_queue(
                 reason=item.reason_json or {},
             )
         )
-    
+
     return RevisionQueueListResponse(
         items=items,
         total=len(items),
@@ -119,12 +119,12 @@ async def update_revision_queue_item(
 ):
     """
     Update revision queue item status.
-    
+
     Actions:
     - DONE: Mark as completed (only if due_date <= today)
     - SKIP: Mark as skipped
     - SNOOZE: Postpone by snooze_days (1-3 days)
-    
+
     Enforces ownership (must be current user's item).
     """
     # Validate request
@@ -132,7 +132,7 @@ async def update_revision_queue_item(
         request.validate_snooze()
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    
+
     # Get item with ownership check
     stmt = (
         select(RevisionQueue)
@@ -144,41 +144,38 @@ async def update_revision_queue_item(
     )
     result = await db.execute(stmt)
     item = result.scalar_one_or_none()
-    
+
     if not item:
         raise HTTPException(status_code=404, detail="Revision item not found")
-    
+
     if item.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this item")
-    
+
     # Apply action
     today = date.today()
-    
+
     if request.action == "DONE":
         # Only allow marking as DONE if due_date <= today
         if item.due_date > today:
-            raise HTTPException(
-                status_code=422,
-                detail="Cannot mark future items as DONE"
-            )
+            raise HTTPException(status_code=422, detail="Cannot mark future items as DONE")
         item.status = "DONE"
-    
+
     elif request.action == "SKIP":
         item.status = "SKIPPED"
-    
+
     elif request.action == "SNOOZE":
         # Update due_date and status
         new_due_date = item.due_date + timedelta(days=request.snooze_days)
         item.due_date = new_due_date
         item.status = "SNOOZED"
-        
+
         # Note: If a row with same (user_id, theme_id, new_due_date) exists,
         # the unique constraint will fail. For simplicity, we update the current row.
         # In production, you might want to handle this more gracefully.
-    
+
     await db.commit()
     await db.refresh(item)
-    
+
     # Return updated item
     return RevisionQueueItem(
         id=item.id,

@@ -48,7 +48,7 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
         role="STUDENT",
     )
     db.add(user)
-    
+
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
@@ -58,14 +58,14 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
         submitted_at=datetime.utcnow(),
     )
     db.add(session)
-    
+
     q1_id = uuid4()
     q2_id = uuid4()
-    
+
     # Create QUESTION_VIEWED events
     # Q1 viewed at T+0, Q2 viewed at T+30, session submitted at T+60
     base_time = datetime.utcnow() - timedelta(seconds=60)
-    
+
     event1 = AttemptEvent(
         id=uuid4(),
         session_id=session.id,
@@ -74,7 +74,7 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
         event_ts=base_time,
         payload_json={"question_id": str(q1_id)},
     )
-    
+
     event2 = AttemptEvent(
         id=uuid4(),
         session_id=session.id,
@@ -83,13 +83,13 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
         event_ts=base_time + timedelta(seconds=30),
         payload_json={"question_id": str(q2_id)},
     )
-    
+
     db.add_all([event1, event2])
     await db.commit()
-    
+
     # Compute time spent
     time_spent = await compute_time_spent_by_question(db, session.id)
-    
+
     # Q1: 30 seconds (until Q2 viewed)
     # Q2: 30 seconds (until session submitted)
     assert time_spent[q1_id] == 30.0
@@ -106,7 +106,7 @@ async def test_compute_change_count(db: AsyncSession):
         role="STUDENT",
     )
     db.add(user)
-    
+
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
@@ -115,10 +115,10 @@ async def test_compute_change_count(db: AsyncSession):
         count=2,
     )
     db.add(session)
-    
+
     q1_id = uuid4()
     q2_id = uuid4()
-    
+
     # Q1: 2 changes, Q2: 1 change
     for i in range(2):
         event = AttemptEvent(
@@ -127,10 +127,10 @@ async def test_compute_change_count(db: AsyncSession):
             user_id=user.id,
             event_type="ANSWER_CHANGED",
             event_ts=datetime.utcnow(),
-            payload_json={"question_id": str(q1_id), "from_index": i, "to_index": i+1},
+            payload_json={"question_id": str(q1_id), "from_index": i, "to_index": i + 1},
         )
         db.add(event)
-    
+
     event = AttemptEvent(
         id=uuid4(),
         session_id=session.id,
@@ -140,12 +140,12 @@ async def test_compute_change_count(db: AsyncSession):
         payload_json={"question_id": str(q2_id), "from_index": 0, "to_index": 1},
     )
     db.add(event)
-    
+
     await db.commit()
-    
+
     # Compute change counts
     change_counts = await compute_change_count(db, session.id)
-    
+
     assert change_counts[q1_id] == 2
     assert change_counts[q2_id] == 1
 
@@ -160,7 +160,7 @@ async def test_compute_blur_count(db: AsyncSession):
         role="STUDENT",
     )
     db.add(user)
-    
+
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
@@ -169,9 +169,9 @@ async def test_compute_blur_count(db: AsyncSession):
         count=1,
     )
     db.add(session)
-    
+
     q_id = uuid4()
-    
+
     # 3 blur events
     for i in range(3):
         event = AttemptEvent(
@@ -183,11 +183,11 @@ async def test_compute_blur_count(db: AsyncSession):
             payload_json={"question_id": str(q_id), "state": "blur"},
         )
         db.add(event)
-    
+
     await db.commit()
-    
+
     blur_counts = await compute_blur_count(db, session.id)
-    
+
     assert blur_counts[q_id] == 3
 
 
@@ -200,7 +200,7 @@ async def test_compute_blur_count(db: AsyncSession):
 async def test_classify_changed_answer_wrong():
     """Test CHANGED_ANSWER_WRONG classification (precedence #1)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -215,7 +215,7 @@ async def test_classify_changed_answer_wrong():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -226,9 +226,9 @@ async def test_classify_changed_answer_wrong():
             "FAST_WRONG": 1,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification is not None
     assert classification.mistake_type == MISTAKE_TYPE_CHANGED_ANSWER_WRONG
     assert classification.severity == 2
@@ -240,7 +240,7 @@ async def test_classify_changed_answer_wrong():
 async def test_classify_time_pressure_wrong():
     """Test TIME_PRESSURE_WRONG classification (precedence #2)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -255,7 +255,7 @@ async def test_classify_time_pressure_wrong():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -265,9 +265,9 @@ async def test_classify_time_pressure_wrong():
             "TIME_PRESSURE_WRONG": 2,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification.mistake_type == MISTAKE_TYPE_TIME_PRESSURE_WRONG
     assert classification.evidence["remaining_sec_at_answer"] == 30.0
 
@@ -276,7 +276,7 @@ async def test_classify_time_pressure_wrong():
 async def test_classify_fast_wrong():
     """Test FAST_WRONG classification (precedence #3)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -291,7 +291,7 @@ async def test_classify_fast_wrong():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -301,9 +301,9 @@ async def test_classify_fast_wrong():
             "FAST_WRONG": 1,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification.mistake_type == MISTAKE_TYPE_FAST_WRONG
     assert classification.severity == 1
     assert classification.evidence["time_spent_sec"] == 15.0
@@ -313,7 +313,7 @@ async def test_classify_fast_wrong():
 async def test_classify_distracted_wrong():
     """Test DISTRACTED_WRONG classification (precedence #4)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -328,7 +328,7 @@ async def test_classify_distracted_wrong():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -338,9 +338,9 @@ async def test_classify_distracted_wrong():
             "DISTRACTED_WRONG": 1,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification.mistake_type == MISTAKE_TYPE_DISTRACTED_WRONG
     assert classification.evidence["blur_count"] == 2
 
@@ -349,7 +349,7 @@ async def test_classify_distracted_wrong():
 async def test_classify_slow_wrong():
     """Test SLOW_WRONG classification (precedence #5)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -364,7 +364,7 @@ async def test_classify_slow_wrong():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -374,9 +374,9 @@ async def test_classify_slow_wrong():
             "SLOW_WRONG": 2,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification.mistake_type == MISTAKE_TYPE_SLOW_WRONG
     assert classification.evidence["time_spent_sec"] == 120.0
 
@@ -385,7 +385,7 @@ async def test_classify_slow_wrong():
 async def test_classify_knowledge_gap_fallback():
     """Test KNOWLEDGE_GAP as fallback (precedence #6)."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -400,7 +400,7 @@ async def test_classify_knowledge_gap_fallback():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -410,9 +410,9 @@ async def test_classify_knowledge_gap_fallback():
             "KNOWLEDGE_GAP": 2,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     assert classification.mistake_type == MISTAKE_TYPE_KNOWLEDGE_GAP
 
 
@@ -420,7 +420,7 @@ async def test_classify_knowledge_gap_fallback():
 async def test_classify_missing_telemetry():
     """Test fallback to KNOWLEDGE_GAP when telemetry missing."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -435,7 +435,7 @@ async def test_classify_missing_telemetry():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -445,9 +445,9 @@ async def test_classify_missing_telemetry():
             "KNOWLEDGE_GAP": 2,
         },
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     # Should still classify (fallback to KNOWLEDGE_GAP)
     assert classification.mistake_type == MISTAKE_TYPE_KNOWLEDGE_GAP
     assert classification.evidence["time_spent_sec"] is None
@@ -457,7 +457,7 @@ async def test_classify_missing_telemetry():
 async def test_classify_correct_answer_returns_none():
     """Test that correct answers are not classified."""
     from app.learning_engine.mistakes.features import AttemptFeatures
-    
+
     features = AttemptFeatures(
         question_id=uuid4(),
         position=0,
@@ -472,7 +472,7 @@ async def test_classify_correct_answer_returns_none():
         block_id=None,
         theme_id=None,
     )
-    
+
     params = {
         "fast_wrong_sec": 20,
         "slow_wrong_sec": 90,
@@ -480,9 +480,9 @@ async def test_classify_correct_answer_returns_none():
         "blur_threshold": 1,
         "severity_rules": {},
     }
-    
+
     classification = classify_mistake_v0(features, params)
-    
+
     # Correct answers return None
     assert classification is None
 
@@ -503,13 +503,13 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         role="STUDENT",
     )
     db.add(user)
-    
+
     year = AcademicYear(id=1, year=1, name="Year 1")
     db.add(year)
-    
+
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
     db.add(block)
-    
+
     theme = Theme(
         id=uuid4(),
         year=1,
@@ -518,7 +518,7 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         order=1,
     )
     db.add(theme)
-    
+
     question = Question(
         id=uuid4(),
         year=1,
@@ -528,7 +528,7 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         status="PUBLISHED",
     )
     db.add(question)
-    
+
     # Create session
     session = TestSession(
         id=uuid4(),
@@ -539,7 +539,7 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         submitted_at=datetime.utcnow(),
     )
     db.add(session)
-    
+
     # Create session question
     sq = SessionQuestion(
         id=uuid4(),
@@ -548,7 +548,7 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         order_index=0,
     )
     db.add(sq)
-    
+
     # Create wrong answer
     answer = SessionAnswer(
         id=uuid4(),
@@ -560,19 +560,17 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         changed_count=2,  # Changed answer
     )
     db.add(answer)
-    
+
     await db.commit()
-    
+
     # Call service
-    result = await classify_mistakes_v0_for_session(
-        db, session.id, trigger="test"
-    )
-    
+    result = await classify_mistakes_v0_for_session(db, session.id, trigger="test")
+
     # Verify result
     assert result["total_wrong"] == 1
     assert result["classified"] == 1
     assert "run_id" in result
-    
+
     # Check mistake_log created
     stmt = select(MistakeLog).where(
         MistakeLog.session_id == session.id,
@@ -580,11 +578,11 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
     )
     log_result = await db.execute(stmt)
     mistake = log_result.scalar_one_or_none()
-    
+
     assert mistake is not None
     assert mistake.mistake_type == MISTAKE_TYPE_KNOWLEDGE_GAP  # No telemetry → fallback
     assert mistake.is_correct == False
-    
+
     # Check algo_run logged
     run_id = result["run_id"]
     run = await db.get(AlgoRun, run_id)
@@ -603,7 +601,7 @@ async def test_upsert_idempotency(db: AsyncSession):
         role="STUDENT",
     )
     db.add(user)
-    
+
     question = Question(
         id=uuid4(),
         year=1,
@@ -613,7 +611,7 @@ async def test_upsert_idempotency(db: AsyncSession):
         status="PUBLISHED",
     )
     db.add(question)
-    
+
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
@@ -623,7 +621,7 @@ async def test_upsert_idempotency(db: AsyncSession):
         submitted_at=datetime.utcnow(),
     )
     db.add(session)
-    
+
     sq = SessionQuestion(
         id=uuid4(),
         session_id=session.id,
@@ -631,7 +629,7 @@ async def test_upsert_idempotency(db: AsyncSession):
         order_index=0,
     )
     db.add(sq)
-    
+
     answer = SessionAnswer(
         id=uuid4(),
         session_id=session.id,
@@ -642,22 +640,22 @@ async def test_upsert_idempotency(db: AsyncSession):
         changed_count=0,
     )
     db.add(answer)
-    
+
     await db.commit()
-    
+
     # Run classification twice
     result1 = await classify_mistakes_v0_for_session(db, session.id, trigger="test1")
     result2 = await classify_mistakes_v0_for_session(db, session.id, trigger="test2")
-    
+
     # Both succeed
     assert result1["classified"] == 1
     assert result2["classified"] == 1
-    
+
     # Check only one mistake_log row exists
     stmt = select(MistakeLog).where(MistakeLog.session_id == session.id)
     log_result = await db.execute(stmt)
     mistakes = log_result.scalars().all()
-    
+
     assert len(mistakes) == 1  # Not duplicated
 
 
@@ -666,11 +664,9 @@ async def test_best_effort_on_failure(db: AsyncSession):
     """Test that classification failures return error dict, not exception."""
     # Try to classify a non-existent session
     result = await classify_mistakes_v0_for_session(
-        db,
-        session_id=uuid4(),  # Doesn't exist
-        trigger="test"
+        db, session_id=uuid4(), trigger="test"  # Doesn't exist
     )
-    
+
     # Should return error dict, not raise
     assert "error" in result
     assert result["classified"] == 0

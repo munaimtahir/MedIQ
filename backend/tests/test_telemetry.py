@@ -7,7 +7,13 @@ import pytest
 from sqlalchemy import select
 
 from app.models.question_cms import Question, QuestionStatus
-from app.models.session import AttemptEvent, SessionMode, SessionQuestion, SessionStatus, TestSession
+from app.models.session import (
+    AttemptEvent,
+    SessionMode,
+    SessionQuestion,
+    SessionStatus,
+    TestSession,
+)
 from app.models.syllabus import Block
 from app.models.user import User, UserRole
 from app.schemas.telemetry import EventType

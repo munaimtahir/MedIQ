@@ -21,63 +21,84 @@ depends_on = None
 
 def upgrade() -> None:
     # Create enums (only if they don't exist)
-    op.execute("""
+    op.execute(
+        """
         DO $$ BEGIN
             CREATE TYPE question_status AS ENUM ('DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED');
         EXCEPTION
             WHEN duplicate_object THEN null;
         END $$;
-    """)
-    op.execute("""
+    """
+    )
+    op.execute(
+        """
         DO $$ BEGIN
             CREATE TYPE change_kind AS ENUM ('CREATE', 'EDIT', 'STATUS_CHANGE', 'PUBLISH', 'UNPUBLISH', 'IMPORT');
         EXCEPTION
             WHEN duplicate_object THEN null;
         END $$;
-    """)
-    op.execute("""
+    """
+    )
+    op.execute(
+        """
         DO $$ BEGIN
             CREATE TYPE storage_provider AS ENUM ('LOCAL', 'S3');
         EXCEPTION
             WHEN duplicate_object THEN null;
         END $$;
-    """)
-    op.execute("""
+    """
+    )
+    op.execute(
+        """
         DO $$ BEGIN
             CREATE TYPE media_role AS ENUM ('STEM', 'EXPLANATION', 'OPTION_A', 'OPTION_B', 'OPTION_C', 'OPTION_D', 'OPTION_E');
         EXCEPTION
             WHEN duplicate_object THEN null;
         END $$;
-    """)
+    """
+    )
 
     # Handle existing questions table: rename to questions_legacy if it exists and has Integer id
     # Check if old questions table exists with Integer primary key
     connection = op.get_bind()
-    
-    result = connection.execute(sa.text("""
+
+    result = connection.execute(
+        sa.text(
+            """
         SELECT EXISTS (
             SELECT 1 FROM information_schema.tables 
             WHERE table_name = 'questions'
         )
-    """))
+    """
+        )
+    )
     table_exists = result.scalar()
-    
+
     if table_exists:
         # Check if it's the old table (Integer id) or new table (UUID id)
-        result = connection.execute(sa.text("""
+        result = connection.execute(
+            sa.text(
+                """
             SELECT data_type FROM information_schema.columns 
             WHERE table_name = 'questions' AND column_name = 'id'
-        """))
+        """
+            )
+        )
         id_type = result.scalar()
-        
-        if id_type == 'integer':
+
+        if id_type == "integer":
             # Rename old table
             op.execute("ALTER TABLE questions RENAME TO questions_legacy")
 
     # Create questions table (CMS version with UUID)
     op.create_table(
         "questions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("stem", sa.Text(), nullable=True),
         sa.Column("option_a", sa.Text(), nullable=True),
         sa.Column("option_b", sa.Text(), nullable=True),
@@ -86,7 +107,12 @@ def upgrade() -> None:
         sa.Column("option_e", sa.Text(), nullable=True),
         sa.Column("correct_index", sa.SmallInteger(), nullable=True),
         sa.Column("explanation_md", sa.Text(), nullable=True),
-        sa.Column("status", sa.Enum("DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", name="question_status"), nullable=False, server_default="DRAFT"),
+        sa.Column(
+            "status",
+            sa.Enum("DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", name="question_status"),
+            nullable=False,
+            server_default="DRAFT",
+        ),
         sa.Column("year_id", sa.Integer(), nullable=True),
         sa.Column("block_id", sa.Integer(), nullable=True),
         sa.Column("theme_id", sa.Integer(), nullable=True),
@@ -102,7 +128,12 @@ def upgrade() -> None:
         sa.Column("approved_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["year_id"], ["years.id"], onupdate="CASCADE"),
         sa.ForeignKeyConstraint(["block_id"], ["blocks.id"], onupdate="CASCADE"),
@@ -110,7 +141,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], onupdate="CASCADE"),
         sa.ForeignKeyConstraint(["updated_by"], ["users.id"], onupdate="CASCADE"),
         sa.ForeignKeyConstraint(["approved_by"], ["users.id"], onupdate="CASCADE"),
-        sa.CheckConstraint("correct_index >= 0 AND correct_index <= 4", name="ck_question_correct_index"),
+        sa.CheckConstraint(
+            "correct_index >= 0 AND correct_index <= 4", name="ck_question_correct_index"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_questions_status", "questions", ["status"])
@@ -122,15 +155,39 @@ def upgrade() -> None:
     # Create question_versions table
     op.create_table(
         "question_versions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("question_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("version_no", sa.Integer(), nullable=False),
         sa.Column("snapshot", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("change_kind", sa.Enum("CREATE", "EDIT", "STATUS_CHANGE", "PUBLISH", "UNPUBLISH", "IMPORT", name="change_kind"), nullable=False),
+        sa.Column(
+            "change_kind",
+            sa.Enum(
+                "CREATE",
+                "EDIT",
+                "STATUS_CHANGE",
+                "PUBLISH",
+                "UNPUBLISH",
+                "IMPORT",
+                name="change_kind",
+            ),
+            nullable=False,
+        ),
         sa.Column("change_reason", sa.String(500), nullable=True),
         sa.Column("changed_by", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("changed_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.ForeignKeyConstraint(["question_id"], ["questions.id"], ondelete="CASCADE", onupdate="CASCADE"),
+        sa.Column(
+            "changed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["question_id"], ["questions.id"], ondelete="CASCADE", onupdate="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["changed_by"], ["users.id"], onupdate="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("question_id", "version_no", name="uq_question_version"),
@@ -141,14 +198,29 @@ def upgrade() -> None:
     # Create media_assets table
     op.create_table(
         "media_assets",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
-        sa.Column("storage_provider", sa.Enum("LOCAL", "S3", name="storage_provider"), nullable=False, server_default="LOCAL"),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
+        sa.Column(
+            "storage_provider",
+            sa.Enum("LOCAL", "S3", name="storage_provider"),
+            nullable=False,
+            server_default="LOCAL",
+        ),
         sa.Column("path", sa.String(500), nullable=False),
         sa.Column("mime_type", sa.String(100), nullable=False),
         sa.Column("size_bytes", sa.Integer(), nullable=False),
         sa.Column("sha256", sa.String(64), nullable=True),
         sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], onupdate="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -157,13 +229,40 @@ def upgrade() -> None:
     # Create question_media table
     op.create_table(
         "question_media",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("question_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("media_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("role", sa.Enum("STEM", "EXPLANATION", "OPTION_A", "OPTION_B", "OPTION_C", "OPTION_D", "OPTION_E", name="media_role"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.ForeignKeyConstraint(["question_id"], ["questions.id"], ondelete="CASCADE", onupdate="CASCADE"),
-        sa.ForeignKeyConstraint(["media_id"], ["media_assets.id"], ondelete="CASCADE", onupdate="CASCADE"),
+        sa.Column(
+            "role",
+            sa.Enum(
+                "STEM",
+                "EXPLANATION",
+                "OPTION_A",
+                "OPTION_B",
+                "OPTION_C",
+                "OPTION_D",
+                "OPTION_E",
+                name="media_role",
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["question_id"], ["questions.id"], ondelete="CASCADE", onupdate="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["media_id"], ["media_assets.id"], ondelete="CASCADE", onupdate="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_question_media_question_id", "question_media", ["question_id"])
@@ -172,7 +271,12 @@ def upgrade() -> None:
     # Create audit_log table
     op.create_table(
         "audit_log",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa.Column(
+            "id",
+            postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("action", sa.String(100), nullable=False),
         sa.Column("entity_type", sa.String(50), nullable=False),
@@ -180,7 +284,12 @@ def upgrade() -> None:
         sa.Column("before", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("after", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("meta", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["actor_user_id"], ["users.id"], onupdate="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )

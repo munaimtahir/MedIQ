@@ -26,9 +26,9 @@ async def classify_mistakes_v0_for_session(
 ) -> dict[str, Any]:
     """
     Classify mistakes for all wrong answers in a session.
-    
+
     This is a BEST-EFFORT operation - failures should not block session submission.
-    
+
     Workflow:
     1. Resolve active mistakes v0 version and params
     2. Start algo run logging
@@ -36,12 +36,12 @@ async def classify_mistakes_v0_for_session(
     4. Classify wrong answers using rule-based precedence
     5. Bulk upsert into mistake_log
     6. Log run success with counts
-    
+
     Args:
         db: Database session
         session_id: Session ID
         trigger: Run trigger source (e.g., "submit", "manual")
-    
+
     Returns:
         Summary dictionary with counts and run_id, or error dict
     """
@@ -55,9 +55,9 @@ async def classify_mistakes_v0_for_session(
                 "classified": 0,
                 "error": "no_active_algo",
             }
-        
+
         params = params_obj.params_json
-        
+
         # Get session
         session = await db.get(TestSession, session_id)
         if not session:
@@ -67,7 +67,7 @@ async def classify_mistakes_v0_for_session(
                 "classified": 0,
                 "error": "session_not_found",
             }
-        
+
         # Start run logging
         run = await log_run_start(
             db,
@@ -78,10 +78,10 @@ async def classify_mistakes_v0_for_session(
             trigger=trigger,
             input_summary={"session_id": str(session_id)},
         )
-        
+
         # Extract features for all attempts
         features_list = await build_features_for_session(db, session_id)
-        
+
         if not features_list:
             await log_run_success(
                 db,
@@ -97,10 +97,10 @@ async def classify_mistakes_v0_for_session(
                 "classified": 0,
                 "run_id": str(run.id),
             }
-        
+
         # Classify wrong answers
         classifications = classify_session_mistakes_v0(features_list, params)
-        
+
         if not classifications:
             await log_run_success(
                 db,
@@ -116,14 +116,14 @@ async def classify_mistakes_v0_for_session(
                 "classified": 0,
                 "run_id": str(run.id),
             }
-        
+
         # Prepare bulk upsert data
         mistake_records = []
         counts_by_type = defaultdict(int)
-        
+
         for features, classification in classifications:
             counts_by_type[classification.mistake_type] += 1
-            
+
             record = {
                 "user_id": session.user_id,
                 "session_id": session_id,
@@ -141,7 +141,7 @@ async def classify_mistakes_v0_for_session(
                 "run_id": run.id,
             }
             mistake_records.append(record)
-        
+
         # Bulk upsert (idempotent)
         if mistake_records:
             stmt = insert(MistakeLog).values(mistake_records)
@@ -158,41 +158,41 @@ async def classify_mistakes_v0_for_session(
                     "block_id": stmt.excluded.block_id,
                     "theme_id": stmt.excluded.theme_id,
                     "position": stmt.excluded.position,
-                }
+                },
             )
             await db.execute(stmt)
             await db.commit()
-        
+
         # Log success
         output_summary = {
             "total_wrong": len(classifications),
             "classified": len(mistake_records),
             "counts_by_type": dict(counts_by_type),
         }
-        
+
         await log_run_success(
             db,
             run_id=run.id,
             output_summary=output_summary,
         )
-        
+
         return {
             "total_wrong": len(classifications),
             "classified": len(mistake_records),
             "counts_by_type": dict(counts_by_type),
             "run_id": str(run.id),
         }
-    
+
     except Exception as e:
         logger.error(f"Failed to classify mistakes for session {session_id}: {e}")
-        
+
         # Log failure if run was started
-        if 'run' in locals():
+        if "run" in locals():
             try:
                 await log_run_failure(db, run_id=run.id, error_message=str(e))
             except Exception as log_error:
                 logger.error(f"Failed to log run failure: {log_error}")
-        
+
         # Best-effort: return error dict, do not raise
         return {
             "total_wrong": 0,

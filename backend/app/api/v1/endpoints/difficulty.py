@@ -58,24 +58,24 @@ async def update_difficulty(
 ):
     """
     Update difficulty ratings from attempts.
-    
+
     This is an internal endpoint called by the backend.
     Students can only update their own attempts.
     """
     # Validate session ownership if session_id provided
     if request.session_id:
         from app.models.session import TestSession
-        
+
         stmt = select(TestSession).where(TestSession.id == request.session_id)
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
-        
+
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         if session.user_id != current_user.id and current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized to update this session")
-    
+
     # Convert attempts to dict format
     attempts = [
         {
@@ -87,7 +87,7 @@ async def update_difficulty(
         }
         for a in request.attempts
     ]
-    
+
     # Update difficulty
     result = await update_difficulty_for_session(
         db,
@@ -95,10 +95,10 @@ async def update_difficulty(
         user_id=current_user.id,
         attempts=attempts,
     )
-    
+
     # Get algo version from first successful update
     algo_version = "v1"  # Default
-    
+
     return UpdateDifficultyResponse(
         ok=True,
         algo_version=algo_version,
@@ -116,7 +116,7 @@ async def get_question_difficulty(
 ):
     """
     Get difficulty rating for a question.
-    
+
     Returns global rating and theme-specific ratings if available.
     """
     # Get global rating
@@ -127,10 +127,10 @@ async def get_question_difficulty(
     )
     result = await db.execute(stmt)
     global_rating = result.scalar_one_or_none()
-    
+
     if not global_rating:
         raise HTTPException(status_code=404, detail="Question rating not found")
-    
+
     # Get theme ratings
     stmt = select(DifficultyQuestionRating).where(
         DifficultyQuestionRating.question_id == question_id,
@@ -138,7 +138,7 @@ async def get_question_difficulty(
     )
     result = await db.execute(stmt)
     theme_ratings = result.scalars().all()
-    
+
     theme_ratings_dict = {}
     for tr in theme_ratings:
         theme_ratings_dict[str(tr.scope_id)] = RatingInfo(
@@ -147,7 +147,7 @@ async def get_question_difficulty(
             n_attempts=tr.n_attempts,
             last_seen_at=tr.last_seen_at,
         )
-    
+
     return QuestionDifficultyResponse(
         question_id=question_id,
         global_rating=RatingInfo(
@@ -167,7 +167,7 @@ async def get_my_ability(
 ):
     """
     Get ability rating for current user.
-    
+
     Returns global rating and theme-specific ratings if available.
     """
     # Get global rating
@@ -178,7 +178,7 @@ async def get_my_ability(
     )
     result = await db.execute(stmt)
     global_rating = result.scalar_one_or_none()
-    
+
     if not global_rating:
         # No rating yet - user hasn't attempted any questions
         return UserAbilityResponse(
@@ -191,7 +191,7 @@ async def get_my_ability(
             ),
             theme_ratings={},
         )
-    
+
     # Get theme ratings
     stmt = select(DifficultyUserRating).where(
         DifficultyUserRating.user_id == current_user.id,
@@ -199,7 +199,7 @@ async def get_my_ability(
     )
     result = await db.execute(stmt)
     theme_ratings = result.scalars().all()
-    
+
     theme_ratings_dict = {}
     for tr in theme_ratings:
         theme_ratings_dict[str(tr.scope_id)] = RatingInfo(
@@ -208,7 +208,7 @@ async def get_my_ability(
             n_attempts=tr.n_attempts,
             last_seen_at=tr.last_seen_at,
         )
-    
+
     return UserAbilityResponse(
         user_id=current_user.id,
         global_rating=RatingInfo(
@@ -228,30 +228,30 @@ async def get_health_metrics(
 ):
     """
     Get system health metrics (admin only).
-    
+
     Returns calibration metrics and drift indicators.
     """
     require_admin(current_user)
-    
+
     from datetime import UTC, datetime, timedelta
-    
+
     # Count totals
     stmt = select(func.count(DifficultyUserRating.id)).where(
         DifficultyUserRating.scope_type == RatingScope.GLOBAL.value
     )
     result = await db.execute(stmt)
     total_users = result.scalar() or 0
-    
+
     stmt = select(func.count(DifficultyQuestionRating.id)).where(
         DifficultyQuestionRating.scope_type == RatingScope.GLOBAL.value
     )
     result = await db.execute(stmt)
     total_questions = result.scalar() or 0
-    
+
     stmt = select(func.count(DifficultyUpdateLog.id))
     result = await db.execute(stmt)
     total_updates = result.scalar() or 0
-    
+
     # Recent updates (24h)
     cutoff_24h = datetime.now(UTC) - timedelta(hours=24)
     stmt = select(func.count(DifficultyUpdateLog.id)).where(
@@ -259,10 +259,10 @@ async def get_health_metrics(
     )
     result = await db.execute(stmt)
     recent_updates_24h = result.scalar() or 0
-    
+
     # Calibration metrics (30 days)
     metrics = await compute_all_metrics(db, days=30)
-    
+
     # Mean question rating (drift indicator)
     stmt = select(func.avg(DifficultyQuestionRating.rating)).where(
         DifficultyQuestionRating.scope_type == RatingScope.GLOBAL.value,
@@ -270,10 +270,10 @@ async def get_health_metrics(
     )
     result = await db.execute(stmt)
     mean_q_rating = result.scalar() or 0.0
-    
+
     # Drift detected if abs(mean) > 50
     drift_detected = abs(mean_q_rating) > 50.0
-    
+
     return HealthMetrics(
         total_users=total_users,
         total_questions=total_questions,
@@ -296,20 +296,20 @@ async def recenter_ratings(
 ):
     """
     Recenter question ratings to prevent drift (admin only).
-    
+
     Subtracts mean from question ratings and adds to user ratings,
     preserving relative differences (θ - b).
     """
     require_admin(current_user)
-    
+
     # Validate scope_type
     try:
         scope_enum = RatingScope(scope_type)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid scope_type (must be GLOBAL or THEME)")
-    
+
     result = await recenter_question_ratings(db, scope_enum, scope_id)
-    
+
     return RecenterResponse(
         ok=True,
         mean_adjustment=result["mean_adjustment"],
@@ -329,15 +329,15 @@ async def get_detailed_metrics(
 ):
     """
     Get detailed calibration metrics (admin only).
-    
+
     Returns logloss, Brier score, ECE, and calibration curve.
     """
     require_admin(current_user)
-    
+
     metrics = await compute_all_metrics(db, user_id, theme_id, days)
-    
+
     from app.schemas.difficulty import CalibrationBin
-    
+
     return MetricsResponse(
         logloss=metrics["logloss"],
         brier=metrics["brier"],

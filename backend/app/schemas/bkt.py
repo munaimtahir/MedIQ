@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class BKTParamsResponse(BaseModel):
     """BKT parameters response."""
-    
+
     p_L0: float = Field(..., description="Prior probability of mastery")
     p_T: float = Field(..., description="Probability of learning (transition)")
     p_S: float = Field(..., description="Probability of slip")
@@ -21,7 +21,7 @@ class BKTParamsResponse(BaseModel):
 
 class MasteryStateResponse(BaseModel):
     """User mastery state response."""
-    
+
     concept_id: str
     p_mastery: float = Field(..., ge=0.0, le=1.0, description="Current mastery probability")
     n_attempts: int = Field(..., ge=0)
@@ -32,8 +32,10 @@ class MasteryStateResponse(BaseModel):
 
 class UpdateFromAttemptRequest(BaseModel):
     """Request to update mastery from an attempt."""
-    
-    user_id: Optional[UUID] = Field(None, description="User ID (admin only, otherwise current user)")
+
+    user_id: Optional[UUID] = Field(
+        None, description="User ID (admin only, otherwise current user)"
+    )
     question_id: UUID
     concept_id: UUID
     correct: bool
@@ -43,7 +45,7 @@ class UpdateFromAttemptRequest(BaseModel):
 
 class UpdateFromAttemptResponse(BaseModel):
     """Response from mastery update."""
-    
+
     user_id: str
     concept_id: str
     question_id: str
@@ -59,14 +61,14 @@ class UpdateFromAttemptResponse(BaseModel):
 
 class GetMasteryRequest(BaseModel):
     """Request to get user mastery states."""
-    
+
     user_id: Optional[UUID] = Field(None, description="User ID (admin only)")
     concept_ids: Optional[list[UUID]] = Field(None, description="Optional concept filter")
 
 
 class GetMasteryResponse(BaseModel):
     """Response with mastery states."""
-    
+
     user_id: str
     states: list[MasteryStateResponse]
     total: int
@@ -74,7 +76,7 @@ class GetMasteryResponse(BaseModel):
 
 class RecomputeMasteryRequest(BaseModel):
     """Request to recompute/retrain BKT parameters."""
-    
+
     concept_ids: Optional[list[UUID]] = Field(None, description="Concepts to retrain (None = all)")
     from_date: Optional[datetime] = Field(None, description="Start of training data window")
     to_date: Optional[datetime] = Field(None, description="End of training data window")
@@ -85,7 +87,7 @@ class RecomputeMasteryRequest(BaseModel):
 
 class RecomputeMasteryResponse(BaseModel):
     """Response from recompute/retrain job."""
-    
+
     run_id: str
     algo_version: str
     concepts_processed: int

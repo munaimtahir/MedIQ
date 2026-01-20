@@ -38,10 +38,7 @@ logger = logging.getLogger(__name__)
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Require admin role."""
     if current_user.role != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
 
 
@@ -53,20 +50,19 @@ async def recompute_bkt_params(
 ):
     """
     Recompute BKT parameters from historical data (Admin only).
-    
+
     Fits BKT parameters using EM algorithm on historical attempt data.
     Optionally activates the newly fitted parameters.
-    
+
     **Requires**: Admin role
     """
     # Resolve active BKT algorithm version
     algo_version, algo_params_obj = await resolve_active(db, AlgoKey.BKT)
     if not algo_version or not algo_params_obj:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="BKT algorithm not configured"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="BKT algorithm not configured"
         )
-    
+
     # Start run logging
     run = await log_run_start(
         db,
@@ -81,9 +77,9 @@ async def recompute_bkt_params(
             "min_attempts": request.min_attempts,
             "concept_count": len(request.concept_ids) if request.concept_ids else "all",
             "activate": request.activate_new_params,
-        }
+        },
     )
-    
+
     try:
         summary = BKTRecomputeSummary(
             concepts_processed=0,
@@ -92,22 +88,22 @@ async def recompute_bkt_params(
             run_metrics={},
             errors={},
         )
-        
+
         # Get concept IDs to process
         concept_ids = request.concept_ids or []
-        
+
         if not concept_ids:
             # TODO: Query all concept IDs from concepts table
             # For now, return error
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="concept_ids must be provided (all-concepts not yet implemented)"
+                detail="concept_ids must be provided (all-concepts not yet implemented)",
             )
-        
+
         # Process each concept
         for concept_id in concept_ids:
             summary.concepts_processed += 1
-            
+
             try:
                 # Build training dataset
                 dataset = await build_training_dataset(
@@ -117,25 +113,25 @@ async def recompute_bkt_params(
                     to_date=request.to_date,
                     min_attempts_per_user=1,
                 )
-                
+
                 # Check if sufficient data
                 if not dataset.is_sufficient(min_attempts=request.min_attempts):
                     summary.errors[concept_id] = (
                         f"Insufficient data: {dataset.total_attempts} attempts"
                     )
                     continue
-                
+
                 # Fit parameters
                 params, metrics, is_valid, message = await fit_bkt_parameters(
                     dataset,
                     constraints=None,  # Use defaults
                     use_cross_validation=False,
                 )
-                
+
                 if not is_valid:
                     summary.errors[concept_id] = f"Fitting failed: {message}"
                     continue
-                
+
                 # Persist parameters
                 await persist_fitted_params(
                     db,
@@ -148,16 +144,16 @@ async def recompute_bkt_params(
                     constraints_applied={},
                     activate=request.activate_new_params,
                 )
-                
+
                 summary.params_fitted += 1
-                
+
             except Exception as e:
                 logger.error(f"Error fitting concept {concept_id}: {e}", exc_info=True)
                 summary.errors[concept_id] = str(e)
-        
+
         # Commit all changes
         await db.commit()
-        
+
         # Log success
         await log_run_success(
             db,
@@ -166,10 +162,10 @@ async def recompute_bkt_params(
                 "concepts_processed": summary.concepts_processed,
                 "params_fitted": summary.params_fitted,
                 "errors_count": len(summary.errors),
-            }
+            },
         )
         await db.commit()
-        
+
         return BKTRecomputeResponse(
             ok=True,
             run_id=run.id,
@@ -180,17 +176,17 @@ async def recompute_bkt_params(
             params_id=algo_params_obj.id,
             summary=summary,
         )
-        
+
     except Exception as e:
         logger.error(f"BKT recompute failed: {e}", exc_info=True)
-        
+
         # Log failure
         await log_run_failure(db, run_id=run.id, error_message=str(e))
         await db.commit()
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"BKT recompute failed: {str(e)}"
+            detail=f"BKT recompute failed: {str(e)}",
         )
 
 
@@ -202,26 +198,25 @@ async def update_bkt_mastery(
 ):
     """
     Update BKT mastery for a single attempt.
-    
+
     This endpoint is typically called after a student answers a question.
     It updates the user's mastery probability for the concept using the BKT model.
-    
+
     **Student scope**: Can only update own mastery (user_id must match current user or be None)
     **Admin scope**: Can update any user's mastery
     """
     # Determine target user
     target_user_id = request.user_id or current_user.id
-    
+
     # Enforce student scope
     if current_user.role != "ADMIN" and target_user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot update mastery for other users"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot update mastery for other users"
         )
-    
+
     # Use current time if not provided
     current_time = request.current_time or datetime.now()
-    
+
     try:
         result = await update_bkt_from_attempt(
             db,
@@ -232,19 +227,15 @@ async def update_bkt_mastery(
             current_time=current_time,
             snapshot_mastery=request.snapshot_mastery,
         )
-        
+
         return result
-        
+
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"BKT update failed: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"BKT update failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"BKT update failed: {str(e)}"
         )
 
 
@@ -257,31 +248,30 @@ async def get_bkt_mastery(
 ):
     """
     Get BKT mastery state for a user.
-    
+
     **Student scope**: Can only query own mastery (user_id must match current user or be None)
     **Admin scope**: Can query any user's mastery
-    
+
     Query params:
     - user_id: User ID (defaults to current user)
     - concept_id: Optional concept filter
     """
     # Determine target user
     target_user_id = user_id or current_user.id
-    
+
     # Enforce student scope
     if current_user.role != "ADMIN" and target_user_id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot query mastery for other users"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot query mastery for other users"
         )
-    
+
     try:
         states = await get_user_mastery_state(db, target_user_id, concept_id)
         return states
-        
+
     except Exception as e:
         logger.error(f"Failed to get BKT mastery: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get mastery: {str(e)}"
+            detail=f"Failed to get mastery: {str(e)}",
         )

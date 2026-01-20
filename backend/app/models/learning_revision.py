@@ -3,7 +3,17 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -76,10 +86,17 @@ class RevisionQueue(Base):
     run = relationship("AlgoRun")
 
     __table_args__ = (
-        UniqueConstraint("user_id", "theme_id", "due_date", name="uq_revision_queue_user_theme_date"),
+        UniqueConstraint(
+            "user_id", "theme_id", "due_date", name="uq_revision_queue_user_theme_date"
+        ),
         Index("ix_revision_queue_user_id", "user_id"),
         Index("ix_revision_queue_user_id_due_date_status", "user_id", "due_date", "status"),
-        Index("ix_revision_queue_user_id_priority_score", "user_id", "priority_score", postgresql_using="btree"),
+        Index(
+            "ix_revision_queue_user_id_priority_score",
+            "user_id",
+            "priority_score",
+            postgresql_using="btree",
+        ),
         Index("ix_revision_queue_algo_version_id", "algo_version_id"),
         Index("ix_revision_queue_params_id", "params_id"),
         Index("ix_revision_queue_run_id", "run_id"),

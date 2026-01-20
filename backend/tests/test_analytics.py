@@ -48,7 +48,7 @@ async def block_and_themes(db):
     )
     db.add(block)
     await db.commit()
-    
+
     theme1 = Theme(
         id=1,
         block_id=1,
@@ -63,7 +63,7 @@ async def block_and_themes(db):
     )
     db.add_all([theme1, theme2])
     await db.commit()
-    
+
     return block, [theme1, theme2]
 
 
@@ -71,7 +71,7 @@ async def block_and_themes(db):
 async def published_questions(db, block_and_themes):
     """Create published test questions."""
     block, themes = block_and_themes
-    
+
     questions = []
     for i in range(10):
         q = Question(
@@ -93,20 +93,20 @@ async def published_questions(db, block_and_themes):
             created_by_id=uuid4(),
         )
         questions.append(q)
-    
+
     db.add_all(questions)
     await db.commit()
-    
+
     return questions
 
 
 class TestAnalyticsEmpty:
     """Test analytics with no completed sessions."""
-    
+
     async def test_overview_no_sessions(self, db, student_user):
         """Test overview with no sessions returns empty data."""
         result = await get_overview(db, student_user.id)
-        
+
         assert result["sessions_completed"] == 0
         assert result["questions_seen"] == 0
         assert result["questions_answered"] == 0
@@ -116,23 +116,23 @@ class TestAnalyticsEmpty:
         assert result["weakest_themes"] == []
         assert result["trend"] == []
         assert result["last_session"] is None
-    
+
     async def test_block_analytics_no_data(self, db, student_user, block_and_themes):
         """Test block analytics with no data."""
         block, _ = block_and_themes
         result = await get_block_analytics(db, student_user.id, block.id)
-        
+
         assert result["block_id"] == block.id
         assert result["block_name"] == block.name
         assert result["attempted"] == 0
         assert result["accuracy_pct"] == 0.0
         assert result["themes"] == []
-    
+
     async def test_theme_analytics_no_data(self, db, student_user, block_and_themes):
         """Test theme analytics with no data."""
         block, themes = block_and_themes
         result = await get_theme_analytics(db, student_user.id, themes[0].id)
-        
+
         assert result["theme_id"] == themes[0].id
         assert result["theme_name"] == themes[0].title
         assert result["attempted"] == 0
@@ -141,7 +141,7 @@ class TestAnalyticsEmpty:
 
 class TestAnalyticsWithSessions:
     """Test analytics with completed sessions."""
-    
+
     async def test_single_session_aggregates(self, db, student_user, published_questions):
         """Test analytics with a single completed session."""
         # Create session
@@ -159,7 +159,7 @@ class TestAnalyticsWithSessions:
         )
         db.add(session)
         await db.commit()
-        
+
         # Add session questions (5 questions)
         for i, q in enumerate(published_questions[:5]):
             sq = SessionQuestion(
@@ -175,9 +175,9 @@ class TestAnalyticsWithSessions:
                 },
             )
             db.add(sq)
-        
+
         await db.commit()
-        
+
         # Add answers: 3 correct, 2 incorrect
         for i, q in enumerate(published_questions[:5]):
             answer = SessionAnswer(
@@ -189,12 +189,12 @@ class TestAnalyticsWithSessions:
                 answered_at=datetime.utcnow(),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # Test overview
         result = await get_overview(db, student_user.id)
-        
+
         assert result["sessions_completed"] == 1
         assert result["questions_seen"] == 5
         assert result["questions_answered"] == 5
@@ -206,11 +206,11 @@ class TestAnalyticsWithSessions:
         assert result["by_block"][0]["correct"] == 3
         assert result["last_session"] is not None
         assert result["last_session"]["score_pct"] == 60.0
-    
+
     async def test_multiple_sessions_grouping(self, db, student_user, published_questions):
         """Test analytics aggregates across multiple sessions."""
         sessions = []
-        
+
         # Create 3 sessions
         for i in range(3):
             session = TestSession(
@@ -227,9 +227,9 @@ class TestAnalyticsWithSessions:
             )
             db.add(session)
             sessions.append(session)
-        
+
         await db.commit()
-        
+
         # Add questions and answers for each session
         for session in sessions:
             for j, q in enumerate(published_questions[:3]):
@@ -246,7 +246,7 @@ class TestAnalyticsWithSessions:
                     },
                 )
                 db.add(sq)
-                
+
                 answer = SessionAnswer(
                     id=uuid4(),
                     session_id=session.id,
@@ -256,18 +256,18 @@ class TestAnalyticsWithSessions:
                     answered_at=datetime.utcnow(),
                 )
                 db.add(answer)
-        
+
         await db.commit()
-        
+
         # Test overview
         result = await get_overview(db, student_user.id)
-        
+
         assert result["sessions_completed"] == 3
         assert result["questions_seen"] == 9  # 3 sessions × 3 questions
         assert result["correct"] == 6  # 3 sessions × 2 correct
         # 6/9 = 66.67%
         assert 66 <= result["accuracy_pct"] <= 67
-    
+
     async def test_only_submitted_expired_counted(self, db, student_user, published_questions):
         """Test that only SUBMITTED and EXPIRED sessions are counted."""
         # Create ACTIVE session (should not count)
@@ -280,7 +280,7 @@ class TestAnalyticsWithSessions:
             created_at=datetime.utcnow(),
         )
         db.add(active_session)
-        
+
         # Create SUBMITTED session (should count)
         submitted_session = TestSession(
             id=uuid4(),
@@ -295,9 +295,9 @@ class TestAnalyticsWithSessions:
             score_pct=50.0,
         )
         db.add(submitted_session)
-        
+
         await db.commit()
-        
+
         # Add questions only for submitted session
         for i, q in enumerate(published_questions[:2]):
             sq = SessionQuestion(
@@ -313,7 +313,7 @@ class TestAnalyticsWithSessions:
                 },
             )
             db.add(sq)
-            
+
             answer = SessionAnswer(
                 id=uuid4(),
                 session_id=submitted_session.id,
@@ -323,16 +323,16 @@ class TestAnalyticsWithSessions:
                 answered_at=datetime.utcnow(),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         result = await get_overview(db, student_user.id)
-        
+
         # Only submitted session should count
         assert result["sessions_completed"] == 1
         assert result["questions_seen"] == 2
         assert result["correct"] == 1
-    
+
     async def test_block_analytics_with_themes(self, db, student_user, published_questions):
         """Test block analytics includes theme breakdown."""
         session = TestSession(
@@ -349,7 +349,7 @@ class TestAnalyticsWithSessions:
         )
         db.add(session)
         await db.commit()
-        
+
         # Add 6 questions: 3 from theme 1, 3 from theme 2
         for i, q in enumerate(published_questions[:6]):
             sq = SessionQuestion(
@@ -365,7 +365,7 @@ class TestAnalyticsWithSessions:
                 },
             )
             db.add(sq)
-            
+
             # Theme 1: 2/3 correct, Theme 2: 2/3 correct
             is_correct = i in [0, 1, 3, 4]
             answer = SessionAnswer(
@@ -377,24 +377,26 @@ class TestAnalyticsWithSessions:
                 answered_at=datetime.utcnow(),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # Get block analytics
         result = await get_block_analytics(db, student_user.id, 1)
-        
+
         assert result["attempted"] == 6
         assert result["correct"] == 4
         assert len(result["themes"]) == 2
-        
+
         # Check themes
         theme_dict = {t["theme_id"]: t for t in result["themes"]}
         assert 1 in theme_dict
         assert 2 in theme_dict
         assert theme_dict[1]["attempted"] == 3
         assert theme_dict[2]["attempted"] == 3
-    
-    async def test_weakest_themes_requires_minimum_attempts(self, db, student_user, published_questions):
+
+    async def test_weakest_themes_requires_minimum_attempts(
+        self, db, student_user, published_questions
+    ):
         """Test weakest themes only includes themes with >= 5 attempts."""
         session = TestSession(
             id=uuid4(),
@@ -410,12 +412,12 @@ class TestAnalyticsWithSessions:
         )
         db.add(session)
         await db.commit()
-        
+
         # Add 7 questions: 5 from theme 1 (should appear), 2 from theme 2 (should not)
         for i, q in enumerate(published_questions[:7]):
             # Force first 5 to theme 1, last 2 to theme 2
             theme_id = 1 if i < 5 else 2
-            
+
             sq = SessionQuestion(
                 id=uuid4(),
                 session_id=session.id,
@@ -429,7 +431,7 @@ class TestAnalyticsWithSessions:
                 },
             )
             db.add(sq)
-            
+
             answer = SessionAnswer(
                 id=uuid4(),
                 session_id=session.id,
@@ -439,11 +441,11 @@ class TestAnalyticsWithSessions:
                 answered_at=datetime.utcnow(),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         result = await get_overview(db, student_user.id)
-        
+
         # Only theme 1 should appear in weakest_themes (has >= 5 attempts)
         assert len(result["weakest_themes"]) <= 1
         if len(result["weakest_themes"]) > 0:
@@ -453,17 +455,17 @@ class TestAnalyticsWithSessions:
 
 class TestAnalyticsAPI:
     """Test analytics API endpoints."""
-    
+
     async def test_overview_endpoint_requires_auth(self, client):
         """Test overview endpoint requires authentication."""
         response = await client.get("/v1/analytics/overview")
         assert response.status_code == 401
-    
+
     async def test_block_not_found(self, db, student_user):
         """Test block analytics returns None for non-existent block."""
         result = await get_block_analytics(db, student_user.id, 999)
         assert result is None
-    
+
     async def test_theme_not_found(self, db, student_user):
         """Test theme analytics returns None for non-existent theme."""
         result = await get_theme_analytics(db, student_user.id, 999)

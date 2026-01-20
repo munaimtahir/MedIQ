@@ -12,15 +12,15 @@ async def compute_difficulty_v0(
 ) -> DifficultyOutput:
     """
     Compute difficulty score for a question (v0 stub).
-    
+
     Args:
         db: Database session
         input_data: Difficulty assessment input
         params: Algorithm parameters
-    
+
     Returns:
         Difficulty score output
-    
+
     Raises:
         NotImplementedError: Algorithm not yet implemented
     """

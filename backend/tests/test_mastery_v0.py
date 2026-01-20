@@ -55,7 +55,7 @@ async def block_and_themes(db):
     )
     db.add(block)
     await db.commit()
-    
+
     theme1 = Theme(
         id=1,
         block_id=1,
@@ -70,7 +70,7 @@ async def block_and_themes(db):
     )
     db.add_all([theme1, theme2])
     await db.commit()
-    
+
     return block, [theme1, theme2]
 
 
@@ -78,7 +78,7 @@ async def block_and_themes(db):
 async def published_questions(db, block_and_themes):
     """Create published test questions."""
     block, themes = block_and_themes
-    
+
     questions = []
     for i in range(10):
         q = Question(
@@ -100,16 +100,16 @@ async def published_questions(db, block_and_themes):
             created_by_id=uuid4(),
         )
         questions.append(q)
-    
+
     db.add_all(questions)
     await db.commit()
-    
+
     return questions
 
 
 class TestRecencyWeighting:
     """Test recency-weighted accuracy computation."""
-    
+
     def test_empty_attempts(self):
         """Test with no attempts."""
         params = {
@@ -120,12 +120,12 @@ class TestRecencyWeighting:
             ],
             "use_difficulty": False,
         }
-        
+
         score, breakdown = compute_recency_weighted_accuracy([], params, datetime.utcnow())
-        
+
         assert score == 0.0
         assert breakdown["reason"] == "no_attempts"
-    
+
     def test_all_correct_recent(self):
         """Test with all correct recent attempts."""
         now = datetime.utcnow()
@@ -133,7 +133,7 @@ class TestRecencyWeighting:
             {"is_correct": True, "answered_at": now - timedelta(days=i), "difficulty": "medium"}
             for i in range(5)
         ]
-        
+
         params = {
             "recency_buckets": [
                 {"days": 7, "weight": 0.50},
@@ -142,18 +142,18 @@ class TestRecencyWeighting:
             ],
             "use_difficulty": False,
         }
-        
+
         score, breakdown = compute_recency_weighted_accuracy(attempts, params, now)
-        
+
         # All correct = 1.0 accuracy in each bucket
         # 1.0 * 0.5 + 1.0 * 0.3 + 1.0 * 0.2 = 1.0
         assert score == 1.0
         assert breakdown["total_attempts"] == 5
-    
+
     def test_recency_decay(self):
         """Test that recent attempts are weighted more."""
         now = datetime.utcnow()
-        
+
         # 2 correct in last 7 days
         # 3 incorrect in 30-90 days
         attempts = [
@@ -163,7 +163,7 @@ class TestRecencyWeighting:
             {"is_correct": False, "answered_at": now - timedelta(days=50), "difficulty": "medium"},
             {"is_correct": False, "answered_at": now - timedelta(days=60), "difficulty": "medium"},
         ]
-        
+
         params = {
             "recency_buckets": [
                 {"days": 7, "weight": 0.50},
@@ -172,9 +172,9 @@ class TestRecencyWeighting:
             ],
             "use_difficulty": False,
         }
-        
+
         score, breakdown = compute_recency_weighted_accuracy(attempts, params, now)
-        
+
         # 7d bucket: 2/2 = 1.0, contribution = 0.5
         # 30d bucket: 2/2 = 1.0, contribution = 0.3
         # 90d bucket: 2/5 = 0.4, contribution = 0.08
@@ -186,22 +186,24 @@ class TestRecencyWeighting:
 
 class TestMasteryComputation:
     """Test full mastery computation for a theme."""
-    
+
     async def test_no_sessions(self, db, student_user, block_and_themes):
         """Test with no completed sessions."""
         block, themes = block_and_themes
-        
+
         attempts = await collect_theme_attempts(
             db, student_user.id, themes[0].id, 90, datetime.utcnow()
         )
-        
+
         assert len(attempts) == 0
-    
-    async def test_collect_attempts_with_sessions(self, db, student_user, block_and_themes, published_questions):
+
+    async def test_collect_attempts_with_sessions(
+        self, db, student_user, block_and_themes, published_questions
+    ):
         """Test collecting attempts from sessions."""
         block, themes = block_and_themes
         now = datetime.utcnow()
-        
+
         # Create session with theme 1 questions
         session = TestSession(
             id=uuid4(),
@@ -217,10 +219,10 @@ class TestMasteryComputation:
         )
         db.add(session)
         await db.commit()
-        
+
         # Add 3 questions from theme 1
         theme1_questions = [q for q in published_questions if q.theme_id == 1][:3]
-        
+
         for i, q in enumerate(theme1_questions):
             sq = SessionQuestion(
                 id=uuid4(),
@@ -237,7 +239,7 @@ class TestMasteryComputation:
                 },
             )
             db.add(sq)
-            
+
             # 2 correct, 1 incorrect
             answer = SessionAnswer(
                 id=uuid4(),
@@ -248,33 +250,31 @@ class TestMasteryComputation:
                 answered_at=now - timedelta(days=1),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # Collect attempts
-        attempts = await collect_theme_attempts(
-            db, student_user.id, 1, 90, now
-        )
-        
+        attempts = await collect_theme_attempts(db, student_user.id, 1, 90, now)
+
         assert len(attempts) == 3
         assert sum(1 for a in attempts if a["is_correct"]) == 2
-    
+
     async def test_min_attempts_threshold(self, db, student_user, block_and_themes):
         """Test that mastery is 0 when below min_attempts."""
         block, themes = block_and_themes
-        
+
         params = {
             "lookback_days": 90,
             "min_attempts": 5,
             "recency_buckets": [{"days": 90, "weight": 1.0}],
             "use_difficulty": False,
         }
-        
+
         # Only 2 attempts (below min of 5)
         result = await compute_mastery_for_theme(
             db, student_user.id, 1, block.id, themes[0].id, params, datetime.utcnow()
         )
-        
+
         # Should have 0 attempts since no sessions exist
         assert result["attempts_total"] == 0
         assert result["mastery_score"] == 0.0
@@ -283,12 +283,14 @@ class TestMasteryComputation:
 
 class TestMasteryRecompute:
     """Test full recompute workflow."""
-    
-    async def test_recompute_creates_mastery_records(self, db, student_user, block_and_themes, published_questions):
+
+    async def test_recompute_creates_mastery_records(
+        self, db, student_user, block_and_themes, published_questions
+    ):
         """Test that recompute creates mastery records."""
         block, themes = block_and_themes
         now = datetime.utcnow()
-        
+
         # Create sessions across multiple themes
         for theme in themes:
             session = TestSession(
@@ -305,10 +307,10 @@ class TestMasteryRecompute:
             )
             db.add(session)
             await db.commit()
-            
+
             # Add 5 questions from this theme
             theme_questions = [q for q in published_questions if q.theme_id == theme.id][:5]
-            
+
             for i, q in enumerate(theme_questions):
                 sq = SessionQuestion(
                     id=uuid4(),
@@ -325,7 +327,7 @@ class TestMasteryRecompute:
                     },
                 )
                 db.add(sq)
-                
+
                 answer = SessionAnswer(
                     id=uuid4(),
                     session_id=session.id,
@@ -335,20 +337,20 @@ class TestMasteryRecompute:
                     answered_at=now - timedelta(days=5),
                 )
                 db.add(answer)
-            
+
             await db.commit()
-        
+
         # Recompute mastery
         result = await recompute_mastery_v0_for_user(db, student_user.id)
-        
+
         assert result["themes_computed"] == 2
         assert result["records_upserted"] == 2
-        
+
         # Verify records in database
         stmt = select(UserThemeMastery).where(UserThemeMastery.user_id == student_user.id)
         mastery_result = await db.execute(stmt)
         mastery_records = mastery_result.scalars().all()
-        
+
         assert len(mastery_records) == 2
         for record in mastery_records:
             assert record.attempts_total == 5
@@ -358,12 +360,14 @@ class TestMasteryRecompute:
             assert record.algo_version_id is not None
             assert record.params_id is not None
             assert record.run_id is not None
-    
-    async def test_recompute_upserts_existing_records(self, db, student_user, block_and_themes, published_questions):
+
+    async def test_recompute_upserts_existing_records(
+        self, db, student_user, block_and_themes, published_questions
+    ):
         """Test that recompute updates existing mastery records."""
         block, themes = block_and_themes
         now = datetime.utcnow()
-        
+
         # Create initial session
         session1 = TestSession(
             id=uuid4(),
@@ -379,7 +383,7 @@ class TestMasteryRecompute:
         )
         db.add(session1)
         await db.commit()
-        
+
         theme1_questions = [q for q in published_questions if q.theme_id == 1][:5]
         for i, q in enumerate(theme1_questions):
             sq = SessionQuestion(
@@ -396,7 +400,7 @@ class TestMasteryRecompute:
                 },
             )
             db.add(sq)
-            
+
             answer = SessionAnswer(
                 id=uuid4(),
                 session_id=session1.id,
@@ -406,13 +410,13 @@ class TestMasteryRecompute:
                 answered_at=now - timedelta(days=10),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # First recompute
         result1 = await recompute_mastery_v0_for_user(db, student_user.id)
         assert result1["themes_computed"] == 1
-        
+
         # Get initial mastery
         stmt = select(UserThemeMastery).where(
             UserThemeMastery.user_id == student_user.id,
@@ -421,7 +425,7 @@ class TestMasteryRecompute:
         mastery_result = await db.execute(stmt)
         initial_mastery = mastery_result.scalar_one()
         initial_score = initial_mastery.mastery_score
-        
+
         # Create new session with better performance
         session2 = TestSession(
             id=uuid4(),
@@ -437,7 +441,7 @@ class TestMasteryRecompute:
         )
         db.add(session2)
         await db.commit()
-        
+
         for i, q in enumerate(theme1_questions):
             sq = SessionQuestion(
                 id=uuid4(),
@@ -453,7 +457,7 @@ class TestMasteryRecompute:
                 },
             )
             db.add(sq)
-            
+
             answer = SessionAnswer(
                 id=uuid4(),
                 session_id=session2.id,
@@ -463,19 +467,19 @@ class TestMasteryRecompute:
                 answered_at=now - timedelta(days=1),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # Second recompute
         result2 = await recompute_mastery_v0_for_user(db, student_user.id)
         assert result2["themes_computed"] == 1
         assert result2["records_upserted"] == 1
-        
+
         # Get updated mastery
         mastery_result = await db.execute(stmt)
         updated_mastery = mastery_result.scalar_one()
         updated_score = updated_mastery.mastery_score
-        
+
         # Mastery should improve (recent perfect session)
         assert updated_score > initial_score
         assert updated_mastery.attempts_total == 10
@@ -484,14 +488,16 @@ class TestMasteryRecompute:
 
 class TestAlgoRunLogging:
     """Test that algo runs are logged correctly."""
-    
-    async def test_run_logging_on_success(self, db, student_user, block_and_themes, published_questions):
+
+    async def test_run_logging_on_success(
+        self, db, student_user, block_and_themes, published_questions
+    ):
         """Test that successful recompute logs a run."""
         from app.models.learning import AlgoRun
-        
+
         block, themes = block_and_themes
         now = datetime.utcnow()
-        
+
         # Create minimal session
         session = TestSession(
             id=uuid4(),
@@ -507,7 +513,7 @@ class TestAlgoRunLogging:
         )
         db.add(session)
         await db.commit()
-        
+
         theme1_questions = [q for q in published_questions if q.theme_id == 1][:5]
         for i, q in enumerate(theme1_questions):
             sq = SessionQuestion(
@@ -524,7 +530,7 @@ class TestAlgoRunLogging:
                 },
             )
             db.add(sq)
-            
+
             answer = SessionAnswer(
                 id=uuid4(),
                 session_id=session.id,
@@ -534,13 +540,13 @@ class TestAlgoRunLogging:
                 answered_at=now - timedelta(days=5),
             )
             db.add(answer)
-        
+
         await db.commit()
-        
+
         # Recompute
         result = await recompute_mastery_v0_for_user(db, student_user.id)
         run_id = result["run_id"]
-        
+
         # Verify run exists
         run = await db.get(AlgoRun, run_id)
         assert run is not None

@@ -45,9 +45,7 @@ async def get_dashboard_summary(
         or 0
     )
     draft_count = (
-        db.query(func.count(Question.id))
-        .filter(Question.status == QuestionStatus.DRAFT)
-        .scalar()
+        db.query(func.count(Question.id)).filter(Question.status == QuestionStatus.DRAFT).scalar()
         or 0
     )
 

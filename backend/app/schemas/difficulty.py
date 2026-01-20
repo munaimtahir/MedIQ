@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 class AttemptUpdate(BaseModel):
     """Single attempt for difficulty update."""
-    
+
     attempt_id: Optional[UUID] = None
     question_id: UUID
     theme_id: Optional[UUID] = None
@@ -21,14 +21,14 @@ class AttemptUpdate(BaseModel):
 
 class UpdateDifficultyRequest(BaseModel):
     """Request to update difficulty from attempts."""
-    
+
     session_id: Optional[UUID] = None
     attempts: list[AttemptUpdate]
 
 
 class UpdateDifficultyResponse(BaseModel):
     """Response from difficulty update."""
-    
+
     ok: bool
     algo_version: str
     updates_count: int
@@ -38,7 +38,7 @@ class UpdateDifficultyResponse(BaseModel):
 
 class RatingInfo(BaseModel):
     """Rating information for a scope."""
-    
+
     rating: float
     uncertainty: float
     n_attempts: int
@@ -47,7 +47,7 @@ class RatingInfo(BaseModel):
 
 class QuestionDifficultyResponse(BaseModel):
     """Response for question difficulty lookup."""
-    
+
     question_id: UUID
     global_rating: RatingInfo
     theme_ratings: dict[str, RatingInfo] = Field(default_factory=dict)
@@ -55,7 +55,7 @@ class QuestionDifficultyResponse(BaseModel):
 
 class UserAbilityResponse(BaseModel):
     """Response for user ability lookup."""
-    
+
     user_id: UUID
     global_rating: RatingInfo
     theme_ratings: dict[str, RatingInfo] = Field(default_factory=dict)
@@ -63,7 +63,7 @@ class UserAbilityResponse(BaseModel):
 
 class HealthMetrics(BaseModel):
     """System health metrics."""
-    
+
     total_users: int
     total_questions: int
     total_updates: int
@@ -77,7 +77,7 @@ class HealthMetrics(BaseModel):
 
 class RecenterResponse(BaseModel):
     """Response from recenter operation."""
-    
+
     ok: bool
     mean_adjustment: float
     questions_updated: int
@@ -87,7 +87,7 @@ class RecenterResponse(BaseModel):
 
 class CalibrationBin(BaseModel):
     """Single bin in calibration curve."""
-    
+
     bin_start: float
     bin_end: float
     predicted_mean: float
@@ -97,7 +97,7 @@ class CalibrationBin(BaseModel):
 
 class MetricsResponse(BaseModel):
     """Detailed metrics response."""
-    
+
     logloss: float
     brier: float
     ece: float

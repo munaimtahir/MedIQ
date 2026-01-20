@@ -20,9 +20,13 @@ class SessionCreate(BaseModel):
     mode: SessionMode = Field(..., description="Session mode (TUTOR or EXAM)")
     year: int = Field(..., ge=1, le=2, description="Year (1 or 2)")
     blocks: list[str] = Field(..., description="Block codes (e.g., ['A', 'B'])")
-    themes: list[int] | None = Field(None, description="Theme IDs (optional, null = all themes in blocks)")
+    themes: list[int] | None = Field(
+        None, description="Theme IDs (optional, null = all themes in blocks)"
+    )
     count: int = Field(..., ge=1, le=200, description="Number of questions")
-    duration_seconds: int | None = Field(None, ge=60, description="Test duration in seconds (optional for TUTOR)")
+    duration_seconds: int | None = Field(
+        None, ge=60, description="Test duration in seconds (optional for TUTOR)"
+    )
     difficulty: list[str] | None = Field(None, description="Filter by difficulty levels")
     cognitive: list[str] | None = Field(None, description="Filter by cognitive levels")
 
@@ -98,7 +102,9 @@ class AnswerSubmit(BaseModel):
     """Submit answer for a question."""
 
     question_id: UUID = Field(..., description="Question ID")
-    selected_index: int | None = Field(None, ge=0, le=4, description="Selected option index (0-4), null to clear")
+    selected_index: int | None = Field(
+        None, ge=0, le=4, description="Selected option index (0-4), null to clear"
+    )
     marked_for_review: bool | None = Field(None, description="Mark for review flag")
 
 

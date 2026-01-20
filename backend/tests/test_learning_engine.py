@@ -57,7 +57,9 @@ class TestAlgoVersionSeeding:
             assert version is not None, f"Missing active version for {algo_key.value}"
 
             params = await get_active_params(db, version.id)
-            assert params is not None, f"Missing active params for {algo_key.value} v{version.version}"
+            assert (
+                params is not None
+            ), f"Missing active params for {algo_key.value} v{version.version}"
             assert params.is_active is True
 
     async def test_default_params_populated(self, db):

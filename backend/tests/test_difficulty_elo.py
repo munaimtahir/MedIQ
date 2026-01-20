@@ -41,6 +41,7 @@ from app.models.difficulty import (
 
 # === Core Math Tests ===
 
+
 def test_sigmoid_bounded():
     """Sigmoid output always in [0, 1]."""
     test_values = [-1000, -100, -10, -1, 0, 1, 10, 100, 1000]
@@ -54,7 +55,7 @@ def test_sigmoid_monotonic():
     """Sigmoid is monotonically increasing."""
     x_values = [-10, -5, -1, 0, 1, 5, 10]
     sig_values = [sigmoid(x) for x in x_values]
-    
+
     for i in range(len(sig_values) - 1):
         assert sig_values[i] < sig_values[i + 1], "Sigmoid not monotonic"
 
@@ -63,12 +64,12 @@ def test_p_correct_respects_guess_floor():
     """P(correct) always >= guess_floor."""
     guess_floor = 0.20
     scale = 400.0
-    
+
     # Even with worst ability and hardest question
     theta = -1000.0
     b = 1000.0
     p = p_correct(theta, b, guess_floor, scale)
-    
+
     assert p >= guess_floor, f"P(correct) = {p} < guess_floor = {guess_floor}"
     assert p <= 1.0, f"P(correct) = {p} > 1.0"
 
@@ -79,9 +80,9 @@ def test_p_correct_at_parity():
     b = 0.0
     guess_floor = 0.20
     scale = 400.0
-    
+
     p = p_correct(theta, b, guess_floor, scale)
-    
+
     # At parity, sigmoid(0) = 0.5, so p = 0.2 + 0.8 * 0.5 = 0.6
     expected = guess_floor + (1 - guess_floor) * 0.5
     assert abs(p - expected) < 0.01, f"P(correct) at parity: {p}, expected ~{expected}"
@@ -92,10 +93,10 @@ def test_p_correct_increases_with_ability():
     b = 0.0
     guess_floor = 0.20
     scale = 400.0
-    
+
     theta_values = [-400, -200, 0, 200, 400]
     p_values = [p_correct(theta, b, guess_floor, scale) for theta in theta_values]
-    
+
     for i in range(len(p_values) - 1):
         assert p_values[i] < p_values[i + 1], "P(correct) not increasing with theta"
 
@@ -105,7 +106,7 @@ def test_compute_delta():
     # Correct answer, predicted 0.7
     delta = compute_delta(True, 0.7)
     assert abs(delta - 0.3) < 0.001, f"Delta for correct: {delta}, expected 0.3"
-    
+
     # Incorrect answer, predicted 0.7
     delta = compute_delta(False, 0.7)
     assert abs(delta - (-0.7)) < 0.001, f"Delta for incorrect: {delta}, expected -0.7"
@@ -116,7 +117,7 @@ def test_compute_dynamic_k_bounded():
     k_base = 32.0
     k_min = 8.0
     k_max = 64.0
-    
+
     unc_values = [0, 10, 32, 100, 500, 1000]
     for unc in unc_values:
         k = compute_dynamic_k(k_base, unc, k_min, k_max)
@@ -129,10 +130,10 @@ def test_compute_dynamic_k_monotonic():
     k_base = 32.0
     k_min = 8.0
     k_max = 64.0
-    
+
     unc_values = [0, 10, 32, 100, 500]
     k_values = [compute_dynamic_k(k_base, unc, k_min, k_max) for unc in unc_values]
-    
+
     for i in range(len(k_values) - 1):
         assert k_values[i] <= k_values[i + 1], "K not monotonic with uncertainty"
 
@@ -146,9 +147,11 @@ def test_update_uncertainty_decays():
     unc_floor = 50.0
     unc_decay = 0.9
     unc_age_rate = 1.0
-    
-    unc_new = update_uncertainty(unc, n_attempts, last_seen_at, now, unc_floor, unc_decay, unc_age_rate)
-    
+
+    unc_new = update_uncertainty(
+        unc, n_attempts, last_seen_at, now, unc_floor, unc_decay, unc_age_rate
+    )
+
     # Should be less than original (decay dominates over 1 hour of age)
     assert unc_new < unc, "Uncertainty did not decay"
     assert unc_new >= unc_floor, f"Uncertainty {unc_new} below floor {unc_floor}"
@@ -163,9 +166,11 @@ def test_update_uncertainty_ages():
     unc_floor = 50.0
     unc_decay = 0.9
     unc_age_rate = 1.0
-    
-    unc_new = update_uncertainty(unc, n_attempts, last_seen_at, now, unc_floor, unc_decay, unc_age_rate)
-    
+
+    unc_new = update_uncertainty(
+        unc, n_attempts, last_seen_at, now, unc_floor, unc_decay, unc_age_rate
+    )
+
     # After 30 days, should increase by ~30 points
     assert unc_new > unc, "Uncertainty did not increase with age"
 
@@ -177,9 +182,9 @@ def test_apply_update_correct_answer():
     k_u = 32.0
     k_q = 24.0
     delta = 0.3  # Correct answer with p_pred = 0.7
-    
+
     theta_new, b_new = apply_update(theta, b, k_u, k_q, delta)
-    
+
     assert theta_new > theta, "User rating did not increase after correct"
     assert b_new < b, "Question difficulty did not decrease after correct"
 
@@ -191,9 +196,9 @@ def test_apply_update_incorrect_answer():
     k_u = 32.0
     k_q = 24.0
     delta = -0.7  # Incorrect answer with p_pred = 0.7
-    
+
     theta_new, b_new = apply_update(theta, b, k_u, k_q, delta)
-    
+
     assert theta_new < theta, "User rating did not decrease after incorrect"
     assert b_new > b, "Question difficulty did not increase after incorrect"
 
@@ -203,27 +208,29 @@ def test_validate_rating_finite():
     validate_rating_finite(0.0)
     validate_rating_finite(100.0)
     validate_rating_finite(-100.0)
-    
+
     with pytest.raises(ValueError):
-        validate_rating_finite(float('nan'))
-    
+        validate_rating_finite(float("nan"))
+
     with pytest.raises(ValueError):
-        validate_rating_finite(float('inf'))
+        validate_rating_finite(float("inf"))
 
 
 # === Property Tests ===
 
+
 def test_no_nan_in_p_correct():
     """P(correct) never produces NaN for any finite inputs."""
     import random
+
     random.seed(42)
-    
+
     for _ in range(100):
         theta = random.uniform(-1000, 1000)
         b = random.uniform(-1000, 1000)
         guess_floor = random.uniform(0.1, 0.3)
         scale = random.uniform(100, 500)
-        
+
         p = p_correct(theta, b, guess_floor, scale)
         assert math.isfinite(p), f"NaN/Inf for theta={theta}, b={b}"
         assert guess_floor <= p <= 1.0
@@ -232,14 +239,15 @@ def test_no_nan_in_p_correct():
 def test_no_nan_in_dynamic_k():
     """Dynamic K never produces NaN."""
     import random
+
     random.seed(42)
-    
+
     for _ in range(100):
         k_base = random.uniform(10, 50)
         unc = random.uniform(0, 500)
         k_min = random.uniform(5, 10)
         k_max = random.uniform(50, 100)
-        
+
         k = compute_dynamic_k(k_base, unc, k_min, k_max)
         assert math.isfinite(k)
         assert k_min <= k <= k_max
@@ -247,22 +255,23 @@ def test_no_nan_in_dynamic_k():
 
 # === Service Layer Tests ===
 
+
 @pytest.mark.asyncio
 async def test_get_or_create_user_rating(db_session, test_user):
     """Get or create user rating initializes correctly."""
     user_id = test_user.id
     params = {"rating_init": 0.0, "unc_init_user": 350.0}
-    
+
     # First call creates
     rating1 = await get_or_create_user_rating(db_session, user_id, RatingScope.GLOBAL, None, params)
     await db_session.commit()
-    
+
     assert rating1.user_id == user_id
     assert rating1.scope_type == RatingScope.GLOBAL.value
     assert rating1.rating == 0.0
     assert rating1.uncertainty == 350.0
     assert rating1.n_attempts == 0
-    
+
     # Second call retrieves same
     rating2 = await get_or_create_user_rating(db_session, user_id, RatingScope.GLOBAL, None, params)
     assert rating2.id == rating1.id
@@ -273,19 +282,23 @@ async def test_get_or_create_question_rating(db_session, test_question):
     """Get or create question rating initializes correctly."""
     question_id = test_question.id
     params = {"rating_init": 0.0, "unc_init_question": 250.0}
-    
+
     # First call creates
-    rating1 = await get_or_create_question_rating(db_session, question_id, RatingScope.GLOBAL, None, params)
+    rating1 = await get_or_create_question_rating(
+        db_session, question_id, RatingScope.GLOBAL, None, params
+    )
     await db_session.commit()
-    
+
     assert rating1.question_id == question_id
     assert rating1.scope_type == RatingScope.GLOBAL.value
     assert rating1.rating == 0.0
     assert rating1.uncertainty == 250.0
     assert rating1.n_attempts == 0
-    
+
     # Second call retrieves same
-    rating2 = await get_or_create_question_rating(db_session, question_id, RatingScope.GLOBAL, None, params)
+    rating2 = await get_or_create_question_rating(
+        db_session, question_id, RatingScope.GLOBAL, None, params
+    )
     assert rating2.id == rating1.id
 
 
@@ -303,7 +316,7 @@ async def test_update_difficulty_from_attempt_creates_ratings(
         attempt_id=uuid4(),
         occurred_at=datetime.now(UTC),
     )
-    
+
     assert result["p_pred"] > 0
     assert result["scope_updated"] == "GLOBAL"
     assert "user_rating_global" in result
@@ -316,7 +329,7 @@ async def test_update_difficulty_idempotent(
 ):
     """Same attempt_id is idempotent."""
     attempt_id = uuid4()
-    
+
     # First update
     result1 = await update_difficulty_from_attempt(
         db_session,
@@ -327,7 +340,7 @@ async def test_update_difficulty_idempotent(
         attempt_id=attempt_id,
         occurred_at=datetime.now(UTC),
     )
-    
+
     # Second update with same attempt_id
     result2 = await update_difficulty_from_attempt(
         db_session,
@@ -338,7 +351,7 @@ async def test_update_difficulty_idempotent(
         attempt_id=attempt_id,
         occurred_at=datetime.now(UTC),
     )
-    
+
     assert result2.get("duplicate") == True
     assert result2["p_pred"] == result1["p_pred"]
 
@@ -357,12 +370,12 @@ async def test_update_difficulty_logs_update(
         attempt_id=uuid4(),
         occurred_at=datetime.now(UTC),
     )
-    
+
     # Check log exists
     stmt = select(DifficultyUpdateLog).where(DifficultyUpdateLog.user_id == test_user.id)
     result = await db_session.execute(stmt)
     log = result.scalar_one()
-    
+
     assert log.score == True
     assert log.p_pred > 0
     assert math.isfinite(log.user_rating_pre)
@@ -375,6 +388,7 @@ async def test_update_difficulty_logs_update(
 
 # === Recenter Tests ===
 
+
 @pytest.mark.asyncio
 async def test_recenter_preserves_differences(
     db_session, test_user, test_question, active_difficulty_algo
@@ -385,46 +399,44 @@ async def test_recenter_preserves_differences(
         db_session, test_user.id, RatingScope.GLOBAL, None, {}
     )
     user_rating.rating = 100.0
-    
+
     question_rating = await get_or_create_question_rating(
         db_session, test_question.id, RatingScope.GLOBAL, None, {}
     )
     question_rating.rating = 50.0
-    
+
     await db_session.commit()
-    
+
     # Record difference before
     diff_before = user_rating.rating - question_rating.rating
-    
+
     # Recenter
     await recenter_question_ratings(db_session, RatingScope.GLOBAL, None)
-    
+
     # Reload ratings
     await db_session.refresh(user_rating)
     await db_session.refresh(question_rating)
-    
+
     # Check difference preserved
     diff_after = user_rating.rating - question_rating.rating
     assert abs(diff_before - diff_after) < 0.01, "Difference not preserved by recenter"
 
 
 @pytest.mark.asyncio
-async def test_recenter_zeros_mean(
-    db_session, test_question, active_difficulty_algo
-):
+async def test_recenter_zeros_mean(db_session, test_question, active_difficulty_algo):
     """Recentering brings mean question rating to ~0."""
     from app.models.syllabus import Theme
     from sqlalchemy import func
-    
+
     # Create multiple questions with various ratings
     theme_stmt = select(Theme).limit(1)
     result = await db_session.execute(theme_stmt)
     theme = result.scalar_one()
-    
+
     question_ids = []
     for i in range(5):
         from app.models.question_cms import Question as CMSQuestion, QuestionStatus
-        
+
         q = CMSQuestion(
             year=2024,
             block_id=theme.block_id,
@@ -439,18 +451,16 @@ async def test_recenter_zeros_mean(
         db_session.add(q)
         await db_session.flush()
         question_ids.append(q.id)
-        
+
         # Create rating with varying values
-        rating = await get_or_create_question_rating(
-            db_session, q.id, RatingScope.GLOBAL, None, {}
-        )
+        rating = await get_or_create_question_rating(db_session, q.id, RatingScope.GLOBAL, None, {})
         rating.rating = float(i * 50 - 100)  # -100, -50, 0, 50, 100
-    
+
     await db_session.commit()
-    
+
     # Recenter
     await recenter_question_ratings(db_session, RatingScope.GLOBAL, None)
-    
+
     # Check mean is near zero
     stmt = select(func.avg(DifficultyQuestionRating.rating)).where(
         DifficultyQuestionRating.scope_type == RatingScope.GLOBAL.value,
@@ -458,7 +468,7 @@ async def test_recenter_zeros_mean(
     )
     result = await db_session.execute(stmt)
     mean = result.scalar()
-    
+
     assert abs(mean) < 1.0, f"Mean question rating after recenter: {mean}, expected ~0"
 
 

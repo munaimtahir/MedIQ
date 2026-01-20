@@ -13,12 +13,14 @@ from pydantic import BaseModel, Field, field_validator
 
 class AlgoInfo(BaseModel):
     """Algorithm identification."""
+
     key: str
     version: str
 
 
 class LearningResponse(BaseModel):
     """Standard response envelope for all learning endpoints."""
+
     ok: bool = True
     run_id: UUID
     algo: AlgoInfo
@@ -33,6 +35,7 @@ class LearningResponse(BaseModel):
 
 class MasteryRecomputeRequest(BaseModel):
     """Request to recompute mastery scores."""
+
     user_id: UUID | None = None
     year: int = Field(..., ge=1, le=6)
     block_id: UUID | None = None
@@ -42,6 +45,7 @@ class MasteryRecomputeRequest(BaseModel):
 
 class MasteryRecomputeSummary(BaseModel):
     """Summary of mastery recompute."""
+
     themes_processed: int
     records_upserted: int
     dry_run: bool
@@ -54,6 +58,7 @@ class MasteryRecomputeSummary(BaseModel):
 
 class RevisionPlanRequest(BaseModel):
     """Request to generate revision queue."""
+
     user_id: UUID | None = None
     year: int = Field(..., ge=1, le=6)
     block_id: UUID | None = None
@@ -61,6 +66,7 @@ class RevisionPlanRequest(BaseModel):
 
 class RevisionPlanSummary(BaseModel):
     """Summary of revision plan generation."""
+
     generated: int
     due_today: int
 
@@ -72,6 +78,7 @@ class RevisionPlanSummary(BaseModel):
 
 class AdaptiveNextRequest(BaseModel):
     """Request for adaptive question selection."""
+
     user_id: UUID | None = None
     year: int = Field(..., ge=1, le=6)
     block_ids: list[UUID] = Field(..., min_length=1)
@@ -79,17 +86,18 @@ class AdaptiveNextRequest(BaseModel):
     count: int = Field(..., ge=1, le=100)
     mode: str = Field(..., pattern="^(tutor|exam)$")
     source: str = Field(default="weakness", pattern="^(revision|weakness)$")
-    
-    @field_validator('block_ids')
+
+    @field_validator("block_ids")
     @classmethod
     def validate_block_ids(cls, v):
         if not v:
-            raise ValueError('At least one block_id required')
+            raise ValueError("At least one block_id required")
         return v
 
 
 class AdaptiveNextSummary(BaseModel):
     """Summary of adaptive question selection."""
+
     count: int
     themes_used: list[UUID]
     difficulty_distribution: dict[str, int]
@@ -103,11 +111,13 @@ class AdaptiveNextSummary(BaseModel):
 
 class DifficultyUpdateRequest(BaseModel):
     """Request to update question difficulty."""
+
     session_id: UUID
 
 
 class DifficultyUpdateSummary(BaseModel):
     """Summary of difficulty update."""
+
     questions_updated: int
     avg_delta: float
 
@@ -119,11 +129,13 @@ class DifficultyUpdateSummary(BaseModel):
 
 class MistakesClassifyRequest(BaseModel):
     """Request to classify mistakes."""
+
     session_id: UUID
 
 
 class MistakesClassifySummary(BaseModel):
     """Summary of mistake classification."""
+
     total_wrong: int
     classified: int
     counts_by_type: dict[str, int]

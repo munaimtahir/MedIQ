@@ -44,10 +44,10 @@ async def get_mistakes_summary(
 ):
     """
     Get summary of mistakes for the current user.
-    
+
     Query Parameters:
     - range_days: Number of days to look back (default: 30)
-    
+
     Returns:
     - Total wrong count
     - Counts by mistake type
@@ -56,7 +56,7 @@ async def get_mistakes_summary(
     """
     # Calculate cutoff date
     cutoff_date = datetime.utcnow() - timedelta(days=range_days)
-    
+
     # Get total wrong and counts by type
     stmt = (
         select(
@@ -73,10 +73,10 @@ async def get_mistakes_summary(
     )
     result = await db.execute(stmt)
     type_counts = result.all()
-    
+
     total_wrong = sum(row.total for row in type_counts)
     counts_by_type = {row.mistake_type: row.total for row in type_counts}
-    
+
     # Get top themes
     theme_stmt = (
         select(
@@ -98,7 +98,7 @@ async def get_mistakes_summary(
     )
     theme_result = await db.execute(theme_stmt)
     theme_rows = theme_result.all()
-    
+
     top_themes = [
         ThemeCount(
             theme=ThemeInfo(id=row.theme_id, name=row.name),
@@ -106,7 +106,7 @@ async def get_mistakes_summary(
         )
         for row in theme_rows
     ]
-    
+
     # Get top blocks
     block_stmt = (
         select(
@@ -128,7 +128,7 @@ async def get_mistakes_summary(
     )
     block_result = await db.execute(block_stmt)
     block_rows = block_result.all()
-    
+
     top_blocks = [
         BlockCount(
             block=BlockInfo(id=row.block_id, name=row.name),
@@ -136,7 +136,7 @@ async def get_mistakes_summary(
         )
         for row in block_rows
     ]
-    
+
     return MistakesSummaryResponse(
         range_days=range_days,
         total_wrong=total_wrong,
@@ -164,7 +164,7 @@ async def get_mistakes_list(
 ):
     """
     Get paginated list of mistakes for the current user.
-    
+
     Query Parameters:
     - range_days: Number of days to look back (default: 30)
     - block_id: Filter by block (optional)
@@ -172,35 +172,35 @@ async def get_mistakes_list(
     - mistake_type: Filter by mistake type (optional)
     - page: Page number (default: 1)
     - page_size: Items per page (default: 20, max: 50)
-    
+
     Returns paginated list with question preview and evidence.
     """
     # Calculate cutoff date
     cutoff_date = datetime.utcnow() - timedelta(days=range_days)
-    
+
     # Build base query
     filters = [
         MistakeLog.user_id == current_user.id,
         MistakeLog.created_at >= cutoff_date,
     ]
-    
+
     if block_id:
         filters.append(MistakeLog.block_id == block_id)
-    
+
     if theme_id:
         filters.append(MistakeLog.theme_id == theme_id)
-    
+
     if mistake_type:
         filters.append(MistakeLog.mistake_type == mistake_type)
-    
+
     # Get total count
     count_stmt = select(func.count(MistakeLog.id)).where(and_(*filters))
     count_result = await db.execute(count_stmt)
     total = count_result.scalar()
-    
+
     # Get paginated items
     offset = (page - 1) * page_size
-    
+
     stmt = (
         select(MistakeLog)
         .where(and_(*filters))
@@ -213,10 +213,10 @@ async def get_mistakes_list(
         .offset(offset)
         .limit(page_size)
     )
-    
+
     result = await db.execute(stmt)
     mistakes = result.scalars().all()
-    
+
     # Build response items
     items = []
     for mistake in mistakes:
@@ -226,20 +226,28 @@ async def get_mistakes_list(
             stem_preview = mistake.question.stem_text[:140]
             if len(mistake.question.stem_text) > 140:
                 stem_preview += "..."
-        
+
         items.append(
             MistakeItem(
                 created_at=mistake.created_at,
                 mistake_type=mistake.mistake_type,
                 severity=mistake.severity,
-                theme=ThemeInfo(
-                    id=mistake.theme.id,
-                    name=mistake.theme.name,
-                ) if mistake.theme else ThemeInfo(id=UUID(int=0), name="Unknown"),
-                block=BlockInfo(
-                    id=mistake.block.id,
-                    name=mistake.block.name,
-                ) if mistake.block else BlockInfo(id=UUID(int=0), name="Unknown"),
+                theme=(
+                    ThemeInfo(
+                        id=mistake.theme.id,
+                        name=mistake.theme.name,
+                    )
+                    if mistake.theme
+                    else ThemeInfo(id=UUID(int=0), name="Unknown")
+                ),
+                block=(
+                    BlockInfo(
+                        id=mistake.block.id,
+                        name=mistake.block.name,
+                    )
+                    if mistake.block
+                    else BlockInfo(id=UUID(int=0), name="Unknown")
+                ),
                 question=QuestionInfo(
                     id=mistake.question_id,
                     stem_preview=stem_preview,
@@ -247,7 +255,7 @@ async def get_mistakes_list(
                 evidence=mistake.evidence_json or {},
             )
         )
-    
+
     return MistakesListResponse(
         page=page,
         page_size=page_size,

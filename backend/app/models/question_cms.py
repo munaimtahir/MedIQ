@@ -102,9 +102,15 @@ class Question(Base):
     source_ref = Column(String(100), nullable=True)
 
     # Metadata
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
-    approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=True)
+    created_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
+    updated_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
+    approved_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=True
+    )
     approved_at = Column(DateTime(timezone=True), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -114,11 +120,17 @@ class Question(Base):
     year = relationship("Year", backref="cms_questions")
     block = relationship("Block", backref="cms_questions")
     theme = relationship("Theme", backref="cms_questions")
-    versions = relationship("QuestionVersion", back_populates="question", cascade="all, delete-orphan")
-    media_attachments = relationship("QuestionMedia", back_populates="question", cascade="all, delete-orphan")
+    versions = relationship(
+        "QuestionVersion", back_populates="question", cascade="all, delete-orphan"
+    )
+    media_attachments = relationship(
+        "QuestionMedia", back_populates="question", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-        CheckConstraint("correct_index >= 0 AND correct_index <= 4", name="ck_question_correct_index"),
+        CheckConstraint(
+            "correct_index >= 0 AND correct_index <= 4", name="ck_question_correct_index"
+        ),
         Index("ix_questions_status", "status"),
         Index("ix_questions_updated_at", "updated_at"),
         Index("ix_questions_theme_id", "theme_id"),
@@ -145,7 +157,9 @@ class QuestionVersion(Base):
         nullable=False,
     )
     change_reason = Column(String(500), nullable=True)
-    changed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
+    changed_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
     changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
@@ -174,15 +188,17 @@ class MediaAsset(Base):
     mime_type = Column(String(100), nullable=False)
     size_bytes = Column(Integer, nullable=False)
     sha256 = Column(String(64), nullable=True)  # For deduplication
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
+    created_by = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
-    question_attachments = relationship("QuestionMedia", back_populates="media_asset", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        Index("ix_media_assets_sha256", "sha256"),
+    question_attachments = relationship(
+        "QuestionMedia", back_populates="media_asset", cascade="all, delete-orphan"
     )
+
+    __table_args__ = (Index("ix_media_assets_sha256", "sha256"),)
 
 
 class QuestionMedia(Base):
@@ -223,10 +239,14 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    actor_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False)
+    actor_user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", onupdate="CASCADE"), nullable=False
+    )
     action = Column(String(100), nullable=False)  # e.g., "question.create", "question.publish"
     entity_type = Column(String(50), nullable=False)  # e.g., "QUESTION", "MEDIA"
-    entity_id = Column(UUID(as_uuid=True), nullable=False)  # ID of the entity (can be UUID or converted)
+    entity_id = Column(
+        UUID(as_uuid=True), nullable=False
+    )  # ID of the entity (can be UUID or converted)
     before = Column(JSONB, nullable=True)  # State before change
     after = Column(JSONB, nullable=True)  # State after change
     meta = Column(JSONB, nullable=True)  # IP, user-agent, request-id, etc.

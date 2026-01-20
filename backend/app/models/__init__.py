@@ -32,6 +32,7 @@ from app.models.mfa import MFATOTP, MFABackupCode
 from app.models.notification import Notification
 from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.platform_settings import PlatformSettings
+
 # Legacy Question model - commented out to avoid conflicts with CMS Question
 # from app.models.question import Question
 from app.models.question_cms import (

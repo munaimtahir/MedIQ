@@ -9,7 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.models.session import AttemptEvent, SessionAnswer, SessionQuestion, SessionStatus, TestSession
+from app.models.session import (
+    AttemptEvent,
+    SessionAnswer,
+    SessionQuestion,
+    SessionStatus,
+    TestSession,
+)
 from app.models.user import User
 from app.schemas.session import (
     AnswerOut,
@@ -283,67 +289,73 @@ async def submit_test_session(
         },
     )
     await db.commit()
-    
+
     # Best-effort learning algorithm updates (do not block submission)
     # These run after commit, so submission is already persisted
-    
+
     # 1. Update question difficulty ratings (ELO-lite)
     try:
         from app.learning_engine.difficulty.service import update_question_difficulty_v0_for_session
+
         await update_question_difficulty_v0_for_session(db, session_id, trigger="submit")
     except Exception as e:
         # Log but don't fail
         import logging
-        logging.getLogger(__name__).warning(f"Difficulty update failed for session {session_id}: {e}")
-    
+
+        logging.getLogger(__name__).warning(
+            f"Difficulty update failed for session {session_id}: {e}"
+        )
+
     # 2. Classify mistakes (rule-based)
     try:
         from app.learning_engine.mistakes.service import classify_mistakes_v0_for_session
+
         await classify_mistakes_v0_for_session(db, session_id, trigger="submit")
     except Exception as e:
         # Log but don't fail
         import logging
-        logging.getLogger(__name__).warning(f"Mistake classification failed for session {session_id}: {e}")
-    
+
+        logging.getLogger(__name__).warning(
+            f"Mistake classification failed for session {session_id}: {e}"
+        )
+
     # 3. Update BKT mastery (Bayesian Knowledge Tracing)
     # Note: This requires concept_id extraction from session questions
     # For now, this is a placeholder - full integration requires concept mapping
     try:
         from datetime import datetime
         from app.learning_engine.bkt.service import update_bkt_from_attempt
-        
+
         # Get all answers for this session
         answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session_id)
         answers_result = await db.execute(answers_stmt)
         answers = answers_result.scalars().all()
-        
+
         # Get session questions to extract concept_ids
-        questions_stmt = (
-            select(SessionQuestion)
-            .where(SessionQuestion.session_id == session_id)
-        )
+        questions_stmt = select(SessionQuestion).where(SessionQuestion.session_id == session_id)
         questions_result = await db.execute(questions_stmt)
         questions = questions_result.scalars().all()
         questions_map = {q.question_id: q for q in questions}
-        
+
         # Update BKT for each answered question
         for answer in answers:
             if answer.is_correct is None:
                 continue  # Skip unanswered
-            
+
             # Get concept_id from snapshot_json
             session_question = questions_map.get(answer.question_id)
             if not session_question or not session_question.snapshot_json:
                 continue
-            
+
             concept_id_str = session_question.snapshot_json.get("concept_id")
             if not concept_id_str:
                 continue  # No concept mapping
-            
+
             try:
                 from uuid import UUID as UUIDType
+
                 concept_id = UUIDType(concept_id_str)
-                
+
                 # Update BKT mastery
                 await update_bkt_from_attempt(
                     db,
@@ -357,88 +369,98 @@ async def submit_test_session(
             except (ValueError, KeyError) as e:
                 # Invalid concept_id or BKT update failed for this question
                 pass
-        
+
         # Commit BKT updates
         await db.commit()
-        
+
     except Exception as e:
         # Log but don't fail
         import logging
-        logging.getLogger(__name__).warning(f"BKT mastery update failed for session {session_id}: {e}")
-    
+
+        logging.getLogger(__name__).warning(
+            f"BKT mastery update failed for session {session_id}: {e}"
+        )
+
     # 4. Update SRS (Spaced Repetition System) - FSRS-based forgetting model
     # Note: Similar to BKT, requires concept_id extraction from session questions
     try:
         from datetime import datetime
         from app.learning_engine.srs.service import update_from_attempt
-        from app.learning_engine.mistakes.features import compute_time_spent_by_question, compute_change_count
-        
+        from app.learning_engine.mistakes.features import (
+            compute_time_spent_by_question,
+            compute_change_count,
+        )
+
         # Get all answers and questions (reuse if already loaded)
         if not answers:
             answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session_id)
             answers_result = await db.execute(answers_stmt)
             answers = answers_result.scalars().all()
-        
+
         if not questions:
             questions_stmt = select(SessionQuestion).where(SessionQuestion.session_id == session_id)
             questions_result = await db.execute(questions_stmt)
             questions = questions_result.scalars().all()
             questions_map = {q.question_id: q for q in questions}
-        
+
         # Get telemetry for rating computation
-        events_stmt = select(AttemptEvent).where(
-            AttemptEvent.session_id == session_id
-        ).order_by(AttemptEvent.event_ts)
+        events_stmt = (
+            select(AttemptEvent)
+            .where(AttemptEvent.session_id == session_id)
+            .order_by(AttemptEvent.event_ts)
+        )
         events_result = await db.execute(events_stmt)
         events = events_result.scalars().all()
-        
+
         # Compute telemetry features per question
         time_by_question = compute_time_spent_by_question(events)
         changes_by_question = compute_change_count(events)
-        
+
         # Update SRS for each answered question
         for answer in answers:
             if answer.is_correct is None:
                 continue  # Skip unanswered
-            
+
             # Get concept_id(s) from snapshot_json
             session_question = questions_map.get(answer.question_id)
             if not session_question or not session_question.snapshot_json:
                 continue
-            
+
             # Extract concept_ids (can be single or list)
             snapshot = session_question.snapshot_json
             concept_ids = []
-            
+
             # Try single concept_id first
             concept_id_str = snapshot.get("concept_id")
             if concept_id_str:
                 try:
                     from uuid import UUID as UUIDType
+
                     concept_ids.append(UUIDType(concept_id_str))
                 except (ValueError, TypeError):
                     pass
-            
+
             # Try concept_ids list
             concept_ids_list = snapshot.get("concept_ids", [])
             if concept_ids_list:
                 for cid_str in concept_ids_list:
                     try:
                         from uuid import UUID as UUIDType
+
                         concept_ids.append(UUIDType(cid_str))
                     except (ValueError, TypeError):
                         pass
-            
+
             if not concept_ids:
                 continue  # No concept mapping
-            
+
             # Build telemetry dict
             telemetry = {
                 "time_spent_ms": time_by_question.get(answer.question_id),
                 "change_count": changes_by_question.get(answer.question_id, 0),
                 "marked_for_review": answer.marked_for_review,
             }
-            
+
             # Update SRS
             try:
                 await update_from_attempt(
@@ -454,14 +476,18 @@ async def submit_test_session(
             except Exception as e:
                 # Log but continue with other questions
                 import logging
-                logging.getLogger(__name__).warning(f"SRS update failed for question {answer.question_id}: {e}")
-        
+
+                logging.getLogger(__name__).warning(
+                    f"SRS update failed for question {answer.question_id}: {e}"
+                )
+
         # Commit SRS updates
         await db.commit()
-        
+
     except Exception as e:
         # Log but don't fail
         import logging
+
         logging.getLogger(__name__).warning(f"SRS update failed for session {session_id}: {e}")
 
     return SessionSubmitResponse(
