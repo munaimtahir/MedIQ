@@ -11,6 +11,7 @@ class AlgoKey(str, Enum):
     DIFFICULTY = "difficulty"
     ADAPTIVE = "adaptive"
     MISTAKES = "mistakes"
+    BKT = "bkt"
 
 
 class AlgoStatus(str, Enum):

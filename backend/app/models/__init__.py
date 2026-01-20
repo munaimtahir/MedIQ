@@ -11,6 +11,7 @@ from app.models.academic import (
 )
 from app.models.attempt import AttemptAnswer, AttemptSession
 from app.models.auth import EmailVerificationToken, PasswordResetToken, RefreshToken
+from app.models.bkt import BKTSkillParams, BKTUserSkillState, MasterySnapshot
 from app.models.bookmark import Bookmark
 from app.models.learning import AlgoParams, AlgoRun, AlgoVersion
 from app.models.learning_difficulty import QuestionDifficulty
@@ -99,6 +100,9 @@ __all__ = [
     "RevisionQueue",
     "QuestionDifficulty",
     "MistakeLog",
+    "BKTSkillParams",
+    "BKTUserSkillState",
+    "MasterySnapshot",
     "AcademicYear",
     "AcademicBlock",
     "AcademicSubject",
