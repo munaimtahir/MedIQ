@@ -30,7 +30,6 @@ export default function SessionPlayerPage() {
   const [currentPosition, setCurrentPosition] = useState(1);
   const [savingAnswer, setSavingAnswer] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
 
   // Local answer state for optimistic updates
@@ -236,8 +235,6 @@ export default function SessionPlayerPage() {
   }
 
   async function handleSubmitConfirmed() {
-    setSubmitting(true);
-
     try {
       // Flush telemetry before submit
       await flush();
@@ -250,7 +247,6 @@ export default function SessionPlayerPage() {
       const error = err as { message?: string };
       notify.error("Failed to submit session", error.message || "Please try again");
     } finally {
-      setSubmitting(false);
       setShowSubmitDialog(false);
     }
   }
