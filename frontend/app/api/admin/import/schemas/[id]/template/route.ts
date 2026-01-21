@@ -13,12 +13,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .join("; ");
 
     // Fetch template from backend
-    const response = await fetch(`${process.env.BACKEND_URL}/v1/admin/import/schemas/${id}/template`, {
-      method: "GET",
-      headers: {
-        Cookie: cookieHeader,
+    const response = await fetch(
+      `${process.env.BACKEND_URL}/v1/admin/import/schemas/${id}/template`,
+      {
+        method: "GET",
+        headers: {
+          Cookie: cookieHeader,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return NextResponse.json(
@@ -28,7 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const blob = await response.blob();
-    const contentDisposition = response.headers.get("content-disposition") || `attachment; filename="template.csv"`;
+    const contentDisposition =
+      response.headers.get("content-disposition") || `attachment; filename="template.csv"`;
 
     return new NextResponse(blob, {
       status: 200,

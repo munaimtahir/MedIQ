@@ -88,7 +88,7 @@ export default function ReviewQueuePage() {
           <p className="text-muted-foreground">Questions awaiting review and approval</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-lg px-4 py-2">
+          <Badge variant="outline" className="px-4 py-2 text-lg">
             {questions.length} in queue
           </Badge>
         </div>
@@ -106,7 +106,7 @@ export default function ReviewQueuePage() {
                 Search
               </Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="search"
                   value={searchInput}
@@ -159,7 +159,7 @@ export default function ReviewQueuePage() {
                     <TableRow key={q.id} className="hover:bg-muted/50">
                       <TableCell>
                         <div className="max-w-md">
-                          <p className="text-sm line-clamp-2">{truncateText(q.stem, 200)}</p>
+                          <p className="line-clamp-2 text-sm">{truncateText(q.stem, 200)}</p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -201,13 +201,13 @@ export default function ReviewQueuePage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                             <div
                               className={`h-full ${completeness.percentage >= 75 ? "bg-green-500" : completeness.percentage >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
                               style={{ width: `${completeness.percentage}%` }}
                             />
                           </div>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          <span className="whitespace-nowrap text-xs text-muted-foreground">
                             {completeness.score}/{completeness.total}
                           </span>
                         </div>
@@ -235,8 +235,8 @@ export default function ReviewQueuePage() {
         <CardHeader>
           <CardTitle className="text-base">Review Guidelines</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+        <CardContent className="space-y-2 text-sm">
+          <ul className="list-inside list-disc space-y-1 text-muted-foreground">
             <li>Check that the question stem is clear and unambiguous</li>
             <li>Verify all 5 options are present and the correct answer is marked</li>
             <li>Ensure the explanation is comprehensive and helpful</li>

@@ -157,16 +157,14 @@ export function WorkflowPanel({
             )}
 
             {status === "PUBLISHED" && userRole !== "ADMIN" && (
-              <p className="text-sm text-muted-foreground">
-                Only admins can unpublish questions.
-              </p>
+              <p className="text-sm text-muted-foreground">Only admins can unpublish questions.</p>
             )}
           </div>
 
           {/* Workflow explanation */}
           <div className="mt-4 rounded-md bg-muted p-3 text-sm">
-            <p className="font-medium mb-1">Workflow:</p>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+            <p className="mb-1 font-medium">Workflow:</p>
+            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
               <li>Draft → Submit for Review</li>
               <li>In Review → Approve or Reject</li>
               <li>Approved → Publish (Admin only)</li>
@@ -182,8 +180,8 @@ export function WorkflowPanel({
           <DialogHeader>
             <DialogTitle>Reject Question</DialogTitle>
             <DialogDescription>
-              Please provide a reason for rejecting this question. The question will return to
-              DRAFT status.
+              Please provide a reason for rejecting this question. The question will return to DRAFT
+              status.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

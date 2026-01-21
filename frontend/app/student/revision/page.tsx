@@ -25,7 +25,10 @@ import { format, isToday } from "date-fns";
 
 type TabValue = "today" | "upcoming";
 
-function getPriorityLabel(score: number): { label: string; variant: "destructive" | "default" | "secondary" } {
+function getPriorityLabel(score: number): {
+  label: string;
+  variant: "destructive" | "default" | "secondary";
+} {
   if (score >= 70) return { label: "High", variant: "destructive" };
   if (score >= 40) return { label: "Medium", variant: "default" };
   return { label: "Low", variant: "secondary" };
@@ -33,18 +36,19 @@ function getPriorityLabel(score: number): { label: string; variant: "destructive
 
 function formatReasonText(reason: RevisionQueueItem["reason"]): string {
   const parts: string[] = [];
-  
+
   if (reason.mastery_band) {
     const bandText = reason.mastery_band.charAt(0).toUpperCase() + reason.mastery_band.slice(1);
-    const scoreText = reason.mastery_score !== undefined ? ` (${(reason.mastery_score * 100).toFixed(0)}%)` : "";
+    const scoreText =
+      reason.mastery_score !== undefined ? ` (${(reason.mastery_score * 100).toFixed(0)}%)` : "";
     parts.push(`${bandText} mastery${scoreText}`);
   }
-  
+
   if (reason.days_since_last !== undefined) {
     const days = Math.floor(reason.days_since_last);
     parts.push(`${days} day${days !== 1 ? "s" : ""} since last attempt`);
   }
-  
+
   return parts.length > 0 ? parts.join(", ") : "Scheduled for revision";
 }
 
@@ -65,12 +69,12 @@ function RevisionCard({ item, onStart, onDone, onSnooze, isProcessing }: Revisio
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-center gap-2">
               <Badge variant={priority.variant}>{priority.label} Priority</Badge>
               <Badge variant="outline">{item.block.name}</Badge>
             </div>
-            <CardTitle className="text-xl mb-1">{item.theme.name}</CardTitle>
+            <CardTitle className="mb-1 text-xl">{item.theme.name}</CardTitle>
             <CardDescription className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4" />
               Due {isDueToday ? "Today" : format(dueDate, "MMM d, yyyy")}
@@ -81,7 +85,7 @@ function RevisionCard({ item, onStart, onDone, onSnooze, isProcessing }: Revisio
       <CardContent>
         <div className="space-y-3">
           {/* Why Section */}
-          <div className="p-3 rounded-lg bg-muted">
+          <div className="rounded-lg bg-muted p-3">
             <p className="text-sm text-muted-foreground">
               <span className="font-medium">Why? </span>
               {formatReasonText(item.reason)}
@@ -92,21 +96,20 @@ function RevisionCard({ item, onStart, onDone, onSnooze, isProcessing }: Revisio
           <div className="flex items-center gap-2 text-sm">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">
-              Recommended: <span className="font-medium text-foreground">{item.recommended_count} questions</span>
+              Recommended:{" "}
+              <span className="font-medium text-foreground">
+                {item.recommended_count} questions
+              </span>
             </span>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2">
-            <Button
-              onClick={() => onStart(item)}
-              disabled={isProcessing}
-              className="flex-1"
-            >
+            <Button onClick={() => onStart(item)} disabled={isProcessing} className="flex-1">
               <PlayCircle className="mr-2 h-4 w-4" />
               Start Practice
             </Button>
-            
+
             <Button
               onClick={() => onDone(item.id)}
               disabled={isProcessing}
@@ -118,11 +121,7 @@ function RevisionCard({ item, onStart, onDone, onSnooze, isProcessing }: Revisio
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={isProcessing}
-                  variant="outline"
-                  size="icon"
-                >
+                <Button disabled={isProcessing} variant="outline" size="icon">
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -203,7 +202,10 @@ export default function RevisionPage() {
     try {
       await updateRevisionQueueItem(itemId, { action: "SNOOZE", snooze_days: days });
       setItems((prev) => prev.filter((item) => item.id !== itemId));
-      notify.success("Snoozed", `This revision will reappear in ${days} day${days !== 1 ? "s" : ""}`);
+      notify.success(
+        "Snoozed",
+        `This revision will reappear in ${days} day${days !== 1 ? "s" : ""}`,
+      );
     } catch (err: unknown) {
       console.error("Failed to snooze item:", err);
       notify.error("Failed to snooze", err?.message || "Please try again");
@@ -216,7 +218,7 @@ export default function RevisionPage() {
     return (
       <div className="space-y-6">
         <div>
-          <Skeleton className="h-10 w-64 mb-2" />
+          <Skeleton className="mb-2 h-10 w-64" />
           <Skeleton className="h-5 w-96" />
         </div>
         <Skeleton className="h-12 w-full" />
@@ -252,7 +254,7 @@ export default function RevisionPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-3xl font-bold">
           <Calendar className="h-8 w-8" />
           Revision Queue
         </h1>
@@ -272,8 +274,10 @@ export default function RevisionPage() {
               <CardContent className="py-12">
                 <div className="text-center text-muted-foreground">
                   <CheckCircle2 className="mx-auto mb-4 h-16 w-16 opacity-30" />
-                  <p className="text-lg font-medium mb-2">All clear for today!</p>
-                  <p className="text-sm">No revisions due today. Check back tomorrow or view upcoming items.</p>
+                  <p className="mb-2 text-lg font-medium">All clear for today!</p>
+                  <p className="text-sm">
+                    No revisions due today. Check back tomorrow or view upcoming items.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -304,8 +308,10 @@ export default function RevisionPage() {
               <CardContent className="py-12">
                 <div className="text-center text-muted-foreground">
                   <AlertCircle className="mx-auto mb-4 h-16 w-16 opacity-30" />
-                  <p className="text-lg font-medium mb-2">No upcoming revisions</p>
-                  <p className="text-sm">Complete more practice sessions to build your revision schedule.</p>
+                  <p className="mb-2 text-lg font-medium">No upcoming revisions</p>
+                  <p className="text-sm">
+                    Complete more practice sessions to build your revision schedule.
+                  </p>
                 </div>
               </CardContent>
             </Card>

@@ -115,7 +115,7 @@ export default function ImportQuestionsPage() {
   const selectedSchema = schemas.find((s) => s.id === selectedSchemaId);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Import Questions</h1>
         <p className="text-muted-foreground">Upload CSV file to bulk import questions</p>
@@ -156,7 +156,7 @@ export default function ImportQuestionsPage() {
           {/* File Upload */}
           <div className="space-y-2">
             <Label htmlFor="file">CSV File *</Label>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center space-y-4">
+            <div className="space-y-4 rounded-lg border-2 border-dashed p-8 text-center">
               {file ? (
                 <div className="space-y-2">
                   <FileText className="mx-auto h-12 w-12 text-green-500" />
@@ -192,7 +192,11 @@ export default function ImportQuestionsPage() {
 
           {/* Dry Run Option */}
           <div className="flex items-center space-x-2">
-            <Checkbox id="dry_run" checked={dryRun} onCheckedChange={(checked) => setDryRun(checked === true)} />
+            <Checkbox
+              id="dry_run"
+              checked={dryRun}
+              onCheckedChange={(checked) => setDryRun(checked === true)}
+            />
             <Label htmlFor="dry_run" className="cursor-pointer">
               Dry run (validate only, don't insert questions)
             </Label>
@@ -225,11 +229,15 @@ export default function ImportQuestionsPage() {
             <CardTitle className="text-base">Import Tips</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <ul className="list-disc list-inside space-y-1">
-            <li>Use <strong>Dry Run</strong> to validate your CSV before actually importing</li>
+        <CardContent className="space-y-2 text-sm">
+          <ul className="list-inside list-disc space-y-1">
+            <li>
+              Use <strong>Dry Run</strong> to validate your CSV before actually importing
+            </li>
             <li>Download the template CSV from the schema page to see the expected format</li>
-            <li>All questions are imported as <strong>DRAFT</strong> status</li>
+            <li>
+              All questions are imported as <strong>DRAFT</strong> status
+            </li>
             <li>Year, Block, and Theme must match existing syllabus (no auto-creation)</li>
             <li>Exactly 5 options (A-E) are required for each question</li>
             <li>Rejected rows will be available for download with error details</li>

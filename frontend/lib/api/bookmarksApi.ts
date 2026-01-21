@@ -17,12 +17,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  * List all bookmarks for current user
  */
 export async function listBookmarks(skip = 0, limit = 100): Promise<BookmarkWithQuestion[]> {
-  return fetcher<BookmarkWithQuestion[]>(
-    `${API_BASE}/v1/bookmarks?skip=${skip}&limit=${limit}`,
-    {
-      method: "GET",
-    }
-  );
+  return fetcher<BookmarkWithQuestion[]>(`${API_BASE}/v1/bookmarks?skip=${skip}&limit=${limit}`, {
+    method: "GET",
+  });
 }
 
 /**
@@ -49,7 +46,7 @@ export async function getBookmark(bookmarkId: string): Promise<Bookmark> {
  */
 export async function updateBookmark(
   bookmarkId: string,
-  payload: UpdateBookmarkRequest
+  payload: UpdateBookmarkRequest,
 ): Promise<Bookmark> {
   return fetcher<Bookmark>(`${API_BASE}/v1/bookmarks/${bookmarkId}`, {
     method: "PATCH",

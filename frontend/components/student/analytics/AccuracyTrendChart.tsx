@@ -3,24 +3,14 @@
 import { Card } from "@/components/ui/card";
 import type { DailyTrend } from "@/lib/types/analytics";
 import { format, parseISO } from "date-fns";
-import {
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface AccuracyTrendChartProps {
   data: DailyTrend[];
   title?: string;
 }
 
-export function AccuracyTrendChart({
-  data,
-  title = "Accuracy Trend",
-}: AccuracyTrendChartProps) {
+export function AccuracyTrendChart({ data, title = "Accuracy Trend" }: AccuracyTrendChartProps) {
   if (!data || data.length === 0) {
     return (
       <Card className="p-6">
@@ -43,13 +33,7 @@ export function AccuracyTrendChart({
       <h3 className="mb-4 text-lg font-semibold">{title}</h3>
       <ResponsiveContainer width="100%" height={200}>
         <LineChart data={chartData}>
-          <XAxis
-            dataKey="date"
-            stroke="#888888"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-          />
+          <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
           <YAxis
             stroke="#888888"
             fontSize={12}
@@ -65,20 +49,14 @@ export function AccuracyTrendChart({
                   <div className="rounded-lg border bg-background p-2 shadow-sm">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex flex-col">
-                        <span className="text-[0.70rem] uppercase text-muted-foreground">
-                          Date
-                        </span>
-                        <span className="font-bold text-foreground">
-                          {payload[0].payload.date}
-                        </span>
+                        <span className="text-[0.70rem] uppercase text-muted-foreground">Date</span>
+                        <span className="font-bold text-foreground">{payload[0].payload.date}</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.70rem] uppercase text-muted-foreground">
                           Accuracy
                         </span>
-                        <span className="font-bold text-foreground">
-                          {payload[0].value}%
-                        </span>
+                        <span className="font-bold text-foreground">{payload[0].value}%</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.70rem] uppercase text-muted-foreground">

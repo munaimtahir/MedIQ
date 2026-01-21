@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Build query params
     const params = new URLSearchParams();
-    
+
     const entity_type = searchParams.get("entity_type");
     const entity_id = searchParams.get("entity_id");
     const action = searchParams.get("action");

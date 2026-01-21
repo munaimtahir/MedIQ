@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: data.detail || data.error || { code: "IMPORT_FAILED", message: "Failed to import questions" } },
+        {
+          error: data.detail ||
+            data.error || { code: "IMPORT_FAILED", message: "Failed to import questions" },
+        },
         { status: response.status },
       );
     }

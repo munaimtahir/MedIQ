@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: themeId } = await params;
     const cookie = req.headers.get("cookie") || "";
@@ -22,7 +19,7 @@ export async function GET(
       const errorText = await res.text();
       return NextResponse.json(
         { error: errorText || "Failed to fetch theme analytics" },
-        { status: res.status }
+        { status: res.status },
       );
     }
 

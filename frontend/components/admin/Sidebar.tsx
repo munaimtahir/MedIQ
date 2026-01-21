@@ -76,10 +76,10 @@ export function AdminSidebar() {
             </Link>
           );
         })}
-        
+
         {/* Import Section */}
-        <div className="pt-4 pb-2">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="pb-2 pt-4">
+          <h3 className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Import
           </h3>
         </div>

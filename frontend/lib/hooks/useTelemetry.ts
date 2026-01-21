@@ -28,7 +28,7 @@ export function useTelemetry(sessionId: string | null, enabled: boolean = true) 
   const track = (
     eventType: EventType,
     payload?: Record<string, unknown>,
-    questionId?: string | null
+    questionId?: string | null,
   ) => {
     if (clientRef.current) {
       clientRef.current.track(eventType, payload, questionId);

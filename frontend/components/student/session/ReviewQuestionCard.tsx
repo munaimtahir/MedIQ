@@ -81,7 +81,7 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
   return (
     <Card className="p-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex items-center gap-2">
           <Badge variant="outline">Question {question.position}</Badge>
           {answer.marked_for_review && (
@@ -100,7 +100,9 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Answer changed {answer.changed_count} time{answer.changed_count > 1 ? 's' : ''}</p>
+                  <p>
+                    Answer changed {answer.changed_count} time{answer.changed_count > 1 ? "s" : ""}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -147,21 +149,19 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
               )}
             </Badge>
           )}
-          {!userAnswered && (
-            <Badge variant="secondary">Not Answered</Badge>
-          )}
+          {!userAnswered && <Badge variant="secondary">Not Answered</Badge>}
         </div>
       </div>
 
       {/* Question Stem */}
       <div className="mb-4">
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <p className="text-base leading-relaxed whitespace-pre-wrap">{question.stem}</p>
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <p className="whitespace-pre-wrap text-base leading-relaxed">{question.stem}</p>
         </div>
       </div>
 
       {/* Options */}
-      <div className="space-y-2 mb-4">
+      <div className="mb-4 space-y-2">
         {options.map((option, index) => {
           const isUserSelected = answer.selected_index === index;
           const isCorrectOption = question.correct_index === index;
@@ -170,10 +170,10 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
             <div
               key={index}
               className={cn(
-                "p-3 rounded-lg border-2 transition-colors",
+                "rounded-lg border-2 p-3 transition-colors",
                 isCorrectOption && "border-green-600 bg-green-50 dark:bg-green-950/20",
                 isUserSelected && !isCorrectOption && "border-red-600 bg-red-50 dark:bg-red-950/20",
-                !isCorrectOption && !isUserSelected && "border-muted"
+                !isCorrectOption && !isUserSelected && "border-muted",
               )}
             >
               <div className="flex items-start gap-3">
@@ -182,27 +182,27 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
                     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-sm font-medium",
                     isCorrectOption && "border-green-600 bg-green-600 text-white",
                     isUserSelected && !isCorrectOption && "border-red-600 bg-red-600 text-white",
-                    !isCorrectOption && !isUserSelected && "border-muted-foreground/30"
+                    !isCorrectOption && !isUserSelected && "border-muted-foreground/30",
                   )}
                 >
                   {optionLabels[index]}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm leading-relaxed pt-0.5">{option}</p>
+                  <p className="pt-0.5 text-sm leading-relaxed">{option}</p>
                   {isCorrectOption && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
                       <Check className="h-3 w-3" />
                       Correct answer
                     </div>
                   )}
                   {isUserSelected && !isCorrectOption && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-red-700 dark:text-red-400 font-medium">
+                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400">
                       <X className="h-3 w-3" />
                       Your answer
                     </div>
                   )}
                   {isUserSelected && isCorrectOption && (
-                    <div className="flex items-center gap-1 mt-1 text-xs text-green-700 dark:text-green-400 font-medium">
+                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400">
                       <Check className="h-3 w-3" />
                       Your answer (Correct)
                     </div>
@@ -216,10 +216,10 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
 
       {/* Explanation */}
       {showExplanation && question.explanation_md && (
-        <div className="border-t pt-4 mt-4">
-          <h4 className="font-semibold mb-2 text-sm">Explanation</h4>
-          <div className="prose prose-sm max-w-none dark:prose-invert">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+        <div className="mt-4 border-t pt-4">
+          <h4 className="mb-2 text-sm font-semibold">Explanation</h4>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
               {question.explanation_md}
             </p>
           </div>
@@ -228,7 +228,7 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
 
       {/* Source (if available) */}
       {(question.source_book || question.source_page) && (
-        <div className="border-t pt-3 mt-3">
+        <div className="mt-3 border-t pt-3">
           <p className="text-xs text-muted-foreground">
             Source: {question.source_book}
             {question.source_page && `, page ${question.source_page}`}

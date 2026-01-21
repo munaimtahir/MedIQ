@@ -13,11 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, Info, Target, ChevronRight } from "lucide-react";
 import { notify } from "@/lib/notify";
 import {
@@ -66,15 +62,15 @@ function MistakeCard({ mistake, onPracticeTheme }: MistakeCardProps) {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant={mistakeColor}>{mistakeLabel}</Badge>
               <Badge variant="outline">{mistake.block.name}</Badge>
               <Badge variant="secondary">{mistake.theme.name}</Badge>
               <span className="text-sm font-medium">{getSeverityIndicator(mistake.severity)}</span>
             </div>
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <p className="text-sm text-muted-foreground line-clamp-2">
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <p className="line-clamp-2 text-sm text-muted-foreground">
                 {mistake.question.stem_preview}
               </p>
             </div>
@@ -88,7 +84,7 @@ function MistakeCard({ mistake, onPracticeTheme }: MistakeCardProps) {
               </PopoverTrigger>
               <PopoverContent align="end" className="w-80">
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-sm">Evidence</h4>
+                  <h4 className="text-sm font-semibold">Evidence</h4>
                   <div className="space-y-2 text-sm">
                     {mistake.evidence.time_spent_sec !== undefined && (
                       <div className="flex justify-between">
@@ -111,7 +107,9 @@ function MistakeCard({ mistake, onPracticeTheme }: MistakeCardProps) {
                     {mistake.evidence.remaining_sec_at_answer !== undefined && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Time remaining:</span>
-                        <span className="font-medium">{mistake.evidence.remaining_sec_at_answer}s</span>
+                        <span className="font-medium">
+                          {mistake.evidence.remaining_sec_at_answer}s
+                        </span>
                       </div>
                     )}
                     {mistake.evidence.mark_for_review_used !== undefined && (
@@ -123,7 +121,7 @@ function MistakeCard({ mistake, onPracticeTheme }: MistakeCardProps) {
                       </div>
                     )}
                     {mistake.evidence.rule_fired && (
-                      <div className="pt-2 border-t">
+                      <div className="border-t pt-2">
                         <span className="text-xs text-muted-foreground">
                           Rule: {mistake.evidence.rule_fired}
                         </span>
@@ -237,7 +235,7 @@ export default function MistakesPage() {
     return (
       <div className="space-y-6">
         <div>
-          <Skeleton className="h-10 w-64 mb-2" />
+          <Skeleton className="mb-2 h-10 w-64" />
           <Skeleton className="h-5 w-96" />
         </div>
         <Skeleton className="h-12 w-full" />
@@ -274,13 +272,14 @@ export default function MistakesPage() {
     );
   }
 
-  const uniqueBlocks = summary?.top_blocks.map((b) => ({ id: b.block.id, name: b.block.name })) || [];
+  const uniqueBlocks =
+    summary?.top_blocks.map((b) => ({ id: b.block.id, name: b.block.name })) || [];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-3xl font-bold">
           <AlertTriangle className="h-8 w-8" />
           Mistakes
         </h1>
@@ -328,10 +327,14 @@ export default function MistakesPage() {
               <CardTitle className="text-lg">
                 {Object.entries(summary.counts_by_type).length > 0 ? (
                   (() => {
-                    const sorted = Object.entries(summary.counts_by_type).sort((a, b) => b[1] - a[1]);
+                    const sorted = Object.entries(summary.counts_by_type).sort(
+                      (a, b) => b[1] - a[1],
+                    );
                     return (
                       <div className="space-y-1">
-                        <div className="text-2xl">{MISTAKE_TYPE_LABELS[sorted[0][0]] || sorted[0][0]}</div>
+                        <div className="text-2xl">
+                          {MISTAKE_TYPE_LABELS[sorted[0][0]] || sorted[0][0]}
+                        </div>
                         <div className="text-sm text-muted-foreground">({sorted[0][1]} times)</div>
                       </div>
                     );
@@ -350,7 +353,9 @@ export default function MistakesPage() {
                 {summary.top_themes.length > 0 ? (
                   <div className="space-y-1">
                     <div className="text-base">{summary.top_themes[0].theme.name}</div>
-                    <div className="text-sm text-muted-foreground">({summary.top_themes[0].wrong} wrong)</div>
+                    <div className="text-sm text-muted-foreground">
+                      ({summary.top_themes[0].wrong} wrong)
+                    </div>
                   </div>
                 ) : (
                   <span className="text-muted-foreground">-</span>
@@ -368,7 +373,7 @@ export default function MistakesPage() {
             <CardTitle className="text-lg">Filters</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 flex-wrap">
+            <div className="flex flex-wrap gap-4">
               <div className="w-full sm:w-64">
                 <Select value={selectedBlock} onValueChange={setSelectedBlock}>
                   <SelectTrigger>
@@ -423,7 +428,7 @@ export default function MistakesPage() {
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
               <Target className="mx-auto mb-4 h-16 w-16 opacity-30" />
-              <p className="text-lg font-medium mb-2">No mistakes in this range</p>
+              <p className="mb-2 text-lg font-medium">No mistakes in this range</p>
               <p className="text-sm">
                 {summary && summary.total_wrong === 0
                   ? "You haven't made any mistakes yet. Keep up the great work!"

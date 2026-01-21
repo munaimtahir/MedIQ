@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // Build query params for CMS endpoints (supports all filter params)
     const params = new URLSearchParams();
-    
+
     // CMS filters
     const status = searchParams.get("status");
     const year_id = searchParams.get("year_id");

@@ -55,7 +55,7 @@ export default function BookmarksPage() {
   }
 
   const filteredBookmarks = bookmarks.filter((bookmark) =>
-    bookmark.question_stem.toLowerCase().includes(searchQuery.toLowerCase())
+    bookmark.question_stem.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (loading) {
@@ -80,19 +80,17 @@ export default function BookmarksPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-3xl font-bold">
           <Bookmark className="h-8 w-8" />
           Bookmarks
         </h1>
-        <p className="text-muted-foreground">
-          Questions you&apos;ve saved for later review
-        </p>
+        <p className="text-muted-foreground">Questions you&apos;ve saved for later review</p>
       </div>
 
       {/* Search */}
       {bookmarks.length > 0 && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search bookmarks..."
             value={searchQuery}
@@ -104,7 +102,7 @@ export default function BookmarksPage() {
 
       {/* Stats */}
       {bookmarks.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Total Bookmarks</CardDescription>
@@ -114,9 +112,7 @@ export default function BookmarksPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>With Notes</CardDescription>
-              <CardTitle className="text-3xl">
-                {bookmarks.filter((b) => b.notes).length}
-              </CardTitle>
+              <CardTitle className="text-3xl">{bookmarks.filter((b) => b.notes).length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
@@ -134,7 +130,7 @@ export default function BookmarksPage() {
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
               <Bookmark className="mx-auto mb-4 h-16 w-16 opacity-30" />
-              <p className="text-lg font-medium mb-2">No bookmarks yet</p>
+              <p className="mb-2 text-lg font-medium">No bookmarks yet</p>
               <p className="text-sm">
                 Click the bookmark icon on questions during review to save them here
               </p>
@@ -146,7 +142,7 @@ export default function BookmarksPage() {
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
               <Search className="mx-auto mb-4 h-16 w-16 opacity-30" />
-              <p className="text-lg font-medium mb-2">No matching bookmarks</p>
+              <p className="mb-2 text-lg font-medium">No matching bookmarks</p>
               <p className="text-sm">Try a different search term</p>
             </div>
           </CardContent>
@@ -157,28 +153,22 @@ export default function BookmarksPage() {
             <Card key={bookmark.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline">
-                        {bookmark.difficulty || "N/A"}
-                      </Badge>
-                      <Badge variant="secondary">
-                        {bookmark.cognitive_level || "N/A"}
-                      </Badge>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Badge variant="outline">{bookmark.difficulty || "N/A"}</Badge>
+                      <Badge variant="secondary">{bookmark.cognitive_level || "N/A"}</Badge>
                       {bookmark.question_status && (
                         <Badge
                           variant={
-                            bookmark.question_status === "PUBLISHED"
-                              ? "default"
-                              : "secondary"
+                            bookmark.question_status === "PUBLISHED" ? "default" : "secondary"
                           }
                         >
                           {bookmark.question_status}
                         </Badge>
                       )}
                     </div>
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <p className="text-base leading-relaxed line-clamp-3">
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <p className="line-clamp-3 text-base leading-relaxed">
                         {bookmark.question_stem}
                       </p>
                     </div>
@@ -197,8 +187,8 @@ export default function BookmarksPage() {
               </CardHeader>
               {bookmark.notes && (
                 <CardContent className="pt-0">
-                  <div className="p-3 rounded-lg bg-muted">
-                    <p className="text-sm text-muted-foreground italic">
+                  <div className="rounded-lg bg-muted p-3">
+                    <p className="text-sm italic text-muted-foreground">
                       &quot;{bookmark.notes}&quot;
                     </p>
                   </div>
@@ -206,9 +196,7 @@ export default function BookmarksPage() {
               )}
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    Saved {format(new Date(bookmark.created_at), "MMM d, yyyy")}
-                  </span>
+                  <span>Saved {format(new Date(bookmark.created_at), "MMM d, yyyy")}</span>
                 </div>
               </CardContent>
             </Card>

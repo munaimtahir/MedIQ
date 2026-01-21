@@ -137,7 +137,7 @@ export default function AuditPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="entity_type">Entity Type</Label>
               <Select
@@ -242,8 +242,8 @@ export default function AuditPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-sm truncate">{log.actor_name || "Unknown"}</span>
-                          <span className="text-xs text-muted-foreground truncate">
+                          <span className="truncate text-sm">{log.actor_name || "Unknown"}</span>
+                          <span className="truncate text-xs text-muted-foreground">
                             {log.actor_user_id.substring(0, 8)}...
                           </span>
                         </div>
@@ -255,14 +255,10 @@ export default function AuditPage() {
                         <Badge variant="outline">{log.entity_type}</Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="text-xs font-mono">{log.entity_id}</span>
+                        <span className="font-mono text-xs">{log.entity_id}</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDetails(log)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleViewDetails(log)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -277,12 +273,10 @@ export default function AuditPage() {
 
       {/* Detail Modal */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Audit Log Details</DialogTitle>
-            <DialogDescription>
-              Detailed information about this audit log entry
-            </DialogDescription>
+            <DialogDescription>Detailed information about this audit log entry</DialogDescription>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
@@ -301,14 +295,14 @@ export default function AuditPage() {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Entity ID</Label>
-                  <p className="text-sm font-mono text-xs">{selectedLog.entity_id}</p>
+                  <p className="font-mono text-sm text-xs">{selectedLog.entity_id}</p>
                 </div>
               </div>
 
               {selectedLog.before && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Before</Label>
-                  <pre className="mt-1 p-3 bg-muted rounded-md text-xs overflow-x-auto">
+                  <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-3 text-xs">
                     {JSON.stringify(selectedLog.before, null, 2)}
                   </pre>
                 </div>
@@ -317,7 +311,7 @@ export default function AuditPage() {
               {selectedLog.after && (
                 <div>
                   <Label className="text-xs text-muted-foreground">After</Label>
-                  <pre className="mt-1 p-3 bg-muted rounded-md text-xs overflow-x-auto">
+                  <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-3 text-xs">
                     {JSON.stringify(selectedLog.after, null, 2)}
                   </pre>
                 </div>
@@ -326,7 +320,7 @@ export default function AuditPage() {
               {selectedLog.meta && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Metadata</Label>
-                  <pre className="mt-1 p-3 bg-muted rounded-md text-xs overflow-x-auto">
+                  <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-3 text-xs">
                     {JSON.stringify(selectedLog.meta, null, 2)}
                   </pre>
                 </div>

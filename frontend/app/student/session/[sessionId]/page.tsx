@@ -20,7 +20,7 @@ export default function SessionPlayerPage() {
   const router = useRouter();
   const params = useParams();
   const sessionId = params.sessionId as string;
-  
+
   // Telemetry
   const { track, flush } = useTelemetry(sessionId);
 
@@ -33,7 +33,9 @@ export default function SessionPlayerPage() {
   const [showMobileNav, setShowMobileNav] = useState(false);
 
   // Local answer state for optimistic updates
-  const [localAnswers, setLocalAnswers] = useState<Map<string, { selected_index: number | null; marked_for_review: boolean }>>(new Map());
+  const [localAnswers, setLocalAnswers] = useState<
+    Map<string, { selected_index: number | null; marked_for_review: boolean }>
+  >(new Map());
 
   // Load session
   useEffect(() => {
@@ -86,7 +88,10 @@ export default function SessionPlayerPage() {
       setSessionState(state);
 
       // Initialize local answers from questions
-      const answers = new Map<string, { selected_index: number | null; marked_for_review: boolean }>();
+      const answers = new Map<
+        string,
+        { selected_index: number | null; marked_for_review: boolean }
+      >();
       state.questions.forEach((q) => {
         answers.set(q.question_id, {
           selected_index: null, // Will be populated by backend if exists
@@ -96,7 +101,7 @@ export default function SessionPlayerPage() {
       setLocalAnswers(answers);
     } catch (err: unknown) {
       console.error("Failed to load session:", err);
-      
+
       if (err?.status === 404) {
         setError("Session not found");
       } else if (err?.status === 403) {
@@ -139,7 +144,7 @@ export default function SessionPlayerPage() {
           ...sessionState,
           progress: response.progress,
           questions: sessionState.questions.map((q) =>
-            q.question_id === questionId ? { ...q, has_answer: true } : q
+            q.question_id === questionId ? { ...q, has_answer: true } : q,
           ),
         });
       }
@@ -184,7 +189,7 @@ export default function SessionPlayerPage() {
           ...sessionState,
           progress: response.progress,
           questions: sessionState.questions.map((q) =>
-            q.question_id === questionId ? { ...q, marked_for_review: marked } : q
+            q.question_id === questionId ? { ...q, marked_for_review: marked } : q,
           ),
         });
       }
@@ -233,7 +238,7 @@ export default function SessionPlayerPage() {
     try {
       // Flush telemetry before submit
       await flush();
-      
+
       await submitSession(sessionId);
       notify.success("Session submitted", "Your test has been submitted successfully");
       router.push(`/student/session/${sessionId}/review`);
@@ -251,8 +256,8 @@ export default function SessionPlayerPage() {
       <div className="space-y-6">
         <Skeleton className="h-16 w-full" />
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
               <Skeleton className="h-64 w-full" />
               <Skeleton className="h-96 w-full" />
             </div>
@@ -267,11 +272,8 @@ export default function SessionPlayerPage() {
 
   if (error || !sessionState) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <InlineAlert
-          variant="error"
-          message={error || "Session not found"}
-        />
+      <div className="container mx-auto max-w-2xl px-4 py-8">
+        <InlineAlert variant="error" message={error || "Session not found"} />
         <Button onClick={() => router.push("/student/dashboard")} className="mt-4">
           Back to Dashboard
         </Button>
@@ -279,14 +281,13 @@ export default function SessionPlayerPage() {
     );
   }
 
-  const currentQuestion = sessionState.current_question || sessionState.questions.find((q) => q.position === currentPosition);
+  const currentQuestion =
+    sessionState.current_question ||
+    sessionState.questions.find((q) => q.position === currentPosition);
   if (!currentQuestion || !sessionState.current_question) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <InlineAlert
-          variant="error"
-          message="Current question not found"
-        />
+      <div className="container mx-auto max-w-2xl px-4 py-8">
+        <InlineAlert variant="error" message="Current question not found" />
       </div>
     );
   }
@@ -294,7 +295,7 @@ export default function SessionPlayerPage() {
   const localAnswer = localAnswers.get(currentQuestion.question_id);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col">
       {/* Top Bar */}
       <SessionTopBar
         mode={sessionState.session.mode}
@@ -306,12 +307,12 @@ export default function SessionPlayerPage() {
       />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="container mx-auto flex-1 px-4 py-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Question View (Left) */}
           <div className="lg:col-span-2">
             {/* Mobile Nav Toggle */}
-            <div className="lg:hidden mb-4">
+            <div className="mb-4 lg:hidden">
               <Sheet open={showMobileNav} onOpenChange={setShowMobileNav}>
                 <SheetTrigger asChild>
                   <Button variant="outline" className="w-full">
@@ -341,7 +342,9 @@ export default function SessionPlayerPage() {
               isSaving={savingAnswer}
               totalQuestions={sessionState.session.total_questions}
               onSelectOption={(index) => handleSelectOption(currentQuestion.question_id, index)}
-              onToggleMarkForReview={(marked) => handleToggleMarkForReview(currentQuestion.question_id, marked)}
+              onToggleMarkForReview={(marked) =>
+                handleToggleMarkForReview(currentQuestion.question_id, marked)
+              }
               onPrevious={handlePrevious}
               onNext={handleNext}
               canGoPrevious={currentPosition > 1}

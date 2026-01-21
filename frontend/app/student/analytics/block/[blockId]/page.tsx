@@ -86,9 +86,7 @@ export default function BlockAnalyticsPage() {
               You haven&apos;t attempted any questions from this block yet
             </p>
             <Button asChild>
-              <Link href={`/student/practice/build?blocks=${blockId}`}>
-                Practice This Block
-              </Link>
+              <Link href={`/student/practice/build?blocks=${blockId}`}>Practice This Block</Link>
             </Button>
           </div>
         </Card>
@@ -106,9 +104,7 @@ export default function BlockAnalyticsPage() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">{data.block_name}</h1>
         <Button asChild>
-          <Link href={`/student/practice/build?blocks=${blockId}`}>
-            Practice This Block
-          </Link>
+          <Link href={`/student/practice/build?blocks=${blockId}`}>Practice This Block</Link>
         </Button>
       </div>
 
@@ -153,10 +149,7 @@ export default function BlockAnalyticsPage() {
 
       {/* Trend Chart */}
       <div className="mb-6">
-        <AccuracyTrendChart
-          data={data.trend}
-          title="Accuracy Trend for This Block"
-        />
+        <AccuracyTrendChart data={data.trend} title="Accuracy Trend for This Block" />
       </div>
 
       {/* Themes Table */}
@@ -181,16 +174,10 @@ export default function BlockAnalyticsPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-2xl font-bold">
-                        {theme.accuracy_pct.toFixed(1)}%
-                      </p>
+                      <p className="text-2xl font-bold">{theme.accuracy_pct.toFixed(1)}%</p>
                     </div>
                     <Button asChild variant="outline" size="sm">
-                      <Link
-                        href={`/student/analytics/theme/${theme.theme_id}`}
-                      >
-                        View Details
-                      </Link>
+                      <Link href={`/student/analytics/theme/${theme.theme_id}`}>View Details</Link>
                     </Button>
                   </div>
                 </div>

@@ -35,12 +35,12 @@ export function SessionTopBar({
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Mode & Progress */}
-          <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
             <Badge variant={mode === "EXAM" ? "default" : "secondary"}>
               {mode === "EXAM" ? "Exam Mode" : "Tutor Mode"}
             </Badge>
 
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground flex-1 min-w-0">
+            <div className="hidden min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground sm:flex">
               <span className="whitespace-nowrap">
                 {progress.answered_count}/{totalQuestions}
               </span>
@@ -50,11 +50,11 @@ export function SessionTopBar({
 
           {/* Center: Timer (if exists) */}
           {expiresAt && (
-            <div className={`flex items-center gap-2 ${countdown.isWarning ? "text-amber-600" : ""}`}>
+            <div
+              className={`flex items-center gap-2 ${countdown.isWarning ? "text-amber-600" : ""}`}
+            >
               <Clock className="h-4 w-4" />
-              <span className="font-mono text-sm font-medium">
-                {countdown.formattedTime}
-              </span>
+              <span className="font-mono text-sm font-medium">{countdown.formattedTime}</span>
             </div>
           )}
 
@@ -66,7 +66,7 @@ export function SessionTopBar({
         </div>
 
         {/* Mobile Progress */}
-        <div className="sm:hidden mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground sm:hidden">
           <span className="whitespace-nowrap">
             {progress.answered_count}/{totalQuestions}
           </span>

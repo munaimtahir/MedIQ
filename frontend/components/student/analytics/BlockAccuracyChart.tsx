@@ -2,14 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import type { BlockSummary } from "@/lib/types/analytics";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface BlockAccuracyChartProps {
   data: BlockSummary[];
@@ -43,13 +36,7 @@ export function BlockAccuracyChart({
       <h3 className="mb-4 text-lg font-semibold">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData}>
-          <XAxis
-            dataKey="name"
-            stroke="#888888"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-          />
+          <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
           <YAxis
             stroke="#888888"
             fontSize={12}
@@ -68,17 +55,13 @@ export function BlockAccuracyChart({
                         <span className="text-[0.70rem] uppercase text-muted-foreground">
                           Block
                         </span>
-                        <span className="font-bold text-foreground">
-                          {payload[0].payload.name}
-                        </span>
+                        <span className="font-bold text-foreground">{payload[0].payload.name}</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.70rem] uppercase text-muted-foreground">
                           Accuracy
                         </span>
-                        <span className="font-bold text-foreground">
-                          {payload[0].value}%
-                        </span>
+                        <span className="font-bold text-foreground">{payload[0].value}%</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.70rem] uppercase text-muted-foreground">
@@ -95,11 +78,7 @@ export function BlockAccuracyChart({
               return null;
             }}
           />
-          <Bar
-            dataKey="accuracy"
-            fill="hsl(var(--primary))"
-            radius={[4, 4, 0, 0]}
-          />
+          <Bar dataKey="accuracy" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </Card>

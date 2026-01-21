@@ -106,9 +106,7 @@ export const adminImportApi = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || errorData.detail || "Failed to activate schema",
-      );
+      throw new Error(errorData.error?.message || errorData.detail || "Failed to activate schema");
     }
 
     return response.json();
@@ -159,9 +157,7 @@ export const adminImportApi = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || errorData.detail || "Failed to import questions",
-      );
+      throw new Error(errorData.error?.message || errorData.detail || "Failed to import questions");
     }
 
     return response.json();

@@ -21,10 +21,8 @@ export function QuestionNavigator({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold mb-2">Questions</h3>
-        <p className="text-sm text-muted-foreground">
-          Click to jump to any question
-        </p>
+        <h3 className="mb-2 font-semibold">Questions</h3>
+        <p className="text-sm text-muted-foreground">Click to jump to any question</p>
       </div>
 
       <div className="grid grid-cols-5 gap-2">
@@ -39,14 +37,11 @@ export function QuestionNavigator({
               variant={isCurrent ? "default" : hasAnswer ? "secondary" : "outline"}
               size="sm"
               onClick={() => onNavigate(q.position)}
-              className={cn(
-                "relative h-10 w-full",
-                isCurrent && "ring-2 ring-offset-2"
-              )}
+              className={cn("relative h-10 w-full", isCurrent && "ring-2 ring-offset-2")}
             >
               <span>{q.position}</span>
               {hasAnswer && !isCurrent && (
-                <Check className="absolute top-0.5 right-0.5 h-3 w-3 text-green-600" />
+                <Check className="absolute right-0.5 top-0.5 h-3 w-3 text-green-600" />
               )}
               {isMarked && (
                 <Flag className="absolute bottom-0.5 right-0.5 h-3 w-3 text-amber-500" />
@@ -57,7 +52,7 @@ export function QuestionNavigator({
       </div>
 
       {/* Legend */}
-      <div className="space-y-1 text-xs text-muted-foreground border-t pt-3">
+      <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <div className="h-3 w-3 rounded bg-primary" />
           <span>Current</span>

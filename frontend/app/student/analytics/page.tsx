@@ -164,11 +164,7 @@ export default function AnalyticsPage() {
                     <p className="text-2xl font-bold">{theme.accuracy_pct.toFixed(1)}%</p>
                   </div>
                   <Button asChild variant="outline" size="sm">
-                    <Link
-                      href={`/student/practice/build?themes=${theme.theme_id}`}
-                    >
-                      Practice
-                    </Link>
+                    <Link href={`/student/practice/build?themes=${theme.theme_id}`}>Practice</Link>
                   </Button>
                 </div>
               </div>

@@ -3,7 +3,7 @@
  * Handles two-factor authentication setup, verification, and management
  */
 
-import { apiRequest } from './base';
+import { apiRequest } from "./base";
 
 export interface MFASetupResponse {
   qr_code_data_uri: string;
@@ -35,8 +35,8 @@ export interface MFARegenerateCodesResponse {
  * Initiate MFA setup - generates QR code and secret
  */
 export async function setupMFA(): Promise<MFASetupResponse> {
-  return apiRequest<MFASetupResponse>('/auth/mfa/totp/setup', {
-    method: 'POST',
+  return apiRequest<MFASetupResponse>("/auth/mfa/totp/setup", {
+    method: "POST",
   });
 }
 
@@ -44,8 +44,8 @@ export async function setupMFA(): Promise<MFASetupResponse> {
  * Verify TOTP code during setup
  */
 export async function verifyMFASetup(code: string): Promise<MFAVerifyResponse> {
-  return apiRequest<MFAVerifyResponse>('/auth/mfa/totp/verify', {
-    method: 'POST',
+  return apiRequest<MFAVerifyResponse>("/auth/mfa/totp/verify", {
+    method: "POST",
     body: JSON.stringify({ code }),
   });
 }
@@ -54,8 +54,8 @@ export async function verifyMFASetup(code: string): Promise<MFAVerifyResponse> {
  * Complete MFA setup and get new tokens
  */
 export async function completeMFASetup(code: string): Promise<MFACompleteResponse> {
-  return apiRequest<MFACompleteResponse>('/auth/mfa/totp/complete', {
-    method: 'POST',
+  return apiRequest<MFACompleteResponse>("/auth/mfa/totp/complete", {
+    method: "POST",
     body: JSON.stringify({ code }),
   });
 }
@@ -64,8 +64,8 @@ export async function completeMFASetup(code: string): Promise<MFACompleteRespons
  * Disable MFA for the current user
  */
 export async function disableMFA(code: string): Promise<void> {
-  return apiRequest<void>('/auth/mfa/totp/disable', {
-    method: 'POST',
+  return apiRequest<void>("/auth/mfa/totp/disable", {
+    method: "POST",
     body: JSON.stringify({ code }),
   });
 }
@@ -73,9 +73,11 @@ export async function disableMFA(code: string): Promise<void> {
 /**
  * Regenerate backup codes (requires current TOTP code)
  */
-export async function regenerateBackupCodes(totp_code: string): Promise<MFARegenerateCodesResponse> {
-  return apiRequest<MFARegenerateCodesResponse>('/auth/mfa/backup-code/regenerate', {
-    method: 'POST',
+export async function regenerateBackupCodes(
+  totp_code: string,
+): Promise<MFARegenerateCodesResponse> {
+  return apiRequest<MFARegenerateCodesResponse>("/auth/mfa/backup-code/regenerate", {
+    method: "POST",
     body: JSON.stringify({ totp_code }),
   });
 }
@@ -86,14 +88,14 @@ export async function regenerateBackupCodes(totp_code: string): Promise<MFARegen
 export async function getMFAStatus(): Promise<{ enabled: boolean; enabled_at?: string }> {
   try {
     // This endpoint might not exist, so we'll check via auth/me
-    const response = await fetch('/api/auth/me', {
-      credentials: 'include',
+    const response = await fetch("/api/auth/me", {
+      credentials: "include",
     });
-    
+
     if (!response.ok) {
       return { enabled: false };
     }
-    
+
     const data = await response.json();
     return {
       enabled: data.user?.mfa_enabled || false,

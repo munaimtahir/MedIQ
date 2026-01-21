@@ -29,25 +29,21 @@ export function ReviewSummary({ session }: ReviewSummaryProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Session Results</CardTitle>
-          <Badge variant={session.mode === "EXAM" ? "default" : "secondary"}>
-            {session.mode}
-          </Badge>
+          <Badge variant={session.mode === "EXAM" ? "default" : "secondary"}>{session.mode}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Score Display */}
-        <div className="text-center py-4">
-          <div className={`text-5xl font-bold ${getScoreColor()}`}>
-            {scorePercent.toFixed(1)}%
-          </div>
-          <p className="text-muted-foreground mt-2">
+        <div className="py-4 text-center">
+          <div className={`text-5xl font-bold ${getScoreColor()}`}>{scorePercent.toFixed(1)}%</div>
+          <p className="mt-2 text-muted-foreground">
             {scoreCorrect} correct out of {scoreTotal} questions
           </p>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-3 p-3 rounded-lg border">
+          <div className="flex items-center gap-3 rounded-lg border p-3">
             <CheckCircle2 className="h-8 w-8 text-green-600" />
             <div>
               <p className="text-sm text-muted-foreground">Correct</p>
@@ -55,7 +51,7 @@ export function ReviewSummary({ session }: ReviewSummaryProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 rounded-lg border">
+          <div className="flex items-center gap-3 rounded-lg border p-3">
             <XCircle className="h-8 w-8 text-red-600" />
             <div>
               <p className="text-sm text-muted-foreground">Incorrect</p>
@@ -65,7 +61,7 @@ export function ReviewSummary({ session }: ReviewSummaryProps) {
         </div>
 
         {/* Metadata */}
-        <div className="space-y-2 text-sm border-t pt-4">
+        <div className="space-y-2 border-t pt-4 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Submitted:</span>
             <span className="font-medium">
@@ -77,7 +73,7 @@ export function ReviewSummary({ session }: ReviewSummaryProps) {
           {session.duration_seconds && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Duration:</span>
-              <span className="font-medium flex items-center gap-1">
+              <span className="flex items-center gap-1 font-medium">
                 <Clock className="h-3 w-3" />
                 {Math.floor(session.duration_seconds / 60)} minutes
               </span>

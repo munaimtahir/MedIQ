@@ -231,7 +231,7 @@ export default function EditQuestionPage() {
                 {question.status}
               </Badge>
             </div>
-            <p className="text-muted-foreground text-sm">ID: {question.id}</p>
+            <p className="text-sm text-muted-foreground">ID: {question.id}</p>
           </div>
         </div>
 
@@ -249,12 +249,12 @@ export default function EditQuestionPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <QuestionEditor question={question} onChange={setFormData} />
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
+        <div className="space-y-6 lg:col-span-1">
           <WorkflowPanel
             status={question.status}
             userRole={userRole}

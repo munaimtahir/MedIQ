@@ -20,7 +20,13 @@ export type MediaRole =
   | "OPTION_D"
   | "OPTION_E";
 
-export type CognitiveLevel = "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
+export type CognitiveLevel =
+  | "REMEMBER"
+  | "UNDERSTAND"
+  | "APPLY"
+  | "ANALYZE"
+  | "EVALUATE"
+  | "CREATE";
 
 export type DifficultyLevel = "EASY" | "MEDIUM" | "HARD";
 

@@ -1,6 +1,6 @@
 /**
  * Telemetry client for batching and sending behavioral events
- * 
+ *
  * IMPORTANT: All telemetry operations are best-effort and must NOT break the UI.
  */
 
@@ -66,11 +66,7 @@ export class TelemetryClient {
   /**
    * Track an event (adds to queue)
    */
-  track(
-    eventType: EventType,
-    payload?: Record<string, unknown>,
-    questionId?: string | null
-  ): void {
+  track(eventType: EventType, payload?: Record<string, unknown>, questionId?: string | null): void {
     try {
       this.seq += 1;
 
@@ -120,10 +116,7 @@ export class TelemetryClient {
   /**
    * Send batch to backend with retry
    */
-  private async sendBatch(
-    events: TelemetryEvent[],
-    retryCount = 0
-  ): Promise<void> {
+  private async sendBatch(events: TelemetryEvent[], retryCount = 0): Promise<void> {
     if (events.length === 0) return;
 
     try {
@@ -146,12 +139,12 @@ export class TelemetryClient {
       }
 
       const result = await response.json();
-      
+
       // Log if any events were rejected (for debugging)
       if (result.rejected > 0) {
         console.debug(
           `Telemetry: ${result.accepted} accepted, ${result.rejected} rejected`,
-          result.rejected_reasons_sample
+          result.rejected_reasons_sample,
         );
       }
     } catch (err) {
@@ -196,9 +189,6 @@ export class TelemetryClient {
 /**
  * Create a telemetry client instance
  */
-export function createTelemetryClient(
-  sessionId: string,
-  source: string = "web"
-): TelemetryClient {
+export function createTelemetryClient(sessionId: string, source: string = "web"): TelemetryClient {
   return new TelemetryClient(sessionId, source);
 }

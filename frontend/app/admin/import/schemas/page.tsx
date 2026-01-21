@@ -163,7 +163,7 @@ export default function ImportSchemasPage() {
                       {formatDate(schema.updated_at || schema.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -205,13 +205,13 @@ export default function ImportSchemasPage() {
         <CardHeader>
           <CardTitle className="text-base">About Import Schemas</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             Import schemas define how CSV/JSON files are parsed and mapped to question fields. Each
             schema can have multiple versions to accommodate changes over time.
           </p>
           <p className="font-medium">Key features:</p>
-          <ul className="list-disc list-inside space-y-1">
+          <ul className="list-inside list-disc space-y-1">
             <li>Only one schema can be active at a time (used for imports without schema_id)</li>
             <li>Versioning prevents breaking old import jobs</li>
             <li>Download template CSV to see expected format</li>

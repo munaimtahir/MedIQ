@@ -40,9 +40,7 @@ export function SubmitConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            {(hasUnanswered || hasMarked) && (
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-            )}
+            {(hasUnanswered || hasMarked) && <AlertTriangle className="h-5 w-5 text-amber-500" />}
             Submit Test Session?
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-3 pt-2">
@@ -53,7 +51,9 @@ export function SubmitConfirmDialog({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Answered:</span>
-                <span className="font-medium">{answeredCount} / {totalQuestions}</span>
+                <span className="font-medium">
+                  {answeredCount} / {totalQuestions}
+                </span>
               </div>
               {hasUnanswered && (
                 <div className="flex justify-between text-amber-600">
@@ -75,16 +75,12 @@ export function SubmitConfirmDialog({
               </p>
             )}
 
-            <p className="font-medium">
-              Are you sure you want to submit?
-            </p>
+            <p className="font-medium">Are you sure you want to submit?</p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>
-            Submit Session
-          </AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm}>Submit Session</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

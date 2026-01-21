@@ -13,12 +13,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .join("; ");
 
     // Fetch rejected CSV from backend
-    const response = await fetch(`${process.env.BACKEND_URL}/v1/admin/import/jobs/${id}/rejected.csv`, {
-      method: "GET",
-      headers: {
-        Cookie: cookieHeader,
+    const response = await fetch(
+      `${process.env.BACKEND_URL}/v1/admin/import/jobs/${id}/rejected.csv`,
+      {
+        method: "GET",
+        headers: {
+          Cookie: cookieHeader,
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return NextResponse.json(
@@ -28,7 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const blob = await response.blob();
-    const contentDisposition = response.headers.get("content-disposition") || `attachment; filename="rejected_${id}.csv"`;
+    const contentDisposition =
+      response.headers.get("content-disposition") || `attachment; filename="rejected_${id}.csv"`;
 
     return new NextResponse(blob, {
       status: 200,

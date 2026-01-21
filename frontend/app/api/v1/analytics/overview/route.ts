@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       const errorText = await res.text();
       return NextResponse.json(
         { error: errorText || "Failed to fetch analytics overview" },
-        { status: res.status }
+        { status: res.status },
       );
     }
 

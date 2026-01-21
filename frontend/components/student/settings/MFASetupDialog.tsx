@@ -31,12 +31,12 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
   const [step, setStep] = useState<Step>("intro");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Setup data
   const [qrCodeUri, setQrCodeUri] = useState<string>("");
   const [secret, setSecret] = useState<string>("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  
+
   // User input
   const [totpCode, setTotpCode] = useState("");
   const [verifiedCode, setVerifiedCode] = useState("");
@@ -160,24 +160,23 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
                 <Shield className="h-5 w-5" />
                 Enable Two-Factor Authentication
               </DialogTitle>
-              <DialogDescription>
-                Add an extra layer of security to your account
-              </DialogDescription>
+              <DialogDescription>Add an extra layer of security to your account</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <p className="text-sm">
-                Two-factor authentication (2FA) helps protect your account by requiring a second verification
-                step when you log in.
+                Two-factor authentication (2FA) helps protect your account by requiring a second
+                verification step when you log in.
               </p>
 
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold">What you'll need:</h4>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
-                    <Smartphone className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <Smartphone className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     <span>
-                      An authenticator app like Google Authenticator, Authy, 1Password, or Microsoft Authenticator
+                      An authenticator app like Google Authenticator, Authy, 1Password, or Microsoft
+                      Authenticator
                     </span>
                   </li>
                 </ul>
@@ -206,21 +205,19 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
           <>
             <DialogHeader>
               <DialogTitle>Scan QR Code</DialogTitle>
-              <DialogDescription>
-                Use your authenticator app to scan this code
-              </DialogDescription>
+              <DialogDescription>Use your authenticator app to scan this code</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               {/* QR Code */}
-              <div className="flex justify-center p-4 bg-white rounded-lg">
+              <div className="flex justify-center rounded-lg bg-white p-4">
                 {qrCodeUri && (
                   <Image
                     src={qrCodeUri}
                     alt="MFA QR Code"
                     width={192}
                     height={192}
-                    className="w-48 h-48"
+                    className="h-48 w-48"
                     unoptimized
                   />
                 )}
@@ -232,20 +229,11 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
                   Or enter this code manually:
                 </Label>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded bg-muted px-3 py-2 text-sm font-mono">
+                  <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
                     {secret}
                   </code>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={copySecret}
-                    title="Copy secret"
-                  >
-                    {copiedSecret ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
+                  <Button variant="outline" size="icon" onClick={copySecret} title="Copy secret">
+                    {copiedSecret ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -299,14 +287,15 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Important:</strong> Save these codes in a safe place. Each code can only be used once.
+                  <strong>Important:</strong> Save these codes in a safe place. Each code can only
+                  be used once.
                 </AlertDescription>
               </Alert>
 
               {/* Backup codes grid */}
-              <div className="grid grid-cols-2 gap-2 p-4 bg-muted rounded-lg">
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-4">
                 {backupCodes.map((code, index) => (
-                  <code key={index} className="text-sm font-mono">
+                  <code key={index} className="font-mono text-sm">
                     {code}
                   </code>
                 ))}
@@ -314,12 +303,7 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
 
               {/* Action buttons */}
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyAllCodes}
-                  className="flex-1"
-                >
+                <Button variant="outline" size="sm" onClick={copyAllCodes} className="flex-1">
                   {copiedCodes ? (
                     <>
                       <Check className="mr-2 h-4 w-4" />
@@ -332,12 +316,7 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
                     </>
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadCodes}
-                  className="flex-1"
-                >
+                <Button variant="outline" size="sm" onClick={downloadCodes} className="flex-1">
                   <Download className="mr-2 h-4 w-4" />
                   Download
                 </Button>

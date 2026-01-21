@@ -2,7 +2,7 @@
  * Revision Queue API Client
  */
 
-import { apiRequest } from './base';
+import { apiRequest } from "./base";
 
 export interface BlockInfo {
   id: string;
@@ -36,7 +36,7 @@ export interface RevisionQueueListResponse {
 }
 
 export interface RevisionQueueUpdateRequest {
-  action: 'DONE' | 'SNOOZE' | 'SKIP';
+  action: "DONE" | "SNOOZE" | "SKIP";
   snooze_days?: number;
 }
 
@@ -44,8 +44,8 @@ export interface RevisionQueueUpdateRequest {
  * Get revision queue items
  */
 export async function getRevisionQueue(
-  scope: 'today' | 'week' = 'today',
-  status: 'DUE' | 'DONE' | 'SNOOZED' | 'SKIPPED' | 'ALL' = 'DUE'
+  scope: "today" | "week" = "today",
+  status: "DUE" | "DONE" | "SNOOZED" | "SKIPPED" | "ALL" = "DUE",
 ): Promise<RevisionQueueListResponse> {
   const params = new URLSearchParams({
     scope,
@@ -60,10 +60,10 @@ export async function getRevisionQueue(
  */
 export async function updateRevisionQueueItem(
   itemId: string,
-  request: RevisionQueueUpdateRequest
+  request: RevisionQueueUpdateRequest,
 ): Promise<RevisionQueueItem> {
   return apiRequest<RevisionQueueItem>(`/v1/revision/queue/${itemId}`, {
-    method: 'PATCH',
+    method: "PATCH",
     body: JSON.stringify(request),
   });
 }

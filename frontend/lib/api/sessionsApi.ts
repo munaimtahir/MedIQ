@@ -39,7 +39,7 @@ export async function getSession(sessionId: string): Promise<SessionState> {
  */
 export async function submitAnswer(
   sessionId: string,
-  payload: SubmitAnswerRequest
+  payload: SubmitAnswerRequest,
 ): Promise<SubmitAnswerResponse> {
   return fetcher<SubmitAnswerResponse>(`${API_BASE}/v1/sessions/${sessionId}/answer`, {
     method: "POST",

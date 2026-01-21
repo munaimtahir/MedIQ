@@ -128,7 +128,7 @@ export default function QuestionsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* Filters Sidebar */}
         <div className="lg:col-span-1">
           <QuestionFilters
@@ -187,9 +187,7 @@ export default function QuestionsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    handleFilterChange({ ...filters, page: (filters.page || 1) - 1 })
-                  }
+                  onClick={() => handleFilterChange({ ...filters, page: (filters.page || 1) - 1 })}
                   disabled={(filters.page || 1) <= 1}
                 >
                   Previous
@@ -197,9 +195,7 @@ export default function QuestionsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() =>
-                    handleFilterChange({ ...filters, page: (filters.page || 1) + 1 })
-                  }
+                  onClick={() => handleFilterChange({ ...filters, page: (filters.page || 1) + 1 })}
                   disabled={questions.length < (filters.page_size || 20)}
                 >
                   Next

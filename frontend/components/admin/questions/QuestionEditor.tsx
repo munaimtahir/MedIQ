@@ -175,7 +175,9 @@ export function QuestionEditor({ question, onChange, errors }: QuestionEditorPro
       <Card>
         <CardHeader>
           <CardTitle>Explanation</CardTitle>
-          <CardDescription>Provide a detailed explanation (supports Markdown and LaTeX)</CardDescription>
+          <CardDescription>
+            Provide a detailed explanation (supports Markdown and LaTeX)
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -198,13 +200,10 @@ export function QuestionEditor({ question, onChange, errors }: QuestionEditorPro
           <CardDescription>Assign year, block, theme, and metadata tags</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="year">Year *</Label>
-              <Select
-                value={formData.year_id?.toString() || ""}
-                onValueChange={handleYearChange}
-              >
+              <Select value={formData.year_id?.toString() || ""} onValueChange={handleYearChange}>
                 <SelectTrigger id="year">
                   <SelectValue placeholder="Select year" />
                 </SelectTrigger>
@@ -259,7 +258,7 @@ export function QuestionEditor({ question, onChange, errors }: QuestionEditorPro
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="cognitive_level">Cognitive Level</Label>
               <Select
@@ -307,7 +306,7 @@ export function QuestionEditor({ question, onChange, errors }: QuestionEditorPro
           <CardDescription>Reference the source material</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="source_book">Source Book</Label>
               <Input

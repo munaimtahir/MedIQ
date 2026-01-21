@@ -11,14 +11,7 @@ import type { ImportJobOut } from "@/lib/types/import";
 import { SkeletonTable } from "@/components/status/SkeletonTable";
 import { ErrorState } from "@/components/status/ErrorState";
 import { notify } from "@/lib/notify";
-import {
-  ArrowLeft,
-  Download,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  FileText,
-} from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 const STATUS_COLORS = {
@@ -131,7 +124,7 @@ export default function ImportJobPage() {
               <Badge className={STATUS_COLORS[job.status]}>{job.status}</Badge>
               {job.dry_run && <Badge variant="outline">DRY RUN</Badge>}
             </div>
-            <p className="text-muted-foreground text-sm">Job ID: {job.id}</p>
+            <p className="text-sm text-muted-foreground">Job ID: {job.id}</p>
           </div>
         </div>
         {job.rejected_rows > 0 && (
@@ -143,12 +136,10 @@ export default function ImportJobPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Rows
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Rows</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -160,9 +151,7 @@ export default function ImportJobPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Accepted
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Accepted</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -174,9 +163,7 @@ export default function ImportJobPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Rejected
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -221,7 +208,9 @@ export default function ImportJobPage() {
             <div>
               <p className="text-sm text-muted-foreground">Started</p>
               <p className="font-medium">
-                {job.started_at ? formatDistanceToNow(new Date(job.started_at), { addSuffix: true }) : "—"}
+                {job.started_at
+                  ? formatDistanceToNow(new Date(job.started_at), { addSuffix: true })
+                  : "—"}
               </p>
             </div>
             <div>

@@ -47,7 +47,10 @@ export function MFADisableDialog({ open, onOpenChange, onSuccess }: MFADisableDi
 
     try {
       await disableMFA(totpCode);
-      notify.success("Two-factor authentication disabled", "Your account security settings have been updated");
+      notify.success(
+        "Two-factor authentication disabled",
+        "Your account security settings have been updated",
+      );
       handleClose();
       onSuccess();
     } catch (err: unknown) {
@@ -81,15 +84,13 @@ export function MFADisableDialog({ open, onOpenChange, onSuccess }: MFADisableDi
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Warning:</strong> Disabling 2FA will make your account less secure. Anyone with your
-              password will be able to access your account.
+              <strong>Warning:</strong> Disabling 2FA will make your account less secure. Anyone
+              with your password will be able to access your account.
             </AlertDescription>
           </Alert>
 
           <div className="space-y-2">
-            <Label htmlFor="disable-code">
-              Enter your current 6-digit authentication code
-            </Label>
+            <Label htmlFor="disable-code">Enter your current 6-digit authentication code</Label>
             <Input
               id="disable-code"
               type="text"
@@ -103,9 +104,7 @@ export function MFADisableDialog({ open, onOpenChange, onSuccess }: MFADisableDi
               className="text-center text-lg tracking-widest"
               autoFocus
             />
-            <p className="text-xs text-muted-foreground">
-              Or enter one of your backup codes
-            </p>
+            <p className="text-xs text-muted-foreground">Or enter one of your backup codes</p>
           </div>
 
           {error && (

@@ -53,7 +53,7 @@ export default function NewQuestionPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.back()}>
@@ -85,12 +85,9 @@ export default function NewQuestionPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <QuestionEditor
-            onChange={setFormData}
-            errors={validationErrors}
-          />
+          <QuestionEditor onChange={setFormData} errors={validationErrors} />
 
-          <div className="mt-6 flex gap-4 justify-end border-t pt-6">
+          <div className="mt-6 flex justify-end gap-4 border-t pt-6">
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>
               Cancel
             </Button>
@@ -106,15 +103,17 @@ export default function NewQuestionPage() {
         <CardHeader>
           <CardTitle className="text-base">Tips for Creating Questions</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+        <CardContent className="space-y-2 text-sm">
+          <ul className="list-inside list-disc space-y-1 text-muted-foreground">
             <li>Start with a clear, concise question stem</li>
             <li>Provide exactly 5 options (A-E)</li>
             <li>Mark the correct answer</li>
             <li>Add a detailed explanation (helpful for students)</li>
             <li>Tag with Year, Block, and Theme for organization</li>
             <li>Reference source materials when available</li>
-            <li>You can save as draft now and complete required fields before submitting for review</li>
+            <li>
+              You can save as draft now and complete required fields before submitting for review
+            </li>
           </ul>
         </CardContent>
       </Card>

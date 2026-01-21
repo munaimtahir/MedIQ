@@ -161,9 +161,7 @@ export const adminQuestionsApi = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || errorData.detail || "Failed to approve question",
-      );
+      throw new Error(errorData.error?.message || errorData.detail || "Failed to approve question");
     }
 
     return response.json();
@@ -200,9 +198,7 @@ export const adminQuestionsApi = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || errorData.detail || "Failed to publish question",
-      );
+      throw new Error(errorData.error?.message || errorData.detail || "Failed to publish question");
     }
 
     return response.json();

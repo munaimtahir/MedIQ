@@ -83,7 +83,7 @@ export default function SessionReviewPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6 max-w-5xl space-y-6">
+      <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6">
         <Skeleton className="h-12 w-64" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-96 w-full" />
@@ -93,7 +93,7 @@ export default function SessionReviewPage() {
 
   if (error || !review) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto max-w-2xl px-4 py-8">
         <InlineAlert variant="error" message={error || "Review not found"} />
         <Button onClick={() => router.push("/student/dashboard")} className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -104,21 +104,15 @@ export default function SessionReviewPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
+    <div className="container mx-auto max-w-5xl px-4 py-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.push("/student/dashboard")}
-        >
+      <div className="mb-6 flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => router.push("/student/dashboard")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Session Review</h1>
-          <p className="text-muted-foreground">
-            Review your answers and learn from explanations
-          </p>
+          <p className="text-muted-foreground">Review your answers and learn from explanations</p>
         </div>
       </div>
 
@@ -131,28 +125,18 @@ export default function SessionReviewPage() {
       <div className="mb-6">
         <Tabs value={filter} onValueChange={(v) => setFilter(v as ReviewFilter)}>
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">
-              All ({filterCounts.all})
-            </TabsTrigger>
-            <TabsTrigger value="correct">
-              Correct ({filterCounts.correct})
-            </TabsTrigger>
-            <TabsTrigger value="incorrect">
-              Incorrect ({filterCounts.incorrect})
-            </TabsTrigger>
-            <TabsTrigger value="unanswered">
-              Unanswered ({filterCounts.unanswered})
-            </TabsTrigger>
-            <TabsTrigger value="marked">
-              Marked ({filterCounts.marked})
-            </TabsTrigger>
+            <TabsTrigger value="all">All ({filterCounts.all})</TabsTrigger>
+            <TabsTrigger value="correct">Correct ({filterCounts.correct})</TabsTrigger>
+            <TabsTrigger value="incorrect">Incorrect ({filterCounts.incorrect})</TabsTrigger>
+            <TabsTrigger value="unanswered">Unanswered ({filterCounts.unanswered})</TabsTrigger>
+            <TabsTrigger value="marked">Marked ({filterCounts.marked})</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
       {/* Questions */}
       {filteredItems.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="py-12 text-center text-muted-foreground">
           <p>No questions match the selected filter</p>
         </div>
       ) : (

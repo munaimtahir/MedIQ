@@ -16,10 +16,7 @@ export interface CountdownState {
  * @param expiresAt ISO timestamp when session expires
  * @param onExpire Callback when timer reaches 0
  */
-export function useCountdown(
-  expiresAt: string | null,
-  onExpire?: () => void
-): CountdownState {
+export function useCountdown(expiresAt: string | null, onExpire?: () => void): CountdownState {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
   const onExpireRef = useRef(onExpire);

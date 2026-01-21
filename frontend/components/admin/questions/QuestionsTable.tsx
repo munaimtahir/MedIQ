@@ -67,7 +67,7 @@ export function QuestionsTable({ questions }: QuestionsTableProps) {
       <TableBody>
         {questions.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center text-muted-foreground h-24">
+            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
               No questions found
             </TableCell>
           </TableRow>
@@ -81,7 +81,7 @@ export function QuestionsTable({ questions }: QuestionsTableProps) {
               </TableCell>
               <TableCell>
                 <div className="max-w-md">
-                  <p className="text-sm line-clamp-2">{truncateText(q.stem, 150)}</p>
+                  <p className="line-clamp-2 text-sm">{truncateText(q.stem, 150)}</p>
                 </div>
               </TableCell>
               <TableCell>
@@ -119,18 +119,14 @@ export function QuestionsTable({ questions }: QuestionsTableProps) {
                 {q.source_book || q.source_page ? (
                   <div className="text-xs">
                     {q.source_book && <div className="truncate">{q.source_book}</div>}
-                    {q.source_page && (
-                      <div className="text-muted-foreground">{q.source_page}</div>
-                    )}
+                    {q.source_page && <div className="text-muted-foreground">{q.source_page}</div>}
                   </div>
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
               </TableCell>
               <TableCell>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(q.updated_at)}
-                </span>
+                <span className="text-xs text-muted-foreground">{formatDate(q.updated_at)}</span>
               </TableCell>
               <TableCell className="text-right">
                 <Button

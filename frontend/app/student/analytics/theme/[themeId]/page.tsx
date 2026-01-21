@@ -86,9 +86,7 @@ export default function ThemeAnalyticsPage() {
               You haven&apos;t attempted any questions from this theme yet
             </p>
             <Button asChild>
-              <Link href={`/student/practice/build?themes=${themeId}`}>
-                Practice This Theme
-              </Link>
+              <Link href={`/student/practice/build?themes=${themeId}`}>Practice This Theme</Link>
             </Button>
           </div>
         </Card>
@@ -106,14 +104,10 @@ export default function ThemeAnalyticsPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{data.theme_name}</h1>
-          <p className="text-sm text-muted-foreground">
-            Block: {data.block_name}
-          </p>
+          <p className="text-sm text-muted-foreground">Block: {data.block_name}</p>
         </div>
         <Button asChild>
-          <Link href={`/student/practice/build?themes=${themeId}`}>
-            Practice This Theme
-          </Link>
+          <Link href={`/student/practice/build?themes=${themeId}`}>Practice This Theme</Link>
         </Button>
       </div>
 
@@ -158,19 +152,14 @@ export default function ThemeAnalyticsPage() {
 
       {/* Trend Chart */}
       <div className="mb-6">
-        <AccuracyTrendChart
-          data={data.trend}
-          title="Accuracy Trend for This Theme"
-        />
+        <AccuracyTrendChart data={data.trend} title="Accuracy Trend for This Theme" />
       </div>
 
       {/* Future: Common Mistakes */}
       {data.common_mistakes && data.common_mistakes.length > 0 && (
         <Card className="p-6">
           <h3 className="mb-4 text-lg font-semibold">Common Mistakes</h3>
-          <p className="text-sm text-muted-foreground">
-            This feature is coming soon!
-          </p>
+          <p className="text-sm text-muted-foreground">This feature is coming soon!</p>
         </Card>
       )}
     </div>
