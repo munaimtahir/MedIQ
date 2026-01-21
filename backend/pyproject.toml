@@ -21,6 +21,7 @@ ignore = ["UP038"]  # Allow isinstance with tuple (X, Y) instead of X | Y
 "**/schemas/bkt.py" = ["N815"]  # BKT schema uses math notation in class scope
 "**/endpoints/sessions.py" = ["N811"]  # UUID as UUIDType is intentional for clarity
 "alembic/versions/*.py" = ["E501"]  # Migration SQL strings can be long
+"scripts/*.py" = ["E501"]  # Scripts can have long lines (URLs, messages, etc.)
 "tests/test_bkt.py" = ["N802", "N803", "N806"]  # Test functions use math notation
 "tests/test_srs.py" = ["N803", "N806"]  # Test functions use FSRS notation
 "tests/test_difficulty_elo.py" = ["N803", "N806"]  # Test functions use Elo notation
