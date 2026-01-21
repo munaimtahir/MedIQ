@@ -48,7 +48,10 @@ export default function BookmarksPage() {
       notify.success("Bookmark removed", "Question removed from bookmarks");
     } catch (err: unknown) {
       console.error("Failed to delete bookmark:", err);
-      notify.error("Failed to remove bookmark", err instanceof Error ? err.message : "Please try again");
+      notify.error(
+        "Failed to remove bookmark",
+        err instanceof Error ? err.message : "Please try again",
+      );
     } finally {
       setDeletingId(null);
     }
