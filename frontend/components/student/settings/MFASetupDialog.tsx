@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -214,10 +215,13 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
               {/* QR Code */}
               <div className="flex justify-center p-4 bg-white rounded-lg">
                 {qrCodeUri && (
-                  <img
+                  <Image
                     src={qrCodeUri}
                     alt="MFA QR Code"
+                    width={192}
+                    height={192}
                     className="w-48 h-48"
+                    unoptimized
                   />
                 )}
               </div>
