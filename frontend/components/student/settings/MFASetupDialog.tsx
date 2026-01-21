@@ -68,7 +68,7 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
       setBackupCodes(response.backup_codes);
       setStep("scan");
     } catch (err: unknown) {
-      setError(err?.message || "Failed to start MFA setup");
+      setError(err instanceof Error ? err.message : "Failed to start MFA setup");
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
         setTotpCode("");
       }
     } catch (err: unknown) {
-      setError(err?.message || "Failed to verify code");
+      setError(err instanceof Error ? err.message : "Failed to verify code");
       setTotpCode("");
     } finally {
       setLoading(false);
@@ -115,7 +115,7 @@ export function MFASetupDialog({ open, onOpenChange, onSuccess }: MFASetupDialog
       handleClose();
       onSuccess();
     } catch (err: unknown) {
-      setError(err?.message || "Failed to complete MFA setup");
+      setError(err instanceof Error ? err.message : "Failed to complete MFA setup");
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,9 @@
  * Revision Queue API Client
  */
 
-import { apiRequest } from "./base";
+import fetcher from "../fetcher";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface BlockInfo {
   id: string;
@@ -52,7 +54,7 @@ export async function getRevisionQueue(
     status,
   });
 
-  return apiRequest<RevisionQueueListResponse>(`/v1/revision/queue?${params}`);
+  return fetcher<RevisionQueueListResponse>(`${API_BASE}/v1/revision/queue?${params}`);
 }
 
 /**
@@ -62,7 +64,7 @@ export async function updateRevisionQueueItem(
   itemId: string,
   request: RevisionQueueUpdateRequest,
 ): Promise<RevisionQueueItem> {
-  return apiRequest<RevisionQueueItem>(`/v1/revision/queue/${itemId}`, {
+  return fetcher<RevisionQueueItem>(`${API_BASE}/v1/revision/queue/${itemId}`, {
     method: "PATCH",
     body: JSON.stringify(request),
   });

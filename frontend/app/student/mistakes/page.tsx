@@ -191,7 +191,8 @@ export default function MistakesPage() {
       setHasMore(mistakesData.items.length < mistakesData.total);
     } catch (err: unknown) {
       console.error("Failed to load mistakes:", err);
-      setError(err?.message || "Failed to load mistakes");
+      const error = err as { message?: string };
+      setError(error.message || "Failed to load mistakes");
     } finally {
       setLoading(false);
     }
@@ -214,10 +215,11 @@ export default function MistakesPage() {
 
       setMistakes((prev) => [...prev, ...mistakesData.items]);
       setPage(nextPage);
-      setHasMore(prev.length + mistakesData.items.length < mistakesData.total);
+      setHasMore((prev) => prev.length + mistakesData.items.length < mistakesData.total);
     } catch (err: unknown) {
       console.error("Failed to load more mistakes:", err);
-      notify.error("Failed to load more", err?.message || "Please try again");
+      const error = err as { message?: string };
+      notify.error("Failed to load more", error.message || "Please try again");
     } finally {
       setLoadingMore(false);
     }

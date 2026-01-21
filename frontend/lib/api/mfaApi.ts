@@ -3,7 +3,9 @@
  * Handles two-factor authentication setup, verification, and management
  */
 
-import { apiRequest } from "./base";
+import fetcher from "../fetcher";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface MFASetupResponse {
   qr_code_data_uri: string;
@@ -35,7 +37,7 @@ export interface MFARegenerateCodesResponse {
  * Initiate MFA setup - generates QR code and secret
  */
 export async function setupMFA(): Promise<MFASetupResponse> {
-  return apiRequest<MFASetupResponse>("/auth/mfa/totp/setup", {
+  return fetcher<MFASetupResponse>(`${API_BASE}/v1/auth/mfa/totp/setup`, {
     method: "POST",
   });
 }
@@ -44,7 +46,7 @@ export async function setupMFA(): Promise<MFASetupResponse> {
  * Verify TOTP code during setup
  */
 export async function verifyMFASetup(code: string): Promise<MFAVerifyResponse> {
-  return apiRequest<MFAVerifyResponse>("/auth/mfa/totp/verify", {
+  return fetcher<MFAVerifyResponse>(`${API_BASE}/v1/auth/mfa/totp/verify`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });
@@ -54,7 +56,7 @@ export async function verifyMFASetup(code: string): Promise<MFAVerifyResponse> {
  * Complete MFA setup and get new tokens
  */
 export async function completeMFASetup(code: string): Promise<MFACompleteResponse> {
-  return apiRequest<MFACompleteResponse>("/auth/mfa/totp/complete", {
+  return fetcher<MFACompleteResponse>(`${API_BASE}/v1/auth/mfa/totp/complete`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });
@@ -64,7 +66,7 @@ export async function completeMFASetup(code: string): Promise<MFACompleteRespons
  * Disable MFA for the current user
  */
 export async function disableMFA(code: string): Promise<void> {
-  return apiRequest<void>("/auth/mfa/totp/disable", {
+  return fetcher<void>(`${API_BASE}/v1/auth/mfa/totp/disable`, {
     method: "POST",
     body: JSON.stringify({ code }),
   });
@@ -76,7 +78,7 @@ export async function disableMFA(code: string): Promise<void> {
 export async function regenerateBackupCodes(
   totp_code: string,
 ): Promise<MFARegenerateCodesResponse> {
-  return apiRequest<MFARegenerateCodesResponse>("/auth/mfa/backup-code/regenerate", {
+  return fetcher<MFARegenerateCodesResponse>(`${API_BASE}/v1/auth/mfa/backup-code/regenerate`, {
     method: "POST",
     body: JSON.stringify({ totp_code }),
   });

@@ -38,14 +38,15 @@ export default function SessionReviewPage() {
     } catch (err: unknown) {
       console.error("Failed to load review:", err);
 
-      if (err?.status === 404) {
+      const error = err as { status?: number; message?: string };
+      if (error.status === 404) {
         setError("Session not found");
-      } else if (err?.status === 403) {
+      } else if (error.status === 403) {
         setError("You don't have permission to access this session");
-      } else if (err?.status === 400) {
+      } else if (error.status === 400) {
         setError("This session hasn't been submitted yet");
       } else {
-        setError(err?.message || "Failed to load review");
+        setError(error.message || "Failed to load review");
       }
     } finally {
       setLoading(false);

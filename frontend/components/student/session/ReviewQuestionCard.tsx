@@ -72,7 +72,8 @@ export function ReviewQuestionCard({ item, showExplanation = true }: ReviewQuest
       }
     } catch (err: unknown) {
       console.error("Failed to toggle bookmark:", err);
-      notify.error("Failed to update bookmark", err?.message || "Please try again");
+      const error = err as { message?: string };
+      notify.error("Failed to update bookmark", error.message || "Please try again");
     } finally {
       setBookmarking(false);
     }

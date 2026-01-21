@@ -166,7 +166,8 @@ export default function RevisionPage() {
       setItems(data.items);
     } catch (err: unknown) {
       console.error("Failed to load revision queue:", err);
-      setError(err?.message || "Failed to load revision queue");
+      const error = err as { message?: string };
+      setError(error.message || "Failed to load revision queue");
     } finally {
       setLoading(false);
     }
@@ -190,7 +191,8 @@ export default function RevisionPage() {
       notify.success("Marked as done", "This revision item has been completed");
     } catch (err: unknown) {
       console.error("Failed to update item:", err);
-      notify.error("Failed to update", err?.message || "Please try again");
+      const error = err as { message?: string };
+      notify.error("Failed to update", error.message || "Please try again");
     } finally {
       setProcessingId(null);
     }
@@ -208,7 +210,8 @@ export default function RevisionPage() {
       );
     } catch (err: unknown) {
       console.error("Failed to snooze item:", err);
-      notify.error("Failed to snooze", err?.message || "Please try again");
+      const error = err as { message?: string };
+      notify.error("Failed to snooze", error.message || "Please try again");
     } finally {
       setProcessingId(null);
     }

@@ -33,7 +33,7 @@ export default function BookmarksPage() {
       setBookmarks(data);
     } catch (err: unknown) {
       console.error("Failed to load bookmarks:", err);
-      setError(err?.message || "Failed to load bookmarks");
+      setError(err instanceof Error ? err.message : "Failed to load bookmarks");
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function BookmarksPage() {
       notify.success("Bookmark removed", "Question removed from bookmarks");
     } catch (err: unknown) {
       console.error("Failed to delete bookmark:", err);
-      notify.error("Failed to remove bookmark", err?.message || "Please try again");
+      notify.error("Failed to remove bookmark", err instanceof Error ? err.message : "Please try again");
     } finally {
       setDeletingId(null);
     }

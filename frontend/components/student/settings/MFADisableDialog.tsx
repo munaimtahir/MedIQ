@@ -54,7 +54,9 @@ export function MFADisableDialog({ open, onOpenChange, onSuccess }: MFADisableDi
       handleClose();
       onSuccess();
     } catch (err: unknown) {
-      setError(err?.message || "Failed to disable MFA. Please check your code and try again.");
+      setError(
+        err instanceof Error ? err.message : "Failed to disable MFA. Please check your code and try again."
+      );
       setTotpCode("");
     } finally {
       setLoading(false);

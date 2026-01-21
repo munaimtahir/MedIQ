@@ -2,7 +2,9 @@
  * Mistakes API Client
  */
 
-import { apiRequest } from "./base";
+import fetcher from "../fetcher";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface BlockInfo {
   id: string;
@@ -71,7 +73,7 @@ export async function getMistakesSummary(rangeDays: number = 30): Promise<Mistak
     range_days: rangeDays.toString(),
   });
 
-  return apiRequest<MistakesSummaryResponse>(`/v1/mistakes/summary?${params}`);
+  return fetcher<MistakesSummaryResponse>(`${API_BASE}/v1/mistakes/summary?${params}`);
 }
 
 /**
@@ -94,5 +96,5 @@ export async function getMistakesList(params: {
   if (params.page) searchParams.set("page", params.page.toString());
   if (params.pageSize) searchParams.set("page_size", params.pageSize.toString());
 
-  return apiRequest<MistakesListResponse>(`/v1/mistakes/list?${searchParams}`);
+  return fetcher<MistakesListResponse>(`${API_BASE}/v1/mistakes/list?${searchParams}`);
 }
