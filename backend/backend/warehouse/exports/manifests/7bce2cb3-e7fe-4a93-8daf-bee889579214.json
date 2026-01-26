@@ -1,0 +1,11 @@
+{
+  "run_id": "7bce2cb3-e7fe-4a93-8daf-bee889579214",
+  "dataset": "events",
+  "range_start": null,
+  "range_end": "2026-01-26T20:49:48.807045+00:00",
+  "rows": 0,
+  "files": [],
+  "schema_version": "v1",
+  "generated_at": "2026-01-26T20:49:48.864314+00:00",
+  "checksums": {}
+}

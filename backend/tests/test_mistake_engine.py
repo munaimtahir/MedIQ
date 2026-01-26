@@ -24,7 +24,7 @@ from app.learning_engine.mistakes.v0 import (
 )
 from app.models.learning import AlgoRun
 from app.models.mistakes import MistakeLog
-from app.models.question_cms import Question
+from app.models.question_cms import Question, QuestionStatus
 from app.models.session import AttemptEvent, SessionAnswer, SessionQuestion, SessionMode, SessionStatus, TestSession
 from app.models.syllabus import Year, Block, Theme
 from app.core.security import hash_password
@@ -94,7 +94,7 @@ async def test_compute_time_spent_by_question(db_session: AsyncSession):
     await db_session.commit()
 
     # Compute time spent
-    time_spent = await compute_time_spent_by_question(db, session.id)
+    time_spent = await compute_time_spent_by_question(db_session, session.id)
 
     # Q1: 30 seconds (until Q2 viewed)
     # Q2: 30 seconds (until session submitted)
@@ -155,7 +155,7 @@ async def test_compute_change_count(db_session: AsyncSession):
     await db_session.commit()
 
     # Compute change counts
-    change_counts = await compute_change_count(db, session.id)
+    change_counts = await compute_change_count(db_session, session.id)
 
     assert change_counts[q1_id] == 2
     assert change_counts[q2_id] == 1
@@ -202,7 +202,7 @@ async def test_compute_blur_count(db_session: AsyncSession):
 
     await db_session.commit()
 
-    blur_counts = await compute_blur_count(db, session.id)
+    blur_counts = await compute_blur_count(db_session, session.id)
 
     assert blur_counts[q_id] == 3
 
@@ -538,8 +538,6 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
         is_active=True,
     )
     db_session.add(theme)
-
-    from app.models.question_cms import QuestionStatus
     
     question = Question(
         id=uuid4(),
@@ -596,7 +594,7 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
     await db_session.commit()
 
     # Call service
-    result = await classify_mistakes_v0_for_session(db, session.id, trigger="test")
+    result = await classify_mistakes_v0_for_session(db_session, session.id, trigger="test")
 
     # Verify result
     assert result["total_wrong"] == 1
@@ -608,7 +606,7 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
         MistakeLog.session_id == session.id,
         MistakeLog.question_id == question.id,
     )
-    log_result = await db.execute(stmt)
+    log_result = await db_session.execute(stmt)
     mistake = log_result.scalar_one_or_none()
 
     assert mistake is not None
@@ -617,7 +615,8 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
 
     # Check algo_run logged
     run_id = result["run_id"]
-    run = await db.get(AlgoRun, run_id)
+    run_result = await db_session.execute(select(AlgoRun).where(AlgoRun.id == run_id))
+    run = run_result.scalar_one_or_none()
     assert run is not None
     assert run.status == "SUCCESS"
 
@@ -637,13 +636,30 @@ async def test_upsert_idempotency(db_session: AsyncSession):
     )
     db_session.add(user)
 
+    # Create year, block, theme first
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
+    block = Block(id=1, year_id=1, code="A", name="Test Block", order_no=1, is_active=True)
+    db_session.add(block)
+    theme = Theme(id=1, block_id=1, title="Test Theme", order_no=1, is_active=True)
+    db_session.add(theme)
+    await db_session.flush()
+    
     question = Question(
         id=uuid4(),
-        year=1,
-        block_id=uuid4(),
-        theme_id=uuid4(),
-        stem_text="Q1",
+        year_id=1,
+        block_id=1,
+        theme_id=1,
+        stem="Q1",
+        option_a="A",
+        option_b="B",
+        option_c="C",
+        option_d="D",
+        option_e="E",
+        correct_index=0,
         status=QuestionStatus.PUBLISHED,
+        created_by=user.id,
+        updated_by=user.id,
     )
     db_session.add(question)
 
@@ -681,8 +697,8 @@ async def test_upsert_idempotency(db_session: AsyncSession):
     await db_session.commit()
 
     # Run classification twice
-    result1 = await classify_mistakes_v0_for_session(db, session.id, trigger="test1")
-    result2 = await classify_mistakes_v0_for_session(db, session.id, trigger="test2")
+    result1 = await classify_mistakes_v0_for_session(db_session, session.id, trigger="test1")
+    result2 = await classify_mistakes_v0_for_session(db_session, session.id, trigger="test2")
 
     # Both succeed
     assert result1["classified"] == 1
@@ -690,7 +706,7 @@ async def test_upsert_idempotency(db_session: AsyncSession):
 
     # Check only one mistake_log row exists
     stmt = select(MistakeLog).where(MistakeLog.session_id == session.id)
-    log_result = await db.execute(stmt)
+    log_result = await db_session.execute(stmt)
     mistakes = log_result.scalars().all()
 
     assert len(mistakes) == 1  # Not duplicated
@@ -701,7 +717,7 @@ async def test_best_effort_on_failure(db_session: AsyncSession):
     """Test that classification failures return error dict, not exception."""
     # Try to classify a non-existent session
     result = await classify_mistakes_v0_for_session(
-        db, session_id=uuid4(), trigger="test"  # Doesn't exist
+        db_session, session_id=uuid4(), trigger="test"  # Doesn't exist
     )
 
     # Should return error dict, not raise

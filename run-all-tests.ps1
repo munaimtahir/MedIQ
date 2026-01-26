@@ -74,17 +74,17 @@ if ($backendExitCode -ne 0) {
     Write-Host "Containers are still running. View logs with:" -ForegroundColor Yellow
     Write-Host "  docker compose -f $composeFile --profile test logs backend-test" -ForegroundColor Cyan
     Write-Host "  docker logs exam_platform_backend_test" -ForegroundColor Cyan
-    Set-Location "d:\PMC\New Exam Prep Site"
-    exit $backendExitCode
+    Write-Host "`nContinuing with frontend tests despite backend failures..." -ForegroundColor Yellow
+    # Don't exit - continue to frontend tests
 }
 
 Write-Host "`n=== Running Frontend Tests in Docker ===" -ForegroundColor Cyan
 
-# Clean up any existing containers first
-Write-Host "Cleaning up any existing containers..." -ForegroundColor Yellow
-Invoke-DockerCompose -Arguments @("-f", $composeFile, "--profile", "test", "down", "-v") 2>&1 | Out-Null
+# Stop backend containers but keep them (preserve logs) - don't use down -v which removes containers
+Write-Host "Stopping backend test containers (preserving containers and logs for inspection)..." -ForegroundColor Yellow
+Invoke-DockerCompose -Arguments @("-f", $composeFile, "--profile", "test", "stop", "backend-test") 2>&1 | Out-Null
 
-# Run frontend tests
+# Run frontend tests (this will start new containers)
 Write-Host "Starting frontend tests..." -ForegroundColor Yellow
 try {
     $frontendExitCode = Invoke-DockerCompose -Arguments @("-f", $composeFile, "--profile", "test", "up", "--abort-on-container-exit", "--exit-code-from", "frontend-test", "frontend-test")
@@ -102,19 +102,28 @@ try {
 # Keep containers running for inspection (cleanup skipped)
 Write-Host "`nFrontend test containers are kept running for inspection." -ForegroundColor Yellow
 Write-Host "To view logs: docker compose -f $composeFile --profile test logs frontend-test" -ForegroundColor Cyan
+Write-Host "To view backend logs: docker compose -f $composeFile --profile test logs backend-test" -ForegroundColor Cyan
 Write-Host "To clean up: docker compose -f $composeFile --profile test down -v" -ForegroundColor Cyan
 
 if ($frontendExitCode -ne 0) {
     Write-Host "`nFrontend tests failed with exit code $frontendExitCode" -ForegroundColor Red
-    Write-Host "Containers are still running. View logs with:" -ForegroundColor Yellow
-    Write-Host "  docker compose -f $composeFile --profile test logs frontend-test" -ForegroundColor Cyan
-    Write-Host "  docker logs exam_platform_frontend_test" -ForegroundColor Cyan
+    Write-Host "Containers are preserved (stopped but not removed) for log inspection." -ForegroundColor Yellow
+    Write-Host "View logs with:" -ForegroundColor Yellow
+    Write-Host "  Frontend: docker compose -f $composeFile --profile test logs frontend-test" -ForegroundColor Cyan
+    Write-Host "  Backend: docker compose -f $composeFile --profile test logs backend-test" -ForegroundColor Cyan
+    Write-Host "  Or directly: docker logs exam_platform_frontend_test" -ForegroundColor Cyan
+    Write-Host "  Or directly: docker logs exam_platform_backend_test" -ForegroundColor Cyan
+    Write-Host "`nNote: Containers are stopped but preserved. Logs remain accessible." -ForegroundColor Yellow
+    Write-Host "To clean up later: docker compose -f $composeFile --profile test down -v" -ForegroundColor Cyan
     Set-Location "d:\PMC\New Exam Prep Site"
     exit $frontendExitCode
 }
 
 Write-Host "`n=== All Tests Passed! ===" -ForegroundColor Green
 Write-Host "`nContainers are kept running for inspection." -ForegroundColor Yellow
+Write-Host "To view logs:" -ForegroundColor Cyan
+Write-Host "  docker compose -f $composeFile --profile test logs backend-test" -ForegroundColor Cyan
+Write-Host "  docker compose -f $composeFile --profile test logs frontend-test" -ForegroundColor Cyan
 Write-Host "To clean up all test containers:" -ForegroundColor Cyan
 Write-Host "  docker compose -f $composeFile --profile test down -v" -ForegroundColor Cyan
 Set-Location "d:\PMC\New Exam Prep Site"

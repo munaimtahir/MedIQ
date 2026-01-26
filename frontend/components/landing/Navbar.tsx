@@ -24,6 +24,7 @@ export const Navbar = memo(function Navbar() {
     { href: "#blocks", label: "Blocks" },
     { href: "#pricing", label: "Pricing" },
     { href: "#faq", label: "FAQ" },
+    { href: "/exam-prep", label: "Exam Prep" },
   ];
 
   return (

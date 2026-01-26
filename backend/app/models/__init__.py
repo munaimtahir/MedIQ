@@ -100,6 +100,9 @@ from app.models.question_cms import (
 from app.models.question_cms import (
     Question as CMSQuestion,
 )
+
+# Alias for backward compatibility
+Question = CMSQuestion
 from app.models.session import (
     AttemptEvent,
     SessionAnswer,
@@ -158,7 +161,7 @@ __all__ = [
     "Year",
     "Block",
     "Theme",
-    # "Question",  # Legacy question model - disabled to avoid conflicts
+    "Question",  # Alias for CMSQuestion for backward compatibility
     "CMSQuestion",  # New CMS question model (aliased as Question in question_cms.py)
     "QuestionStatus",
     "QuestionVersion",

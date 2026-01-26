@@ -66,14 +66,15 @@ def client(db):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
-
-    with TestClient(app) as c:
+    try:
+        # Use TestClient without context manager to avoid lifespan issues
+        c = TestClient(app)
         # Attach helpers for tests
         c.admin_user = admin_user  # type: ignore[attr-defined]
         c.student_user = student_user  # type: ignore[attr-defined]
         yield c
-
-    app.dependency_overrides.clear()
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_admin_questions_first_page_query_count_reasonable(client: TestClient):

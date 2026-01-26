@@ -36,6 +36,8 @@ from app.models.difficulty import (
     DifficultyUpdateLog,
     RatingScope,
 )
+from app.models.question_cms import Question, QuestionStatus
+from app.models.user import User, UserRole
 
 # === Core Math Tests ===
 
@@ -254,10 +256,63 @@ def test_no_nan_in_dynamic_k():
 # === Service Layer Tests ===
 
 
+@pytest.fixture
+async def test_user_async(db_session):
+    """Create a test user in async session."""
+    from app.core.security import hash_password
+    
+    user_id = uuid4()
+    user = User(
+        id=user_id,
+        email=f"test_user_{user_id}@example.com",
+        full_name="Test User",
+        password_hash=hash_password("Test123!"),
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
+        onboarding_completed=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    # Refresh to ensure user is accessible
+    await db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+async def test_question_async(db_session, test_user_async):
+    """Create a test question in async session."""
+    question_id = uuid4()
+    question = Question(
+        id=question_id,
+        status=QuestionStatus.PUBLISHED,
+        year_id=1,
+        block_id=1,
+        theme_id=1,
+        stem="Test Question",
+        option_a="A",
+        option_b="B",
+        option_c="C",
+        option_d="D",
+        option_e="E",
+        correct_index=0,
+        explanation_md="Test explanation",
+        difficulty="MEDIUM",
+        cognitive_level="UNDERSTAND",
+        created_by=test_user_async.id,
+        updated_by=test_user_async.id,
+    )
+    db_session.add(question)
+    await db_session.flush()
+    # Refresh to ensure question is accessible
+    await db_session.refresh(question)
+    return question
+
+
 @pytest.mark.asyncio
-async def test_get_or_create_user_rating(db_session, test_user):
+async def test_get_or_create_user_rating(db_session, test_user_async):
     """Get or create user rating initializes correctly."""
-    user_id = test_user.id
+    user_id = test_user_async.id
     params = {"rating_init": 0.0, "unc_init_user": 350.0}
 
     # First call creates
@@ -276,9 +331,9 @@ async def test_get_or_create_user_rating(db_session, test_user):
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_question_rating(db_session, test_question):
+async def test_get_or_create_question_rating(db_session, test_question_async):
     """Get or create question rating initializes correctly."""
-    question_id = test_question.id
+    question_id = test_question_async.id
     params = {"rating_init": 0.0, "unc_init_question": 250.0}
 
     # First call creates
@@ -302,13 +357,13 @@ async def test_get_or_create_question_rating(db_session, test_question):
 
 @pytest.mark.asyncio
 async def test_update_difficulty_from_attempt_creates_ratings(
-    db_session, test_user, test_question, active_difficulty_algo
+    db_session, test_user_async, test_question_async, active_difficulty_algo
 ):
     """First attempt creates user and question ratings."""
     result = await update_difficulty_from_attempt(
         db_session,
-        user_id=test_user.id,
-        question_id=test_question.id,
+        user_id=test_user_async.id,
+        question_id=test_question_async.id,
         theme_id=None,
         score=True,
         attempt_id=uuid4(),
@@ -323,7 +378,7 @@ async def test_update_difficulty_from_attempt_creates_ratings(
 
 @pytest.mark.asyncio
 async def test_update_difficulty_idempotent(
-    db_session, test_user, test_question, active_difficulty_algo
+    db_session, test_user_async, test_question_async, active_difficulty_algo
 ):
     """Same attempt_id is idempotent."""
     attempt_id = uuid4()
@@ -331,8 +386,8 @@ async def test_update_difficulty_idempotent(
     # First update
     result1 = await update_difficulty_from_attempt(
         db_session,
-        user_id=test_user.id,
-        question_id=test_question.id,
+        user_id=test_user_async.id,
+        question_id=test_question_async.id,
         theme_id=None,
         score=True,
         attempt_id=attempt_id,
@@ -342,8 +397,8 @@ async def test_update_difficulty_idempotent(
     # Second update with same attempt_id
     result2 = await update_difficulty_from_attempt(
         db_session,
-        user_id=test_user.id,
-        question_id=test_question.id,
+        user_id=test_user_async.id,
+        question_id=test_question_async.id,
         theme_id=None,
         score=True,
         attempt_id=attempt_id,
@@ -356,13 +411,13 @@ async def test_update_difficulty_idempotent(
 
 @pytest.mark.asyncio
 async def test_update_difficulty_logs_update(
-    db_session, test_user, test_question, active_difficulty_algo
+    db_session, test_user_async, test_question_async, active_difficulty_algo
 ):
     """Update creates log entry with pre/post values."""
     await update_difficulty_from_attempt(
         db_session,
-        user_id=test_user.id,
-        question_id=test_question.id,
+        user_id=test_user_async.id,
+        question_id=test_question_async.id,
         theme_id=None,
         score=True,
         attempt_id=uuid4(),
@@ -370,7 +425,7 @@ async def test_update_difficulty_logs_update(
     )
 
     # Check log exists
-    stmt = select(DifficultyUpdateLog).where(DifficultyUpdateLog.user_id == test_user.id)
+    stmt = select(DifficultyUpdateLog).where(DifficultyUpdateLog.user_id == test_user_async.id)
     result = await db_session.execute(stmt)
     log = result.scalar_one()
 
@@ -389,17 +444,17 @@ async def test_update_difficulty_logs_update(
 
 @pytest.mark.asyncio
 async def test_recenter_preserves_differences(
-    db_session, test_user, test_question, active_difficulty_algo
+    db_session, test_user_async, test_question_async, active_difficulty_algo
 ):
     """Recentering preserves θ - b differences."""
     # Create some ratings
     user_rating = await get_or_create_user_rating(
-        db_session, test_user.id, RatingScope.GLOBAL, None, {}
+        db_session, test_user_async.id, RatingScope.GLOBAL, None, {}
     )
     user_rating.rating = 100.0
 
     question_rating = await get_or_create_question_rating(
-        db_session, test_question.id, RatingScope.GLOBAL, None, {}
+        db_session, test_question_async.id, RatingScope.GLOBAL, None, {}
     )
     question_rating.rating = 50.0
 
@@ -421,7 +476,7 @@ async def test_recenter_preserves_differences(
 
 
 @pytest.mark.asyncio
-async def test_recenter_zeros_mean(db_session, test_question, active_difficulty_algo):
+async def test_recenter_zeros_mean(db_session, test_question_async, active_difficulty_algo):
     """Recentering brings mean question rating to ~0."""
     from sqlalchemy import func
 

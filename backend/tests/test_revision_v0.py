@@ -28,11 +28,11 @@ async def student_user(db):
     user = User(
         id=uuid4(),
         email="student@test.com",
-        hashed_password="hashed",
+        password_hash="hashed",
         full_name="Test Student",
-        role=UserRole.STUDENT,
-        year=1,
-        is_email_verified=True,
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
     db.add(user)
     await db.commit()

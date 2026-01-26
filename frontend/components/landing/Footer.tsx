@@ -5,6 +5,7 @@ const footerLinks = {
     { label: "Features", href: "#features" },
     { label: "Blocks", href: "#blocks" },
     { label: "FAQ", href: "#faq" },
+    { label: "Exam Prep", href: "/exam-prep" },
   ],
   Legal: [
     { label: "Terms", href: "/legal" },

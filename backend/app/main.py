@@ -32,8 +32,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     setup_logging()
-    # Initialize Redis
-    init_redis()
+    # Initialize Redis (skip in test mode to avoid connection attempts)
+    if settings.ENV != "test":
+        init_redis()
     # Create tables (in production, use migrations)
     # Disabled: Using Alembic migrations for all environments
     # if settings.ENV == "dev":

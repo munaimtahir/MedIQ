@@ -104,7 +104,7 @@ def mock_instance_with_results(db: Session, admin_user: User):
 
     run = MockGenerationRun(
         blueprint_id=bp.id,
-        status=MockGenerationRunStatus.DONE,
+        status=MockGenerationRunStatus.DONE.value,
         seed=1,
         config_version_id=v.id,
         requested_by=admin_user.id,

@@ -23,9 +23,8 @@ def test_user(db):
     user = User(
         id=uuid.uuid4(),
         email="test@example.com",
-        first_name="Test",
-        last_name="User",
-        role=UserRole.STUDENT,
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
         password_hash="fake_hash",
         is_active=True,
         email_verified=True,
@@ -61,6 +60,8 @@ def published_questions(db):
             explanation_md="Test explanation",
             difficulty="MEDIUM",
             cognitive_level="UNDERSTAND",
+            created_by=test_user.id,
+            updated_by=test_user.id,
         )
         db.add(q)
         questions.append(q)
@@ -88,6 +89,8 @@ def test_session_create_selects_published_only(db, test_user, published_question
         explanation_md="Draft",
         difficulty="MEDIUM",
         cognitive_level="UNDERSTAND",
+        created_by=test_user.id,
+        updated_by=test_user.id,
     )
     db.add(draft_q)
     db.flush()

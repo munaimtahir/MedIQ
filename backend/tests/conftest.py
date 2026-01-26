@@ -12,8 +12,11 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 
+from fastapi.testclient import TestClient
+
 from app.core.config import settings
 from app.core.security import hash_password
+from app.main import app
 from app.models.question_cms import Question, QuestionStatus
 from app.models.session import SessionStatus, TestSession
 from app.models.syllabus import Block, Theme, Year
@@ -284,3 +287,33 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         await session.rollback()
 
     await async_engine.dispose()
+
+
+@pytest.fixture
+def client(db) -> TestClient:
+    """Create a FastAPI test client with database dependency override."""
+    from app.db.session import get_db
+    
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass  # Don't close the session, it's managed by the db fixture
+    
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_client(client) -> TestClient:
+    """Alias for client fixture for backward compatibility."""
+    return client
+
+
+@pytest.fixture
+def admin_user(db) -> User:
+    """Create an admin user for testing (alias for test_admin_user)."""
+    return test_admin_user(db)

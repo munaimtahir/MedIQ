@@ -23,6 +23,7 @@ import {
   Network,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
 } from "lucide-react";
 
 // Feature flag check
@@ -33,6 +34,7 @@ const baseStudentNavItems = [
   { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/student/notifications", label: "Notifications", icon: Bell },
   { href: "/student/blocks", label: "Blocks", icon: BookOpen },
+  { href: "/exam-prep", label: "Exam Prep", icon: GraduationCap },
   { href: "/student/practice/build", label: "Practice", icon: PlayCircle },
   { href: "/student/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/student/revision", label: "Revision", icon: RotateCcw },

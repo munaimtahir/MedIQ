@@ -75,8 +75,9 @@ def client(db: Session, student_user: User):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
     try:
-        with TestClient(app) as c:
-            yield c
+        # Use TestClient without context manager to avoid lifespan issues
+        c = TestClient(app)
+        yield c
     finally:
         app.dependency_overrides.clear()
 

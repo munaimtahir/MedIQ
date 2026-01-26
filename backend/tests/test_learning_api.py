@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password
 from app.models.learning_mastery import UserThemeMastery
 from app.models.mistakes import MistakeLog
 from app.models.question_cms import Question
@@ -22,7 +23,6 @@ from app.models.user import User
 @pytest.mark.asyncio
 async def test_student_cannot_recompute_mastery_for_another_user(db_session: AsyncSession):
     """Test that students can only recompute mastery for themselves."""
-    from app.core.security import hash_password
     from app.models.user import UserRole
     
     # Create two students
@@ -59,6 +59,7 @@ async def test_student_cannot_recompute_mastery_for_another_user(db_session: Asy
 @pytest.mark.asyncio
 async def test_admin_can_recompute_mastery_for_another_user(db_session: AsyncSession):
     """Test that admins can recompute mastery for any user."""
+    from app.models.user import UserRole
     # Create admin and student
     admin = User(
         id=uuid4(),

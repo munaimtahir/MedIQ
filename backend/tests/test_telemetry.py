@@ -74,7 +74,7 @@ async def test_session_async(db_session):
 
 
 @pytest.fixture
-def test_question(db):
+def test_question(db, test_user):
     """Create a test question."""
     question = Question(
         id=uuid.uuid4(),
@@ -92,6 +92,8 @@ def test_question(db):
         explanation_md="Test",
         difficulty="MEDIUM",
         cognitive_level="UNDERSTAND",
+        created_by=test_user.id,
+        updated_by=test_user.id,
     )
     db.add(question)
     db.flush()
