@@ -25,9 +25,10 @@ from app.learning_engine.mistakes.v0 import (
 from app.models.learning import AlgoRun
 from app.models.mistakes import MistakeLog
 from app.models.question_cms import Question
-from app.models.session import AttemptEvent, SessionAnswer, SessionQuestion, TestSession
-from app.models.syllabus import AcademicYear, Block, Theme
-from app.models.user import User
+from app.models.session import AttemptEvent, SessionAnswer, SessionQuestion, SessionMode, SessionStatus, TestSession
+from app.models.syllabus import Year, Block, Theme
+from app.core.security import hash_password
+from app.models.user import User, UserRole
 
 # ============================================================================
 # FEATURE EXTRACTION TESTS
@@ -35,26 +36,34 @@ from app.models.user import User
 
 
 @pytest.mark.asyncio
-async def test_compute_time_spent_by_question(db: AsyncSession):
+async def test_compute_time_spent_by_question(db_session: AsyncSession):
     """Test time spent calculation from QUESTION_VIEWED events."""
     # Setup: user, session
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
+    from app.models.session import SessionMode, SessionStatus
+    
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=2,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=2,
+        started_at=datetime.utcnow(),
         submitted_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     q1_id = uuid4()
     q2_id = uuid4()
@@ -81,8 +90,8 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
         payload_json={"question_id": str(q2_id)},
     )
 
-    db.add_all([event1, event2])
-    await db.commit()
+    db_session.add_all([event1, event2])
+    await db_session.commit()
 
     # Compute time spent
     time_spent = await compute_time_spent_by_question(db, session.id)
@@ -94,24 +103,29 @@ async def test_compute_time_spent_by_question(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_compute_change_count(db: AsyncSession):
+async def test_compute_change_count(db_session: AsyncSession):
     """Test answer change count from ANSWER_CHANGED events."""
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
-        mode="TUTOR",
-        status="ACTIVE",
-        count=2,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.ACTIVE,
+        year=1,
+        blocks_json=["A"],
+        total_questions=2,
     )
-    db.add(session)
+    db_session.add(session)
 
     q1_id = uuid4()
     q2_id = uuid4()
@@ -126,7 +140,7 @@ async def test_compute_change_count(db: AsyncSession):
             event_ts=datetime.utcnow(),
             payload_json={"question_id": str(q1_id), "from_index": i, "to_index": i + 1},
         )
-        db.add(event)
+        db_session.add(event)
 
     event = AttemptEvent(
         id=uuid4(),
@@ -136,9 +150,9 @@ async def test_compute_change_count(db: AsyncSession):
         event_ts=datetime.utcnow(),
         payload_json={"question_id": str(q2_id), "from_index": 0, "to_index": 1},
     )
-    db.add(event)
+    db_session.add(event)
 
-    await db.commit()
+    await db_session.commit()
 
     # Compute change counts
     change_counts = await compute_change_count(db, session.id)
@@ -148,24 +162,29 @@ async def test_compute_change_count(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_compute_blur_count(db: AsyncSession):
+async def test_compute_blur_count(db_session: AsyncSession):
     """Test blur count from PAUSE_BLUR events."""
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
-        mode="TUTOR",
-        status="ACTIVE",
-        count=1,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.ACTIVE,
+        year=1,
+        blocks_json=["A"],
+        total_questions=1,
     )
-    db.add(session)
+    db_session.add(session)
 
     q_id = uuid4()
 
@@ -179,9 +198,9 @@ async def test_compute_blur_count(db: AsyncSession):
             event_ts=datetime.utcnow(),
             payload_json={"question_id": str(q_id), "state": "blur"},
         )
-        db.add(event)
+        db_session.add(event)
 
-    await db.commit()
+    await db_session.commit()
 
     blur_counts = await compute_blur_count(db, session.id)
 
@@ -490,61 +509,77 @@ async def test_classify_correct_answer_returns_none():
 
 
 @pytest.mark.asyncio
-async def test_classify_mistakes_service_integration(db: AsyncSession):
+async def test_classify_mistakes_service_integration(db_session: AsyncSession):
     """Test full service integration with run logging."""
     # Setup: user, year, block, theme, question
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
+    await db_session.flush()
 
     theme = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
-    db.add(theme)
+    db_session.add(theme)
 
+    from app.models.question_cms import QuestionStatus
+    
     question = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block.id,
         theme_id=theme.id,
-        stem_text="Q1",
-        status="PUBLISHED",
+        stem="Q1",
+        option_a="A",
+        option_b="B",
+        option_c="C",
+        option_d="D",
+        option_e="E",
+        correct_index=0,
+        status=QuestionStatus.PUBLISHED,
+        cognitive_level="UNDERSTAND",
+        difficulty="MEDIUM",
     )
-    db.add(question)
+    db_session.add(question)
 
     # Create session
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=1,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=1,
         submitted_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     # Create session question
     sq = SessionQuestion(
         id=uuid4(),
         session_id=session.id,
         question_id=question.id,
-        order_index=0,
+        position=0,
     )
-    db.add(sq)
+    db_session.add(sq)
 
     # Create wrong answer
     answer = SessionAnswer(
@@ -556,9 +591,9 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
         is_correct=False,  # Wrong
         changed_count=2,  # Changed answer
     )
-    db.add(answer)
+    db_session.add(answer)
 
-    await db.commit()
+    await db_session.commit()
 
     # Call service
     result = await classify_mistakes_v0_for_session(db, session.id, trigger="test")
@@ -588,16 +623,19 @@ async def test_classify_mistakes_service_integration(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_upsert_idempotency(db: AsyncSession):
+async def test_upsert_idempotency(db_session: AsyncSession):
     """Test that re-running classification updates existing records."""
     # Setup minimal data
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     question = Question(
         id=uuid4(),
@@ -605,27 +643,29 @@ async def test_upsert_idempotency(db: AsyncSession):
         block_id=uuid4(),
         theme_id=uuid4(),
         stem_text="Q1",
-        status="PUBLISHED",
+        status=QuestionStatus.PUBLISHED,
     )
-    db.add(question)
+    db_session.add(question)
 
     session = TestSession(
         id=uuid4(),
         user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=1,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=1,
         submitted_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     sq = SessionQuestion(
         id=uuid4(),
         session_id=session.id,
         question_id=question.id,
-        order_index=0,
+        position=0,
     )
-    db.add(sq)
+    db_session.add(sq)
 
     answer = SessionAnswer(
         id=uuid4(),
@@ -636,9 +676,9 @@ async def test_upsert_idempotency(db: AsyncSession):
         is_correct=False,
         changed_count=0,
     )
-    db.add(answer)
+    db_session.add(answer)
 
-    await db.commit()
+    await db_session.commit()
 
     # Run classification twice
     result1 = await classify_mistakes_v0_for_session(db, session.id, trigger="test1")
@@ -657,7 +697,7 @@ async def test_upsert_idempotency(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_best_effort_on_failure(db: AsyncSession):
+async def test_best_effort_on_failure(db_session: AsyncSession):
     """Test that classification failures return error dict, not exception."""
     # Try to classify a non-existent session
     result = await classify_mistakes_v0_for_session(

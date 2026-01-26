@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.session import Base
+from app.db.base import Base
 
 
 class SRSUserParams(Base):
@@ -46,6 +46,16 @@ class SRSUserParams(Base):
         nullable=False,
         default=dict,
         comment="Training metrics: logloss, brier, ece, val_size, etc.",
+    )
+
+    # A/B and cooldown
+    training_cooldown_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="Cooldown period until next training allowed"
+    )
+    assigned_group: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="A/B group: BASELINE_GLOBAL or TUNED_ELIGIBLE",
     )
 
     created_at: Mapped[datetime] = mapped_column(

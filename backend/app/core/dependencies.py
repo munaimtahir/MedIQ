@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 # Error handling is done via HTTPException which uses the global error handler
@@ -16,6 +16,7 @@ CurrentUser = Annotated[User, Depends]
 
 
 def get_current_user(
+    request: Request,
     authorization: Annotated[str | None, Header()] = None,
     db: Session = Depends(get_db),
 ) -> User:
@@ -42,6 +43,7 @@ def get_current_user(
         payload = verify_access_token(token)
         user_id = UUID(payload["sub"])
         role = payload["role"]
+        session_id = payload.get("sid")  # Extract session_id if present
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -70,6 +72,11 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token role mismatch. Please login again.",
         )
+
+    # Attach to request for middleware logging (best-effort)
+    request.state.user = user
+    if session_id:
+        request.state.session_id = session_id
 
     return user
 

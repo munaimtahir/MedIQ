@@ -4,9 +4,17 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.import_schema import ImportFileType, ImportJobStatus
+
+# Validation caps (input hardening)
+SCHEMA_NAME_MAX_LENGTH = 200
+DELIMITER_MAX_LENGTH = 16
+QUOTE_CHAR_MAX_LENGTH = 16
+ENCODING_MAX_LENGTH = 64
+MAPPING_JSON_MAX_KEYS = 80
+RULES_JSON_MAX_KEYS = 80
 
 # ============================================================================
 # Import Schema Schemas
@@ -16,14 +24,30 @@ from app.models.import_schema import ImportFileType, ImportJobStatus
 class ImportSchemaBase(BaseModel):
     """Base schema for import configuration."""
 
-    name: str = Field(..., description="Schema name")
+    name: str = Field(..., max_length=SCHEMA_NAME_MAX_LENGTH, description="Schema name")
     file_type: ImportFileType = Field(default=ImportFileType.CSV, description="File type")
-    delimiter: str = Field(default=",", description="CSV delimiter")
-    quote_char: str = Field(default='"', description="CSV quote character")
+    delimiter: str = Field(
+        default=",", max_length=DELIMITER_MAX_LENGTH, description="CSV delimiter"
+    )
+    quote_char: str = Field(
+        default='"', max_length=QUOTE_CHAR_MAX_LENGTH, description="CSV quote character"
+    )
     has_header: bool = Field(default=True, description="Whether CSV has header row")
-    encoding: str = Field(default="utf-8", description="File encoding")
+    encoding: str = Field(
+        default="utf-8", max_length=ENCODING_MAX_LENGTH, description="File encoding"
+    )
     mapping_json: dict[str, Any] = Field(..., description="Field mapping configuration")
     rules_json: dict[str, Any] = Field(..., description="Validation rules and defaults")
+
+    @model_validator(mode="after")
+    def cap_json_keys(self) -> "ImportSchemaBase":
+        if len(self.mapping_json) > MAPPING_JSON_MAX_KEYS:
+            raise ValueError(
+                f"mapping_json must have at most {MAPPING_JSON_MAX_KEYS} keys"
+            )
+        if len(self.rules_json) > RULES_JSON_MAX_KEYS:
+            raise ValueError(f"rules_json must have at most {RULES_JSON_MAX_KEYS} keys")
+        return self
 
 
 class ImportSchemaCreate(ImportSchemaBase):
@@ -35,14 +59,32 @@ class ImportSchemaCreate(ImportSchemaBase):
 class ImportSchemaUpdate(BaseModel):
     """Schema for updating import schema (creates new version)."""
 
-    name: str | None = None
+    name: str | None = Field(None, max_length=SCHEMA_NAME_MAX_LENGTH)
     file_type: ImportFileType | None = None
-    delimiter: str | None = None
-    quote_char: str | None = None
+    delimiter: str | None = Field(None, max_length=DELIMITER_MAX_LENGTH)
+    quote_char: str | None = Field(None, max_length=QUOTE_CHAR_MAX_LENGTH)
     has_header: bool | None = None
-    encoding: str | None = None
+    encoding: str | None = Field(None, max_length=ENCODING_MAX_LENGTH)
     mapping_json: dict[str, Any] | None = None
     rules_json: dict[str, Any] | None = None
+
+    @field_validator("mapping_json")
+    @classmethod
+    def mapping_json_key_cap(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None and len(v) > MAPPING_JSON_MAX_KEYS:
+            raise ValueError(
+                f"mapping_json must have at most {MAPPING_JSON_MAX_KEYS} keys"
+            )
+        return v
+
+    @field_validator("rules_json")
+    @classmethod
+    def rules_json_key_cap(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None and len(v) > RULES_JSON_MAX_KEYS:
+            raise ValueError(
+                f"rules_json must have at most {RULES_JSON_MAX_KEYS} keys"
+            )
+        return v
 
 
 class ImportSchemaOut(ImportSchemaBase):

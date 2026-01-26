@@ -35,3 +35,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 }));
+
+// Selectors to prevent unnecessary re-renders
+export const selectUser = (state: UserState) => state.user;
+export const selectLoading = (state: UserState) => state.loading;
+export const selectFetchUser = (state: UserState) => state.fetchUser;
+export const selectSetUser = (state: UserState) => state.setUser;
+export const selectClearUser = (state: UserState) => state.clearUser;

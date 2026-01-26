@@ -355,6 +355,34 @@ Legacy question model with Integer ID. See CMS Question below for new structure.
 
 ---
 
+## DB Invariants and Idempotency
+
+DB-level constraints enforce impossible-state prevention under load. App-layer handling treats duplicate/reject as idempotent outcomes (200/204, return existing where applicable).
+
+### Invariants (enforced in DB)
+
+| Invariant | Enforcement | Notes |
+|-----------|-------------|-------|
+| **One submit per session** | `test_sessions`: `CHECK (status <> 'SUBMITTED' OR submitted_at IS NOT NULL)` | Submit updates same row; no duplicate submit rows |
+| **One answer per (session, question)** | `session_answers`: `UNIQUE(session_id, question_id)` | Identity implied |
+| **Answer index in range** | `session_answers`: `CHECK (selected_index IS NULL OR (selected_index >= 0 AND selected_index <= 4))` | 0–4 or unset |
+| **One Elo update per attempt** | `difficulty_update_log`: `UNIQUE(attempt_id)` | When `attempt_id` present |
+| **One mistake classification per (session, question)** | `mistake_log`: `UNIQUE(session_id, question_id)` | Per canonical attempt |
+| **Telemetry append-only** | `attempt_events`: triggers raise on `UPDATE`/`DELETE` | No mutations |
+
+### Idempotent handling
+
+- **Submit:** Safe to call multiple times. If already `SUBMITTED`/`EXPIRED`, return 200 with existing result; no duplicate submit.
+- **Answer:** On `IntegrityError` (duplicate `session_id`/`question_id`), rollback, refetch existing row, return 200 with that row (no-op).
+- **Difficulty / mistake:** Duplicate `attempt_id` or `(session_id, question_id)` → treat as no-op (200/204); app-layer skip or DB reject.
+
+### Tuning
+
+- Invariants are fixed in migrations (`045_integrity`). No env tuning.
+- Row caps (e.g. import max rows) use `IMPORT_MAX_ROWS` and related settings; see `docs/security.md` and config.
+
+---
+
 ## Future Extensions
 
 ### Planned Entities (Not Implemented)

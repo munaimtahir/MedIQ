@@ -25,7 +25,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)
+    full_name = Column(String(255), nullable=True)  # DB column; use .name for API compatibility
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=True)  # Nullable for OAuth-only users
     role = Column(String, nullable=False, default=UserRole.STUDENT.value)
@@ -36,9 +36,27 @@ class User(Base):
     email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    @property
+    def name(self) -> str:
+        """API-friendly name; maps to full_name."""
+        return self.full_name or ""
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.full_name = value or None
 
     # Relationships
+    auth_sessions = relationship(
+        "AuthSession", back_populates="user", cascade="all, delete-orphan"
+    )
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )

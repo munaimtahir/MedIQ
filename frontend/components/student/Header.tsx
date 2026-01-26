@@ -16,13 +16,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/lib/notifications/hooks";
 import { isUnread } from "@/lib/notifications/utils";
-import { useUserStore } from "@/store/userStore";
+import { useUserStore, selectUser, selectFetchUser } from "@/store/userStore";
 import { authClient } from "@/lib/authClient";
 import { notify } from "@/lib/notify";
 
 export function StudentHeader() {
   const router = useRouter();
-  const { user, fetchUser } = useUserStore();
+  const user = useUserStore(selectUser);
+  const fetchUser = useUserStore(selectFetchUser);
   const { items: notifications } = useNotifications();
   const unreadCount = notifications.filter((item) => isUnread(item)).length;
 

@@ -39,6 +39,8 @@ class TestSecurityControls:
         assert error["code"] == expected_code, f"Expected code {expected_code}, got {error['code']}"
         return error
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_1_invalid_login_generic_error(self):
         """TEST 1: Invalid login returns generic error message."""
         response = await self.client.post(
@@ -58,6 +60,8 @@ class TestSecurityControls:
         if request_id:
             self.request_ids.append(request_id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_2_rate_limiting(self):
         """TEST 2: Rate limiting returns 429 with Retry-After header."""
         # Rapidly call login endpoint
@@ -101,6 +105,8 @@ class TestSecurityControls:
         if request_id:
             self.request_ids.append(request_id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_3_account_lockout(self):
         """TEST 3: Account lockout after repeated failures."""
         test_email = f"lockout_test_{int(time.time())}@example.com"
@@ -155,6 +161,8 @@ class TestSecurityControls:
         if request_id:
             self.request_ids.append(request_id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_4_oauth_invalid_state(self):
         """TEST 4: OAuth callback with invalid state returns OAUTH_STATE_INVALID."""
         # Call callback with bogus state (no Redis entry)
@@ -170,6 +178,8 @@ class TestSecurityControls:
         if request_id:
             self.request_ids.append(request_id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_5_mfa_invalid_code(self):
         """TEST 5: MFA invalid code returns MFA_INVALID."""
         # This test requires a user with MFA enabled
@@ -197,6 +207,8 @@ class TestSecurityControls:
         if request_id:
             self.request_ids.append(request_id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_6_logs_include_request_id_and_event_type(self):
         """TEST 6: Verify logs include request_id and event_type."""
         # This test requires access to logs
@@ -222,6 +234,8 @@ class TestSecurityControls:
         #             break
         #     assert found, f"Request ID {request_id} should appear in logs"
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_7_no_secrets_in_logs(self):
         """TEST 7: Verify no secrets appear in logs."""
         # Dangerous substrings to check for

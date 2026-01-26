@@ -1,7 +1,7 @@
 """Add import schema tables and questions.external_id
 
 Revision ID: 006
-Revises: 005
+Revises: 003
 Create Date: 2026-01-20 12:00:00.000000
 
 """
@@ -15,18 +15,13 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "006"
-down_revision = "005"  # Update this to match your latest migration
+down_revision = "15d972a2c27c"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums
-    op.execute("CREATE TYPE import_file_type AS ENUM ('csv', 'json')")
-    op.execute(
-        "CREATE TYPE import_job_status AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED')"
-    )
-
+    # Enums will be created automatically by SQLAlchemy
     # Create import_schemas table
     op.create_table(
         "import_schemas",

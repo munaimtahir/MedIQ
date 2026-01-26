@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.common.pagination import PaginatedResponse, PaginationParams, pagination_params
 from app.core.config import settings
 from app.core.dependencies import require_roles
 from app.db.session import get_db
@@ -35,7 +36,7 @@ class AuditLogOut(BaseModel):
 
 @router.get(
     "",
-    response_model=list[AuditLogOut],
+    response_model=PaginatedResponse[AuditLogOut],
     summary="Query audit log (dev-only)",
     description="Query audit log entries. Only available in dev environment.",
 )
@@ -43,10 +44,10 @@ async def query_audit_log(
     entity_type: Annotated[str | None, Query(description="Filter by entity type")] = None,
     entity_id: Annotated[UUID | None, Query(description="Filter by entity ID")] = None,
     action: Annotated[str | None, Query(description="Filter by action")] = None,
-    limit: Annotated[int, Query(ge=1, le=100, description="Maximum results")] = 50,
+    pagination: Annotated[PaginationParams, Depends(pagination_params)] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
-) -> list[AuditLogOut]:
+) -> PaginatedResponse[AuditLogOut]:
     """Query audit log entries (dev-only endpoint)."""
     if settings.ENV != "dev":
         raise HTTPException(
@@ -63,6 +64,13 @@ async def query_audit_log(
     if action:
         query = query.filter(AuditLog.action.ilike(f"%{action}%"))
 
-    entries = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+    query = query.order_by(AuditLog.created_at.desc())
+    total = query.count()
+    entries = query.offset(pagination.offset).limit(pagination.page_size).all()
 
-    return [AuditLogOut.model_validate(entry) for entry in entries]
+    return PaginatedResponse(
+        items=[AuditLogOut.model_validate(entry) for entry in entries],
+        page=pagination.page,
+        page_size=pagination.page_size,
+        total=total,
+    )

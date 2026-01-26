@@ -2,16 +2,18 @@
  * Dashboard data fetching hooks.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { syllabusAPI, onboardingAPI } from "@/lib/api";
 import { Year, Block, Theme, UserProfile } from "@/lib/api";
-import { DashboardVM, NextAction, RecentSession } from "./types";
+import { DashboardVM, NextAction, RecentSession, DashboardMetrics, WeakTheme } from "./types";
 import {
-  getMockMetrics,
-  getMockWeakThemes,
-  getMockRecentSessions,
-  getMockAnnouncements,
+  getEmptyMetrics,
+  getEmptyWeakThemes,
+  getEmptyRecentSessions,
+  getEmptyAnnouncements,
 } from "./mock";
+import { logger } from "@/lib/logger";
+import { getOverview, getRecentSessions, type RecentSessionSummary } from "@/lib/api/analyticsApi";
 
 interface DashboardDataState {
   data: DashboardVM | null;
@@ -35,13 +37,13 @@ export function useDashboardData(): DashboardDataState {
         let profile: UserProfile | null = null;
         try {
           profile = await onboardingAPI.getProfile();
-          console.log("[Dashboard] Loaded user profile:", {
+          logger.log("[Dashboard] Loaded user profile:", {
             onboarding_completed: profile?.onboarding_completed,
             selected_year: profile?.selected_year?.display_name,
             selected_blocks_count: profile?.selected_blocks?.length || 0,
           });
         } catch (err) {
-          console.error("[Dashboard] Failed to load profile:", err);
+          logger.error("[Dashboard] Failed to load profile:", err);
           // Continue without profile - will use defaults
         }
 
@@ -52,9 +54,9 @@ export function useDashboardData(): DashboardDataState {
         let years: Year[] = [];
         try {
           years = await syllabusAPI.getYears();
-          console.log("[Dashboard] Loaded years:", years.length);
+          logger.log("[Dashboard] Loaded years:", years.length);
         } catch (err) {
-          console.error("[Dashboard] Failed to load years:", err);
+          logger.error("[Dashboard] Failed to load years:", err);
           throw new Error(
             `Failed to load academic years: ${err instanceof Error ? err.message : "Unknown error"}`,
           );
@@ -67,7 +69,7 @@ export function useDashboardData(): DashboardDataState {
         // Improved year matching logic
         if (profile?.selected_year) {
           const profileYearName = profile.selected_year.display_name;
-          console.log("[Dashboard] User selected year:", profileYearName);
+          logger.log("[Dashboard] User selected year:", profileYearName);
 
           // Try multiple matching strategies
           selectedYear =
@@ -96,7 +98,7 @@ export function useDashboardData(): DashboardDataState {
             }) || null;
 
           if (!selectedYear) {
-            console.warn("[Dashboard] Could not match user's year, using first available year");
+            logger.warn("[Dashboard] Could not match user's year, using first available year");
           }
         }
 
@@ -111,15 +113,15 @@ export function useDashboardData(): DashboardDataState {
 
         const selectedYearId = selectedYear.id;
         const selectedYearName = selectedYear.name;
-        console.log("[Dashboard] Using year:", selectedYearName, "(ID:", selectedYearId, ")");
+        logger.log("[Dashboard] Using year:", selectedYearName, "(ID:", selectedYearId, ")");
 
         // Load blocks for selected year
         let blocks: Block[] = [];
         try {
           blocks = await syllabusAPI.getBlocks(selectedYearName);
-          console.log("[Dashboard] Loaded blocks:", blocks.length);
+          logger.log("[Dashboard] Loaded blocks:", blocks.length);
         } catch (err) {
-          console.error("[Dashboard] Failed to load blocks:", err);
+          logger.error("[Dashboard] Failed to load blocks:", err);
           throw new Error(
             `Failed to load blocks for ${selectedYearName}: ${err instanceof Error ? err.message : "Unknown error"}`,
           );
@@ -131,28 +133,149 @@ export function useDashboardData(): DashboardDataState {
           try {
             const firstBlockThemes = await syllabusAPI.getThemes(blocks[0].id);
             themesByBlock[blocks[0].id] = firstBlockThemes;
-            console.log("[Dashboard] Loaded themes for first block:", firstBlockThemes.length);
+            logger.log("[Dashboard] Loaded themes for first block:", firstBlockThemes.length);
           } catch (err) {
-            console.warn("[Dashboard] Failed to load themes for first block:", err);
+            logger.warn("[Dashboard] Failed to load themes for first block:", err);
             // Non-critical, continue without themes
           }
         }
 
-        // Load mock data for features not yet implemented
-        const recentSessions = getMockRecentSessions();
+        // Load real analytics data
+        let analyticsOverview = null;
+        let recentSessionsData: RecentSessionSummary[] = [];
+        try {
+          analyticsOverview = await getOverview();
+          logger.log("[Dashboard] Loaded analytics overview:", {
+            sessions_completed: analyticsOverview.sessions_completed,
+            questions_answered: analyticsOverview.questions_answered,
+            accuracy_pct: analyticsOverview.accuracy_pct,
+            weakest_themes_count: analyticsOverview.weakest_themes.length,
+          });
+        } catch (err) {
+          logger.warn("[Dashboard] Failed to load analytics overview:", err);
+          // Continue with empty data
+        }
+
+        try {
+          const recentSessionsResponse = await getRecentSessions(10);
+          recentSessionsData = recentSessionsResponse.sessions;
+          logger.log("[Dashboard] Loaded recent sessions:", recentSessionsData.length);
+        } catch (err) {
+          logger.warn("[Dashboard] Failed to load recent sessions:", err);
+          // Continue with empty data
+        }
+
+        // Map recent sessions to dashboard format
+        const recentSessions: RecentSession[] = recentSessionsData.map((s, index) => ({
+          id: index + 1, // Use index-based ID for display (frontend expects number)
+          title: s.title,
+          status: s.status,
+          score: s.score_correct ?? undefined,
+          scorePercentage: s.score_pct ? Math.round(s.score_pct) : undefined,
+          href:
+            s.status === "in_progress"
+              ? `/student/session/${s.session_id}`
+              : `/student/session/${s.session_id}/review`,
+          blockId: s.block_id ?? undefined,
+          themeId: s.theme_id ?? undefined,
+        }));
+
         const unfinishedSession = recentSessions.find((s) => s.status === "in_progress");
 
         // Determine next action
         const nextAction = determineNextAction(profile, unfinishedSession, blocks, themesByBlock);
 
-        // Load metrics (mock for now)
-        const metrics = getMockMetrics();
+        // Calculate streak days and minutes this week from recent sessions
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+        
+        // Calculate streak days (consecutive days with completed sessions)
+        let streakDays = 0;
+        const completedSessions = recentSessionsData.filter(
+          (s) => s.status === "completed" && s.submitted_at
+        );
+        if (completedSessions.length > 0) {
+          const sessionDates = new Set(
+            completedSessions
+              .map((s) => {
+                const date = s.submitted_at ? new Date(s.submitted_at) : null;
+                return date ? date.toDateString() : null;
+              })
+              .filter((d): d is string => d !== null)
+          );
+          
+          // Count consecutive days from today backwards
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          let currentDate = new Date(today);
+          
+          while (sessionDates.has(currentDate.toDateString())) {
+            streakDays++;
+            currentDate.setDate(currentDate.getDate() - 1);
+          }
+        }
+        
+        // Calculate minutes this week from session durations
+        let minutesThisWeek = 0;
+        const thisWeekSessions = recentSessionsData.filter((s) => {
+          if (!s.started_at) return false;
+          const started = new Date(s.started_at);
+          return started >= startOfWeek;
+        });
+        
+        for (const session of thisWeekSessions) {
+          if (session.started_at && session.submitted_at) {
+            const started = new Date(session.started_at);
+            const submitted = new Date(session.submitted_at);
+            const durationMs = submitted.getTime() - started.getTime();
+            const durationMinutes = Math.round(durationMs / (1000 * 60));
+            minutesThisWeek += durationMinutes;
+          } else if (session.started_at) {
+            // For in-progress sessions, estimate based on time since start (capped at 2 hours)
+            const started = new Date(session.started_at);
+            const durationMs = now.getTime() - started.getTime();
+            const durationMinutes = Math.min(Math.round(durationMs / (1000 * 60)), 120);
+            minutesThisWeek += durationMinutes;
+          }
+        }
+        
+        // Map metrics from analytics
+        const metrics: DashboardMetrics = analyticsOverview
+          ? {
+              streakDays,
+              minutesThisWeek,
+              questionsThisWeek: analyticsOverview.questions_answered || 0,
+            }
+          : {
+              streakDays,
+              minutesThisWeek,
+              questionsThisWeek: 0,
+            };
 
-        // Load weak themes (mock for now)
-        const weakThemes = getMockWeakThemes();
+        // Map weak themes from analytics
+        const weakThemes: WeakTheme[] = analyticsOverview
+          ? analyticsOverview.weakest_themes.map((theme) => {
+              // Find block for this theme
+              const block = blocks.find((b) => {
+                // Try to find block by checking if any theme in this block matches
+                const blockThemes = themesByBlock[b.id] || [];
+                return blockThemes.some((t) => t.id === theme.theme_id);
+              });
 
-        // Load announcements (mock for now)
-        const announcements = getMockAnnouncements();
+              return {
+                themeId: theme.theme_id,
+                themeTitle: theme.theme_name,
+                blockId: block?.id || 0,
+                blockCode: block?.code || "",
+                reason: theme.accuracy_pct < 50 ? "low_accuracy" : "needs_attention",
+              };
+            })
+          : getEmptyWeakThemes();
+
+        // Announcements (not yet implemented in backend)
+        const announcements = getEmptyAnnouncements();
 
         if (cancelled) return;
 
@@ -179,7 +302,7 @@ export function useDashboardData(): DashboardDataState {
       } catch (error) {
         if (cancelled) return;
         const errorMessage = error instanceof Error ? error.message : "Failed to load dashboard";
-        console.error("[Dashboard] Error loading dashboard:", error);
+        logger.error("[Dashboard] Error loading dashboard:", error);
         setState({
           data: null,
           loading: false,
@@ -204,7 +327,7 @@ function determineNextAction(
   blocks: Block[],
   themesByBlock: Record<number, Theme[]>,
 ): NextAction {
-  console.log("[Dashboard] determineNextAction called with:", {
+  logger.log("[Dashboard] determineNextAction called with:", {
     profile_exists: !!profile,
     onboarding_completed: profile?.onboarding_completed,
     has_unfinished_session: !!unfinishedSession,
@@ -213,7 +336,7 @@ function determineNextAction(
 
   // If onboarding not completed
   if (!profile?.onboarding_completed) {
-    console.log("[Dashboard] Onboarding not completed, showing onboarding prompt");
+    logger.log("[Dashboard] Onboarding not completed, showing onboarding prompt");
     return {
       type: "onboarding",
       label: "Complete Onboarding",

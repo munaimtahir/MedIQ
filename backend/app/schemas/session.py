@@ -222,3 +222,78 @@ class SessionStateWithCurrentOut(BaseModel):
     progress: SessionProgress
     questions: list[SessionQuestionSummary]
     current_question: CurrentQuestionOut | None
+
+
+# ============================================================================
+# Thin Endpoints (Optimized for Player UX)
+# ============================================================================
+
+
+class SessionStateThinOut(BaseModel):
+    """Minimal session state (metadata only, no question content)."""
+
+    session_id: UUID
+    mode: SessionMode
+    status: SessionStatus
+    total_questions: int
+    current_index: int  # 1-based
+    answered_count: int
+    remaining_count: int
+    time_limit_seconds: int | None
+    started_at: datetime
+    server_now: datetime
+    algo_snapshot: dict | None = None  # Optional algo profile/overrides snapshot
+
+
+class QuestionThinOut(BaseModel):
+    """Thin question payload for player (no explanation/tags)."""
+
+    question_id: UUID
+    stem: str
+    options: list[str]  # ["A", "B", "C", "D", "E"]
+    media: list[dict] = []  # [{type, url}, ...]
+
+
+class QuestionWithAnswerStateOut(BaseModel):
+    """Single question with answer state."""
+
+    session_id: UUID
+    index: int  # 1-based position
+    question: QuestionThinOut
+    answer_state: dict  # {selected_index: int | null, marked_for_review: bool}
+
+
+class PrefetchQuestionsOut(BaseModel):
+    """Prefetched questions response."""
+
+    items: list[QuestionWithAnswerStateOut]
+
+
+class AnswerSubmitThin(BaseModel):
+    """Submit answer (idempotent with client_event_id)."""
+
+    index: int = Field(..., ge=1, description="Question index (1-based)")
+    question_id: UUID = Field(..., description="Question ID")
+    selected_index: int | None = Field(
+        None, ge=0, le=4, description="Selected option index (0-4), null to clear"
+    )
+    marked_for_review: bool = Field(False, description="Mark for review flag")
+    client_event_id: UUID | None = Field(
+        None, description="Client event ID for idempotency (optional)"
+    )
+
+
+class AnswerSubmitThinResponse(BaseModel):
+    """Response after submitting answer (thin)."""
+
+    ok: bool
+    server_now: datetime
+    answer_state: dict  # {selected_index: int | null, marked_for_review: bool}
+
+
+class SessionSubmitThinResponse(BaseModel):
+    """Response after submitting session (thin)."""
+
+    ok: bool
+    submitted_at: datetime
+    review_url: str

@@ -34,7 +34,7 @@ import { SkeletonTable } from "@/components/status/SkeletonTable";
 import { EmptyState } from "@/components/status/EmptyState";
 import { ErrorState } from "@/components/status/ErrorState";
 import { FileSearch, Eye, X } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@/lib/dateUtils";
 
 const ACTION_TYPES = [
   "question.create",

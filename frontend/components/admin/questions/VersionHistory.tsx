@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import type { VersionOut, ChangeKind } from "@/lib/types/question-cms";
 import { adminQuestionsApi } from "@/lib/admin/questionsApi";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@/lib/dateUtils";
 import { History } from "lucide-react";
 
 interface VersionHistoryProps {

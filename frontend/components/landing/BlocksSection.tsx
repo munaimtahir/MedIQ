@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import gsap from "gsap";
+import { motion } from "framer-motion";
 
 const blocksByYear = {
   "First Year": ["A", "B", "C", "D", "E", "F"],
@@ -23,41 +23,26 @@ const blockNames: Record<string, string> = {
   F: "Microbiology",
 };
 
+const container = {
+  hidden: { opacity: 1 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: { opacity: 1, scale: 1 },
+};
+
 export function BlocksSection() {
   const [selectedYear, setSelectedYear] = useState("First Year");
-  const sectionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            gsap.from(entry.target.children, {
-              opacity: 0,
-              scale: 0.9,
-              duration: 0.5,
-              stagger: 0.05,
-              ease: "power2.out",
-            });
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.1 },
-    );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
 
   return (
-    <section id="blocks" ref={sectionRef} className="bg-slate-50 py-24">
+    <section id="blocks" className="bg-slate-50 py-24">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -83,22 +68,26 @@ export function BlocksSection() {
 
           {Object.entries(blocksByYear).map(([year, blocks]) => (
             <TabsContent key={year} value={year} className="mt-0">
-              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="grid gap-4 md:grid-cols-3 lg:grid-cols-6"
+              >
                 {blocks.map((block) => (
-                  <Card
-                    key={block}
-                    className="cursor-pointer border-slate-200 bg-white transition-all hover:border-primary hover:shadow-md"
-                  >
-                    <CardHeader className="pb-3">
-                      <Badge className="w-fit bg-primary text-white">Block {block}</Badge>
-                    </CardHeader>
-                    <CardContent>
-                      <CardTitle className="text-lg">{blockNames[block]}</CardTitle>
-                      <CardDescription className="mt-1 text-xs">{year} curriculum</CardDescription>
-                    </CardContent>
-                  </Card>
+                  <motion.div key={block} variants={item}>
+                    <Card className="h-full cursor-pointer border-slate-200 bg-white transition-all hover:border-primary hover:shadow-md">
+                      <CardHeader className="pb-3">
+                        <Badge className="w-fit bg-primary text-white">Block {block}</Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <CardTitle className="text-lg">{blockNames[block]}</CardTitle>
+                        <CardDescription className="mt-1 text-xs">{year} curriculum</CardDescription>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             </TabsContent>
           ))}
         </Tabs>

@@ -1,17 +1,48 @@
 """Authentication-related models.
 
-Includes refresh tokens, password reset tokens, and email verification tokens.
+Includes auth sessions, refresh tokens, password reset tokens, and email verification tokens.
 """
 
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
+
+# Import User for type hints (avoid circular import)
+if False:  # TYPE_CHECKING
+    from app.models.user import User
+
+
+class AuthSession(Base):
+    """Authentication session model for tracking user sessions."""
+
+    __tablename__ = "auth_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    user_agent = Column(Text, nullable=True)
+    ip_address = Column(Text, nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    revoke_reason = Column(Text, nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="auth_sessions")
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="session", cascade="all, delete-orphan"
+    )
+
+    def is_active(self) -> bool:
+        """Check if session is active (not revoked)."""
+        return self.revoked_at is None
 
 
 class RefreshToken(Base):
@@ -23,9 +54,13 @@ class RefreshToken(Base):
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    session_id = Column(
+        UUID(as_uuid=True), ForeignKey("auth_sessions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     token_hash = Column(String, unique=True, nullable=False, index=True)
     issued_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    rotated_at = Column(DateTime(timezone=True), nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     replaced_by_token_id = Column(
         UUID(as_uuid=True), ForeignKey("refresh_tokens.id"), nullable=True
@@ -36,13 +71,16 @@ class RefreshToken(Base):
 
     # Relationships
     user = relationship("User", back_populates="refresh_tokens")
+    session = relationship("AuthSession", back_populates="refresh_tokens")
     replaced_by_token = relationship(
         "RefreshToken", remote_side=[id], foreign_keys=[replaced_by_token_id]
     )
 
     def is_active(self) -> bool:
-        """Check if token is active (not revoked and not expired)."""
+        """Check if token is active (not revoked, not rotated, and not expired)."""
         if self.revoked_at is not None:
+            return False
+        if self.rotated_at is not None:
             return False
         now = datetime.now(UTC)
         return now < self.expires_at
@@ -58,8 +96,10 @@ class PasswordResetToken(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     token_hash = Column(String, unique=True, nullable=False, index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     used_at = Column(DateTime(timezone=True), nullable=True)
+    requested_ip = Column(String, nullable=True)
+    requested_ua = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships

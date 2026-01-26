@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "016"
-down_revision = "015"
+down_revision = "015_add_srs_tables"
 branch_labels = None
 depends_on = None
 

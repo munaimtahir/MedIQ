@@ -19,9 +19,6 @@ function buildQueryString(params: AuditLogQuery): string {
   if (params.page) searchParams.set("page", params.page.toString());
   if (params.page_size) searchParams.set("page_size", params.page_size.toString());
 
-  const limit = params.page_size || 50;
-  searchParams.set("limit", limit.toString());
-
   return searchParams.toString();
 }
 
@@ -46,6 +43,9 @@ export const adminAuditApi = {
       throw new Error(errorData.error?.message || errorData.detail || "Failed to load audit log");
     }
 
-    return response.json();
+    const data = (await response.json()) as
+      | { items: AuditLogItem[]; page: number; page_size: number; total: number }
+      | AuditLogItem[];
+    return Array.isArray(data) ? data : data.items;
   },
 };

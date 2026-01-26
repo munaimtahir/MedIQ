@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { adminUsersAPI } from "./api";
 import { User, UserCreate, UserUpdate, UsersListResponse } from "./types";
 import { notify } from "@/lib/notify";
-import { useUserStore } from "@/store/userStore";
+import { useUserStore, selectUser } from "@/store/userStore";
 
 interface UseAdminUsersParams {
   q?: string;
@@ -197,6 +197,6 @@ export function useUserMutations() {
  * Hook to get current user ID for guardrails.
  */
 export function useCurrentUserId(): string | null {
-  const { user } = useUserStore();
+  const user = useUserStore(selectUser);
   return user?.id || null;
 }

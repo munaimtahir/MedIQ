@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const { data } = await backendFetch<{
       status: string;
       message: string;
-    }>("/auth/reset-password", {
+    }>("/auth/password-reset/confirm", {
       method: "POST",
       cookies,
       body,

@@ -1,0 +1,5 @@
+{
+  "description": "Temporarily suppress known vulnerabilities. Each entry requires id, reason, and expires (YYYY-MM-DD). Use sparingly; see docs/security.md.",
+  "backend": [],
+  "frontend": []
+}

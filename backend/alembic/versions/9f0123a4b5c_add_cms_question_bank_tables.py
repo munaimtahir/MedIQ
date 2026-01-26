@@ -20,43 +20,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums (only if they don't exist)
-    op.execute(
-        """
-        DO $$ BEGIN
-            CREATE TYPE question_status AS ENUM ('DRAFT', 'IN_REVIEW', 'APPROVED', 'PUBLISHED');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """
-    )
-    op.execute(
-        """
-        DO $$ BEGIN
-            CREATE TYPE change_kind AS ENUM ('CREATE', 'EDIT', 'STATUS_CHANGE', 'PUBLISH', 'UNPUBLISH', 'IMPORT');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """
-    )
-    op.execute(
-        """
-        DO $$ BEGIN
-            CREATE TYPE storage_provider AS ENUM ('LOCAL', 'S3');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """
-    )
-    op.execute(
-        """
-        DO $$ BEGIN
-            CREATE TYPE media_role AS ENUM ('STEM', 'EXPLANATION', 'OPTION_A', 'OPTION_B', 'OPTION_C', 'OPTION_D', 'OPTION_E');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-    """
-    )
+    # Enums will be created automatically by SQLAlchemy when tables are created
+    pass
 
     # Handle existing questions table: rename to questions_legacy if it exists and has Integer id
     # Check if old questions table exists with Integer primary key
@@ -248,6 +213,7 @@ def upgrade() -> None:
                 "OPTION_D",
                 "OPTION_E",
                 name="media_role",
+                create_type=False,
             ),
             nullable=False,
         ),

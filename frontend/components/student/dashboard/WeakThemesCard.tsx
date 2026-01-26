@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +15,43 @@ interface WeakThemesCardProps {
   error?: Error | null;
 }
 
-export function WeakThemesCard({ weakThemes, loading, error }: WeakThemesCardProps) {
+const getReasonLabel = (reason: WeakTheme["reason"]): string => {
+  switch (reason) {
+    case "low_accuracy":
+      return "Low accuracy";
+    case "needs_attention":
+      return "Needs attention";
+    case "not_practiced":
+      return "Not practiced";
+    default:
+      return "Needs attention";
+  }
+};
+
+const getReasonVariant = (
+  reason: WeakTheme["reason"],
+): "default" | "destructive" | "secondary" => {
+  switch (reason) {
+    case "low_accuracy":
+      return "destructive";
+    case "needs_attention":
+      return "default";
+    case "not_practiced":
+      return "secondary";
+    default:
+      return "default";
+  }
+};
+
+export const WeakThemesCard = memo(function WeakThemesCard({ 
+  weakThemes, 
+  loading, 
+  error 
+}: WeakThemesCardProps) {
   const router = useRouter();
+  
+  // Memoize top 6 weak themes
+  const topWeakThemes = useMemo(() => weakThemes.slice(0, 6), [weakThemes]);
 
   if (loading) {
     return (
@@ -76,34 +112,6 @@ export function WeakThemesCard({ weakThemes, loading, error }: WeakThemesCardPro
     );
   }
 
-  const getReasonLabel = (reason: WeakTheme["reason"]) => {
-    switch (reason) {
-      case "low_accuracy":
-        return "Low accuracy";
-      case "needs_attention":
-        return "Needs attention";
-      case "not_practiced":
-        return "Not practiced";
-      default:
-        return "Needs attention";
-    }
-  };
-
-  const getReasonVariant = (
-    reason: WeakTheme["reason"],
-  ): "default" | "destructive" | "secondary" => {
-    switch (reason) {
-      case "low_accuracy":
-        return "destructive";
-      case "needs_attention":
-        return "default";
-      case "not_practiced":
-        return "secondary";
-      default:
-        return "default";
-    }
-  };
-
   return (
     <Card className="col-span-full md:col-span-1">
       <CardHeader>
@@ -114,7 +122,7 @@ export function WeakThemesCard({ weakThemes, loading, error }: WeakThemesCardPro
         <CardDescription>Top themes that need attention</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {weakThemes.slice(0, 6).map((theme) => (
+        {topWeakThemes.map((theme) => (
           <div
             key={theme.themeId}
             className="flex items-center justify-between rounded-lg border p-3"
@@ -142,4 +150,4 @@ export function WeakThemesCard({ weakThemes, loading, error }: WeakThemesCardPro
       </CardContent>
     </Card>
   );
-}
+});

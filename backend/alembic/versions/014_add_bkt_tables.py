@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "014_add_bkt_tables"
-down_revision = "013_add_mistake_log"
+down_revision = "013_mistake_log"
 branch_labels = None
 depends_on = None
 
@@ -182,8 +182,8 @@ def upgrade() -> None:
     # These will be used when no concept-specific parameters are available
     op.execute(
         """
-        INSERT INTO algo_versions (algo_key, version, status, description, created_at, updated_at)
-        VALUES ('bkt', 'v1', 'ACTIVE', 'Bayesian Knowledge Tracing v1 - Standard 4-parameter model', now(), now())
+        INSERT INTO algo_versions (id, algo_key, version, status, description, created_at, updated_at)
+        VALUES (gen_random_uuid(), 'bkt', 'v1', 'ACTIVE', 'Bayesian Knowledge Tracing v1 - Standard 4-parameter model', now(), now())
         ON CONFLICT (algo_key, version) DO NOTHING;
     """
     )
@@ -191,8 +191,9 @@ def upgrade() -> None:
     # Insert default parameters for BKT v1
     op.execute(
         """
-        INSERT INTO algo_params (algo_version_id, params_json, is_active, created_at, updated_at)
+        INSERT INTO algo_params (id, algo_version_id, params_json, is_active, created_at, updated_at)
         SELECT
+            gen_random_uuid(),
             av.id,
             '{
                 "default_L0": 0.1,

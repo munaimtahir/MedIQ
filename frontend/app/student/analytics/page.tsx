@@ -1,14 +1,35 @@
 "use client";
 
-import { AccuracyTrendChart } from "@/components/student/analytics/AccuracyTrendChart";
-import { BlockAccuracyChart } from "@/components/student/analytics/BlockAccuracyChart";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getOverview } from "@/lib/api/analyticsApi";
 import type { AnalyticsOverview } from "@/lib/types/analytics";
 import { BarChart3, BookOpen, CheckCircle2, Target } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+// Lazy load heavy chart components
+const AccuracyTrendChart = dynamic(
+  () => import("@/components/student/analytics/AccuracyTrendChart").then((mod) => ({ 
+    default: mod.AccuracyTrendChart 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[200px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
+
+const BlockAccuracyChart = dynamic(
+  () => import("@/components/student/analytics/BlockAccuracyChart").then((mod) => ({ 
+    default: mod.BlockAccuracyChart 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[300px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsOverview | null>(null);

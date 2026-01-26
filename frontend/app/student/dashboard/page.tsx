@@ -10,7 +10,7 @@ import { RecentActivityCard } from "@/components/student/dashboard/RecentActivit
 import { BrowseSyllabusCard } from "@/components/student/dashboard/BrowseSyllabusCard";
 import { AnnouncementsCard } from "@/components/student/dashboard/AnnouncementsCard";
 import { DashboardSkeleton } from "@/components/student/dashboard/DashboardSkeleton";
-import { useUserStore } from "@/store/userStore";
+import { useUserStore, selectUser } from "@/store/userStore";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 
 export default function StudentDashboard() {
   const { data, loading, error } = useDashboardData();
-  const { user } = useUserStore();
+  const user = useUserStore(selectUser);
   const router = useRouter();
 
   // Show skeleton while loading (but not if there's an error)

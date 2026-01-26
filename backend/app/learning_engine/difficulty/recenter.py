@@ -13,7 +13,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.learning_engine.constants import AlgoKey, RunTrigger
-from app.learning_engine.registry import log_run_start, log_run_success, resolve_active
+from app.learning_engine.registry import resolve_active
+from app.learning_engine.runs import log_run_start, log_run_success
 from app.learning_engine.runs import log_run_failure
 from app.models.difficulty import DifficultyQuestionRating, DifficultyUserRating, RatingScope
 

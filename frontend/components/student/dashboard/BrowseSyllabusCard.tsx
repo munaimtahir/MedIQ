@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { syllabusAPI } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from "@/lib/logger";
 
 interface BrowseSyllabusCardProps {
   blocks: Block[];
@@ -62,7 +63,7 @@ export function BrowseSyllabusCard({
           .getThemes(selectedBlockId)
           .then(setThemes)
           .catch((err) => {
-            console.warn("Failed to load themes:", err);
+            logger.warn("Failed to load themes:", err);
             setThemes([]);
           })
           .finally(() => setLoadingThemes(false));

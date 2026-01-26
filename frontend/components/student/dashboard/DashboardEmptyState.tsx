@@ -3,10 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, PlayCircle, Target } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function DashboardEmptyState() {
-  const router = useRouter();
 
   return (
     <div className="space-y-6">
@@ -36,14 +35,11 @@ export function DashboardEmptyState() {
                 <p className="text-sm text-muted-foreground">
                   Complete onboarding to select your academic year and blocks.
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => router.push("/onboarding")}
-                >
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  Go to Onboarding
+                <Button variant="outline" size="sm" className="mt-2" asChild>
+                  <Link href="/onboarding">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Go to Onboarding
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -57,14 +53,11 @@ export function DashboardEmptyState() {
                 <p className="text-sm text-muted-foreground">
                   Start with a 10-question practice session to get familiar with the platform.
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => router.push("/student/practice/build?preset=tutor&count=10")}
-                >
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Start 10-Question Practice
+                <Button variant="outline" size="sm" className="mt-2" asChild>
+                  <Link href="/student/practice/build?preset=tutor&count=10">
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    Start 10-Question Practice
+                  </Link>
                 </Button>
               </div>
             </div>

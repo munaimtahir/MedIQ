@@ -19,10 +19,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums
-    op.execute("CREATE TYPE session_mode AS ENUM ('TUTOR', 'EXAM')")
-    op.execute("CREATE TYPE session_status AS ENUM ('ACTIVE', 'SUBMITTED', 'EXPIRED')")
-
+    # Enums will be created automatically by SQLAlchemy
     # Create test_sessions table
     op.create_table(
         "test_sessions",

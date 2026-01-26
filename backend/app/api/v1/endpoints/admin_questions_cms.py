@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.common.pagination import PaginatedResponse, PaginationParams, pagination_params
 from app.core.dependencies import require_roles
 from app.db.session import get_db
 from app.models.question_cms import Question, QuestionVersion
@@ -40,7 +41,7 @@ router = APIRouter(prefix="/admin/questions", tags=["Admin - Questions CMS"])
 
 @router.get(
     "",
-    response_model=list[QuestionListOut],
+    response_model=PaginatedResponse[QuestionListOut],
     summary="List questions",
     description="List questions with filtering, pagination, and search.",
 )
@@ -56,13 +57,12 @@ async def list_questions(
     cognitive_level: Annotated[str | None, Query(description="Filter by cognitive level")] = None,
     source_book: Annotated[str | None, Query(description="Filter by source book")] = None,
     q: Annotated[str | None, Query(description="Text search on stem")] = None,
-    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
-    page_size: Annotated[int, Query(ge=1, le=100, description="Page size")] = 20,
+    pagination: Annotated[PaginationParams, Depends(pagination_params)] = None,
     sort: Annotated[str, Query(description="Sort field (default: updated_at)")] = "updated_at",
     order: Annotated[str, Query(description="Sort order (asc/desc)")] = "desc",
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
-) -> list[QuestionListOut]:
+) -> PaginatedResponse[QuestionListOut]:
     """List questions with filters and pagination."""
     query = db.query(Question)
 
@@ -106,10 +106,36 @@ async def list_questions(
             query = query.order_by(Question.created_at.desc())
 
     # Apply pagination
-    skip = (page - 1) * page_size
-    questions = query.offset(skip).limit(page_size).all()
+    total = query.count()
+    questions = query.offset(pagination.offset).limit(pagination.page_size).all()
 
-    return [QuestionListOut.model_validate(q) for q in questions]
+    items: list[QuestionListOut] = []
+    for qobj in questions:
+        stem = (qobj.stem or "").strip()
+        snippet = (stem[:200] + "…") if len(stem) > 200 else (stem or None)
+        items.append(
+            QuestionListOut(
+                id=qobj.id,
+                status=qobj.status,
+                stem=snippet,
+                year_id=qobj.year_id,
+                block_id=qobj.block_id,
+                theme_id=qobj.theme_id,
+                difficulty=qobj.difficulty,
+                cognitive_level=qobj.cognitive_level,
+                source_book=qobj.source_book,
+                source_page=qobj.source_page,
+                created_at=qobj.created_at,
+                updated_at=qobj.updated_at,
+            )
+        )
+
+    return PaginatedResponse(
+        items=items,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        total=total,
+    )
 
 
 @router.post(
@@ -192,6 +218,19 @@ async def delete_question(
 
     db.delete(question)
     db.commit()
+    
+    # Emit outbox event after commit (fail-open)
+    try:
+        from app.search.outbox_emit import emit_search_outbox_event
+        from app.models.search_indexing import SearchOutboxEventType
+        emit_search_outbox_event(
+            db=db,
+            event_type=SearchOutboxEventType.QUESTION_DELETED,
+            question_id=question_id,
+        )
+    except Exception:
+        # Fail-open: log but don't raise
+        pass
 
 
 # ============================================================================

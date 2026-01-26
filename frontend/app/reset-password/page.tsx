@@ -36,8 +36,8 @@ function ResetPasswordForm() {
 
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
+    } else if (password.length < 10) {
+      newErrors.password = "Password must be at least 10 characters";
     } else if (!/[a-zA-Z]/.test(password)) {
       newErrors.password = "Password must contain at least one letter";
     } else if (!/[0-9]/.test(password)) {
@@ -68,9 +68,10 @@ function ResetPasswordForm() {
     setErrors({});
 
     try {
-      const response = await fetch("/api/auth/reset-password", {
+      const response = await fetch("/api/v1/auth/password-reset/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           token,
           new_password: password,
@@ -94,6 +95,10 @@ function ResetPasswordForm() {
         }
       } else {
         setSuccess(true);
+        // Show toast and redirect after a brief delay
+        setTimeout(() => {
+          router.push("/login?reset=success");
+        }, 1500);
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An error occurred";
@@ -193,7 +198,7 @@ function ResetPasswordForm() {
             }}
             placeholder="Enter your new password"
             error={errors.password}
-            helperText="Use at least 8 characters with letters and numbers."
+            helperText="Use at least 10 characters with letters and numbers."
             autoComplete="new-password"
           />
         </div>

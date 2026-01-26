@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db
 from app.models.session import TestSession
 from app.models.user import User
 from app.schemas.learning import (
@@ -123,10 +123,10 @@ async def recompute_mastery(
     # Enforce user scope
     effective_user_id = assert_user_scope(request.user_id, current_user)
 
-    # Call mastery service
-    from app.learning_engine.mastery.service import recompute_mastery_v0_for_user
+    # Call router (routes to v0 or v1 based on runtime config)
+    from app.learning_engine.router import recompute_mastery_for_user
 
-    result = await recompute_mastery_v0_for_user(
+    result = await recompute_mastery_for_user(
         db,
         user_id=effective_user_id,
         theme_ids=None,  # Recompute all themes
@@ -181,10 +181,10 @@ async def generate_revision_plan(
     # Enforce user scope
     effective_user_id = assert_user_scope(request.user_id, current_user)
 
-    # Call revision service
-    from app.learning_engine.revision.service import generate_revision_queue_v0
+    # Call router (routes to v0 or v1 based on runtime config)
+    from app.learning_engine.router import generate_revision_queue_for_user
 
-    result = await generate_revision_queue_v0(
+    result = await generate_revision_queue_for_user(
         db,
         user_id=effective_user_id,
         year=request.year,
@@ -218,6 +218,7 @@ async def generate_revision_plan(
 
 # ============================================================================
 # Task 113: POST /v1/learning/adaptive/next
+# Task 122: Upgrade to v1 with Thompson Sampling
 # ============================================================================
 
 
@@ -228,49 +229,64 @@ async def adaptive_next_questions(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
-    Select next best questions using Adaptive v0.
+    Select next best questions using Adaptive Selection.
 
+    v1 (default): Constrained Thompson Sampling over themes with:
+    - BKT mastery signals (weakness)
+    - FSRS due concepts (revision priority)
+    - Elo challenge band (desirable difficulty)
+    - Per-user Beta posteriors (learning yield optimization)
+
+    v0 (fallback): Rule-based selection if v1 not configured
+
+    Features:
     - Students can only select for themselves
     - Admins/Reviewers can specify any user_id
     - Does NOT create a session (returns question_ids only)
-    - Deterministic output for same inputs
+    - Deterministic output for same inputs (seeded RNG)
     """
     require_student_or_admin(current_user)
 
     # Enforce user scope
     effective_user_id = assert_user_scope(request.user_id, current_user)
 
-    # Call adaptive service
-    from app.learning_engine.adaptive.service import adaptive_select_v0
+    # Call router (routes to v0 or v1 based on runtime config)
+    from app.learning_engine.router import adaptive_next
 
-    result = await adaptive_select_v0(
+    question_ids = await adaptive_next(
         db,
         user_id=effective_user_id,
-        year=request.year,
-        block_ids=request.block_ids,
-        theme_ids=request.theme_ids,
-        count=request.count,
-        mode=request.mode,
-        trigger=f"api_{request.source}",
+        context={
+            "year": request.year,
+            "block_ids": request.block_ids,
+            "theme_ids": request.theme_ids,
+            "count": request.count,
+            "mode": request.mode,
+            "source": request.source,
+        },
     )
 
-    # Get algo info
+    # Get algo info (router handles version selection)
     from app.learning_engine.constants import AlgoKey
     from app.learning_engine.registry import resolve_active
+    from app.learning_engine.runtime import get_algo_version
 
-    version, params_obj = await resolve_active(db, AlgoKey.ADAPTIVE.value)
+    adaptive_version = await get_algo_version(db, "adaptive")
+    if adaptive_version == "v1":
+        version, params_obj = await resolve_active(db, AlgoKey.ADAPTIVE_V1.value)
+        if not version or not params_obj:
+            # Fallback to v0 if v1 not configured
+            version, params_obj = await resolve_active(db, AlgoKey.ADAPTIVE.value)
+    else:
+        version, params_obj = await resolve_active(db, AlgoKey.ADAPTIVE.value)
 
     if not version or not params_obj:
         raise HTTPException(status_code=500, detail="Adaptive algorithm not configured")
 
-    # Compute difficulty distribution (from question_ids)
-    # For now, simple placeholder - could query question_difficulty table
-    question_ids = result.get("question_ids", [])
-
     # Build response
     summary = AdaptiveNextSummary(
         count=len(question_ids),
-        themes_used=[],  # Could extract from selection metadata
+        themes_used=[],
         difficulty_distribution={
             "easy": 0,
             "medium": len(question_ids),
@@ -281,7 +297,7 @@ async def adaptive_next_questions(
 
     return LearningResponse(
         ok=True,
-        run_id=UUID(result["run_id"]),
+        run_id=UUID("00000000-0000-0000-0000-000000000000"),  # Router doesn't return run_id yet
         algo=AlgoInfo(key="adaptive", version=version.version),
         params_id=params_obj.id,
         summary=summary.model_dump(),
@@ -369,15 +385,17 @@ async def classify_mistakes(
     require_student_or_admin(current_user)
 
     # Verify session ownership
-    await assert_session_ownership(db, request.session_id, current_user)
+    session = await assert_session_ownership(db, request.session_id, current_user)
 
-    # Call mistakes service
-    from app.learning_engine.mistakes.service import classify_mistakes_v0_for_session
+    # Call router (routes to v0 or v1 based on session snapshot)
+    from app.learning_engine.router import classify_mistakes_for_session
 
-    result = await classify_mistakes_v0_for_session(
+    result = await classify_mistakes_for_session(
         db,
         session_id=request.session_id,
         trigger="api",
+        session_profile=session.algo_profile_at_start,
+        session_overrides=session.algo_overrides_at_start,
     )
 
     # Handle errors from service

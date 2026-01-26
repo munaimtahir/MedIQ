@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import Link from "next/link";
-import gsap from "gsap";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface AuthPageLayoutProps {
@@ -11,27 +11,12 @@ interface AuthPageLayoutProps {
 }
 
 export function AuthPageLayout({ children, className }: AuthPageLayoutProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (!containerRef.current) return;
-
-    if (prefersReducedMotion) {
-      gsap.set(containerRef.current, { opacity: 1 });
-    } else {
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.3, ease: "power2.out" },
-      );
-    }
-  }, []);
 
   return (
-    <div
-      ref={containerRef}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
         "min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30",
         className,
@@ -70,6 +55,6 @@ export function AuthPageLayout({ children, className }: AuthPageLayoutProps) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

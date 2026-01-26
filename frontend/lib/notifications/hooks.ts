@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { NotificationItem, NotificationsResponse, MarkAllReadResponse } from "./types";
 import { useToast } from "@/components/ui/use-toast";
+import { logger } from "@/lib/logger";
 
 interface UseNotificationsResult {
   items: NotificationItem[];
@@ -98,7 +99,7 @@ export function useNotifications(): UseNotificationsResult {
         };
       });
     } catch (error) {
-      console.error("Failed to mark all as read:", error);
+      logger.error("Failed to mark all as read:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to mark all as read",

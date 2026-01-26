@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
-export function Navbar() {
-  const router = useRouter();
+export const Navbar = memo(function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -15,7 +13,8 @@ export function Navbar() {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
-    window.addEventListener("scroll", handleScroll);
+    // Passive listener for better scroll performance
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -61,18 +60,14 @@ export function Navbar() {
 
           {/* CTA Buttons */}
           <div className="hidden items-center gap-4 md:flex">
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/login")}
-              className="text-slate-600 hover:text-slate-900"
-            >
-              Login
+            <Button variant="ghost" asChild className="text-slate-600 hover:text-slate-900">
+              <Link href="/login">Login</Link>
             </Button>
             <Button
-              onClick={() => router.push("/signup")}
+              asChild
               className="bg-primary shadow-sm transition-all hover:bg-primary/90 hover:shadow-md"
             >
-              Get Started
+              <Link href="/signup">Get Started</Link>
             </Button>
           </div>
 
@@ -102,24 +97,15 @@ export function Navbar() {
               </a>
             ))}
             <div className="space-y-2 border-t border-slate-200 pt-4">
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={() => {
-                  router.push("/login");
-                  setMobileMenuOpen(false);
-                }}
-              >
-                Login
+              <Button variant="ghost" className="w-full" asChild>
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                  Login
+                </Link>
               </Button>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  router.push("/signup");
-                  setMobileMenuOpen(false);
-                }}
-              >
-                Get Started
+              <Button className="w-full" asChild>
+                <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                  Get Started
+                </Link>
               </Button>
             </div>
           </div>
@@ -127,4 +113,4 @@ export function Navbar() {
       )}
     </nav>
   );
-}
+});

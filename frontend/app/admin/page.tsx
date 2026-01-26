@@ -9,6 +9,7 @@ import { SyllabusShortcutsCard } from "@/components/admin/dashboard/SyllabusShor
 import { CsvToolsCard } from "@/components/admin/dashboard/CsvToolsCard";
 import { AdminDashboardSkeleton } from "@/components/admin/dashboard/AdminDashboardSkeleton";
 import { KpiCard } from "@/components/admin/dashboard/KpiCard";
+import { TagQualityDebtCard } from "@/components/admin/dashboard/TagQualityDebtCard";
 import { useAdminDashboardSummary, useSystemReady } from "@/lib/admin/dashboard/hooks";
 import { useAttentionItems } from "@/lib/admin/dashboard/useAttentionItems";
 import { FileQuestion, Upload } from "lucide-react";
@@ -92,6 +93,7 @@ export default function AdminDashboard() {
         {/* Right Column */}
         <div className="space-y-6">
           <SyllabusShortcutsCard loading={summaryLoading} />
+          <TagQualityDebtCard />
           <CsvToolsCard loading={false} />
         </div>
       </div>

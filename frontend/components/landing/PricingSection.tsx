@@ -1,13 +1,10 @@
-"use client";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function PricingSection() {
-  const router = useRouter();
 
   return (
     <section id="pricing" className="bg-slate-50 py-24">
@@ -45,8 +42,8 @@ export function PricingSection() {
                   <span className="text-slate-700">Progress tracking</span>
                 </li>
               </ul>
-              <Button variant="outline" className="w-full" onClick={() => router.push("/login")}>
-                Get Started
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/login">Get Started</Link>
               </Button>
             </CardContent>
           </Card>

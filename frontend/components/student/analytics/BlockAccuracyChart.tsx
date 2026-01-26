@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import type { BlockSummary } from "@/lib/types/analytics";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -9,10 +10,22 @@ interface BlockAccuracyChartProps {
   title?: string;
 }
 
-export function BlockAccuracyChart({
+export const BlockAccuracyChart = memo(function BlockAccuracyChart({
   data,
   title = "Performance by Block",
 }: BlockAccuracyChartProps) {
+  // Memoize chart data transformation
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    return data.map((item) => ({
+      name: item.block_name.substring(0, 20),
+      accuracy: item.accuracy_pct,
+      attempted: item.attempted,
+      correct: item.correct,
+    }));
+  }, [data]);
+  
   if (!data || data.length === 0) {
     return (
       <Card className="p-6">
@@ -23,13 +36,6 @@ export function BlockAccuracyChart({
       </Card>
     );
   }
-
-  const chartData = data.map((item) => ({
-    name: item.block_name.substring(0, 20),
-    accuracy: item.accuracy_pct,
-    attempted: item.attempted,
-    correct: item.correct,
-  }));
 
   return (
     <Card className="p-6">
@@ -83,4 +89,4 @@ export function BlockAccuracyChart({
       </ResponsiveContainer>
     </Card>
   );
-}
+});

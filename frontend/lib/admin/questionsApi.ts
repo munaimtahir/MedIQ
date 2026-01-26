@@ -56,7 +56,10 @@ export const adminQuestionsApi = {
       throw new Error(errorData.error?.message || errorData.detail || "Failed to load questions");
     }
 
-    return response.json();
+    const data = (await response.json()) as
+      | { items: QuestionListItem[]; page: number; page_size: number; total: number }
+      | QuestionListItem[];
+    return Array.isArray(data) ? data : data.items;
   },
 
   /**

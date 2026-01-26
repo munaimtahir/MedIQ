@@ -11,7 +11,7 @@ import logging
 import math
 from datetime import datetime, timedelta
 
-from fsrs import FSRS, Card, Rating, ReviewLog
+from fsrs import Scheduler, Card, Rating, ReviewLog
 
 from app.learning_engine.config import (
     FSRS_DEFAULT_WEIGHTS,
@@ -78,8 +78,8 @@ def compute_next_state_and_due(
     if len(weights) != 19:
         raise ValueError(f"FSRS-6 requires 19 weights, got {len(weights)}")
 
-    # Create FSRS scheduler
-    scheduler = FSRS(w=weights, request_retention=desired_retention)
+    # Create FSRS scheduler with parameters
+    scheduler = Scheduler(parameters=weights, desired_retention=desired_retention)
 
     # Create Card object
     if current_stability is None or current_difficulty is None:
@@ -102,21 +102,19 @@ def compute_next_state_and_due(
     }
     fsrs_rating = rating_map[rating]
 
-    # Compute retrievability at review time
+    # Compute retrievability at review time (before the review)
     if current_stability is not None and delta_days > 0:
-        retrievability = scheduler.forgetting_curve(
-            elapsed_days=delta_days, stability=current_stability
-        )
+        retrievability = scheduler.get_card_retrievability(card)
     else:
         retrievability = 1.0  # First review or immediate review
 
-    # Schedule next review
-    scheduled_card = scheduler.repeat(card, reviewed_at)[fsrs_rating]
+    # Schedule next review using review_card
+    updated_card, review_log = scheduler.review_card(card, fsrs_rating)
 
-    # Extract new state
-    new_stability = scheduled_card.card.stability
-    new_difficulty = scheduled_card.card.difficulty
-    new_due_at = scheduled_card.card.due
+    # Extract new state from updated card
+    new_stability = updated_card.stability
+    new_difficulty = updated_card.difficulty
+    new_due_at = updated_card.due
 
     # Validate outputs (numerical stability checks)
     if not math.isfinite(new_stability) or new_stability <= 0:

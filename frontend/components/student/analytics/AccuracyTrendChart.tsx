@@ -1,8 +1,9 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import type { DailyTrend } from "@/lib/types/analytics";
-import { format, parseISO } from "date-fns";
+import { format, parseISO } from "@/lib/dateUtils";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface AccuracyTrendChartProps {
@@ -10,7 +11,21 @@ interface AccuracyTrendChartProps {
   title?: string;
 }
 
-export function AccuracyTrendChart({ data, title = "Accuracy Trend" }: AccuracyTrendChartProps) {
+export const AccuracyTrendChart = memo(function AccuracyTrendChart({ 
+  data, 
+  title = "Accuracy Trend" 
+}: AccuracyTrendChartProps) {
+  // Memoize chart data transformation
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
+    return data.map((item) => ({
+      date: format(parseISO(item.date), "MMM d"),
+      accuracy: item.accuracy_pct,
+      attempted: item.attempted,
+    }));
+  }, [data]);
+  
   if (!data || data.length === 0) {
     return (
       <Card className="p-6">
@@ -21,12 +36,6 @@ export function AccuracyTrendChart({ data, title = "Accuracy Trend" }: AccuracyT
       </Card>
     );
   }
-
-  const chartData = data.map((item) => ({
-    date: format(parseISO(item.date), "MMM d"),
-    accuracy: item.accuracy_pct,
-    attempted: item.attempted,
-  }));
 
   return (
     <Card className="p-6">
@@ -84,4 +93,4 @@ export function AccuracyTrendChart({ data, title = "Accuracy Trend" }: AccuracyT
       </ResponsiveContainer>
     </Card>
   );
-}
+});

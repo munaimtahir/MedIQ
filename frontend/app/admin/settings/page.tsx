@@ -3,19 +3,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAdminSettings, useSystemInfo, PlatformSettings } from "@/lib/admin/settings/hooks";
+import { useAdminSettings, useSystemInfo, type PlatformSettings } from "@/lib/admin/settings/hooks";
 import { GeneralSettings } from "@/components/admin/settings/GeneralSettings";
 import { PracticeSettings } from "@/components/admin/settings/PracticeSettings";
 import { SecuritySettings } from "@/components/admin/settings/SecuritySettings";
 import { NotificationSettings } from "@/components/admin/settings/NotificationSettings";
-import { SystemInfo } from "@/components/admin/settings/SystemInfo";
+import { SystemInfo, SystemControls } from "@/components/admin/settings/SystemInfo";
 import { SettingsSkeleton } from "@/components/admin/settings/SettingsSkeleton";
 import { InlineError } from "@/components/admin/settings/InlineError";
 import { Save } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const { settings: serverSettings, loading, error, updateSettings } = useAdminSettings();
-  const { info, loading: infoLoading } = useSystemInfo();
   const [draftSettings, setDraftSettings] = useState<PlatformSettings | null>(null);
 
   // Initialize draft when server settings load
@@ -110,7 +109,7 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         <TabsContent value="system">
-          <SystemInfo info={info} loading={infoLoading} />
+          <SystemControls />
         </TabsContent>
       </Tabs>
     </div>

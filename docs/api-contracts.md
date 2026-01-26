@@ -795,7 +795,11 @@ Generate revision queue entries for a user.
 
 ### POST /v1/learning/adaptive/next
 
-Select next best questions using Adaptive v0 algorithm.
+Select next best questions using Adaptive Selection.
+
+**Versions:**
+- **v1 (default)**: Constrained Thompson Sampling over themes with BKT/FSRS/Elo integration
+- **v0 (fallback)**: Rule-based selection if v1 not configured
 
 **Authentication:** Required (Student/Admin/Reviewer)
 
@@ -804,24 +808,59 @@ Select next best questions using Adaptive v0 algorithm.
 {
   "user_id": "uuid | null",
   "year": 1,
-  "block_ids": ["uuid"],
-  "theme_ids": ["uuid"] | null,
+  "block_ids": [1, 2],
+  "theme_ids": [10, 20] | null,
   "count": 20,
   "mode": "tutor",
-  "source": "weakness"
+  "source": "mixed"
 }
 ```
 
 **Request Fields:**
 - `user_id` (optional): Target user (defaults to current user)
 - `year` (required): Academic year (1-6)
-- `block_ids` (required): List of block UUIDs (min 1)
+- `block_ids` (required): List of block IDs (integers, min 1)
 - `theme_ids` (optional): Filter to specific themes
 - `count` (required): Number of questions to select (1-100)
-- `mode` (required): "tutor" or "exam"
-- `source` (optional): "revision" or "weakness" (default: "weakness")
+- `mode` (required): "tutor", "exam", or "revision"
+- `source` (optional): "mixed", "revision", or "weakness" (default: "mixed")
 
-**Response:**
+**Response (v1):**
+```json
+{
+  "ok": true,
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "algo": {
+    "key": "adaptive_selection",
+    "version": "v1"
+  },
+  "params_id": "660e8400-e29b-41d4-a716-446655440000",
+  "summary": {
+    "count": 20,
+    "question_ids": ["uuid1", "uuid2", "..."],
+    "plan": {
+      "themes": [
+        {
+          "theme_id": 123,
+          "quota": 10,
+          "base_priority": 0.73,
+          "sampled_y": 0.41,
+          "final_score": 0.34
+        }
+      ],
+      "due_ratio": 0.65,
+      "p_band": {"low": 0.55, "high": 0.80},
+      "stats": {
+        "excluded_recent": 12,
+        "explore_used": 2,
+        "avg_p_correct": 0.68
+      }
+    }
+  }
+}
+```
+
+**Response (v0 fallback):**
 ```json
 {
   "ok": true,
@@ -833,7 +872,7 @@ Select next best questions using Adaptive v0 algorithm.
   "params_id": "660e8400-e29b-41d4-a716-446655440000",
   "summary": {
     "count": 20,
-    "themes_used": ["uuid1", "uuid2"],
+    "themes_used": [],
     "difficulty_distribution": {
       "easy": 4,
       "medium": 12,
@@ -844,15 +883,33 @@ Select next best questions using Adaptive v0 algorithm.
 }
 ```
 
+**v1 Features:**
+- **Thompson Sampling**: Per-user per-theme Beta posteriors for explore/exploit balance
+- **BKT Integration**: Prioritizes themes with low mastery (weakness)
+- **FSRS Integration**: Prioritizes due concepts in revision mode
+- **Elo Challenge Band**: Selects questions with optimal difficulty (p(correct) ∈ [0.55, 0.80])
+- **Deterministic**: Same inputs on same day produce same output (seeded RNG)
+- **Explainable**: Plan shows themes, scores, and selection reasoning
+
+**v1 Plan Fields:**
+- `themes`: Selected themes with quota allocation and Thompson scores
+- `due_ratio`: Fraction of questions from FSRS due concepts
+- `p_band`: Elo difficulty target range
+- `stats.excluded_recent`: Questions excluded due to anti-repeat filter
+- `stats.explore_used`: Questions selected for exploration
+- `stats.avg_p_correct`: Average predicted probability of correctness
+
 **Important Notes:**
 - Does NOT create a session (returns question_ids only)
-- Deterministic output for same inputs
-- Prioritizes weak themes and revision-due themes
+- Deterministic output for same inputs (seeded by user_id + date + params)
+- Prioritizes weak themes, due concepts, and optimal difficulty
+- Interleaves questions across themes (except in exam mode)
 
 **Use Cases:**
-- Practice Builder: Get optimal questions for user
-- Revision Mode: Get questions for due themes
+- Practice Builder: Get optimal questions for user learning
+- Revision Mode: Get questions for FSRS due concepts
 - Adaptive Test: Get difficulty-matched questions
+- Weakness Mode: Focus on lowest mastery themes
 
 ---
 

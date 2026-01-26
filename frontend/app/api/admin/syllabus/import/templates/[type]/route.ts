@@ -4,15 +4,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function GET(request: NextRequest, { params }: { params: { type: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   try {
+    const { type } = await params;
     const cookies = request.headers.get("cookie") || "";
 
     const { data } = await backendFetch<{
       content: string;
       filename: string;
       content_type: string;
-    }>(`/admin/syllabus/import/templates/${params.type}`, {
+    }>(`/admin/syllabus/import/templates/${type}`, {
       method: "GET",
       cookies,
     });

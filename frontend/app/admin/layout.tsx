@@ -1,4 +1,6 @@
-import { AdminSidebar } from "@/components/admin/Sidebar";
+import { AdminSidebarWrapper } from "@/components/admin/AdminSidebarWrapper";
+import { ExamModeBanner } from "@/components/admin/ExamModeBanner";
+import { FreezeUpdatesBanner } from "@/components/admin/FreezeUpdatesBanner";
 import { requireRole } from "@/lib/server/authGuard";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -6,9 +8,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireRole(["ADMIN", "REVIEWER"]);
 
   return (
-    <div className="flex min-h-screen">
-      <AdminSidebar />
-      <main className="flex-1 p-8">{children}</main>
+    <div className="flex min-h-screen flex-col">
+      <AdminSidebarWrapper>
+        <ExamModeBanner />
+        <FreezeUpdatesBanner />
+        {children}
+      </AdminSidebarWrapper>
     </div>
   );
 }

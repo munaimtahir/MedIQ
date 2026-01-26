@@ -64,14 +64,14 @@ services:
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ports:
       - "${ELASTICSEARCH_PORT:-9200}:9200"
-      - "${ELASTICSEARCH_TRANSPORT_PORT:-9300}:9300"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9200 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
       - exam_platform_network
 
@@ -92,18 +92,38 @@ services:
     container_name: exam_platform_backend
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://exam_user:change_me@postgres:5432/exam_platform}
+      - DATABASE_URL=postgresql+psycopg2://exam_user:exam_user_dev_pw@postgres:5432/exam_platform
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - CORS_ALLOW_ORIGINS_PUBLIC=${CORS_ALLOW_ORIGINS_PUBLIC:-}
+      - CORS_ALLOW_ORIGINS_APP=${CORS_ALLOW_ORIGINS_APP:-http://localhost:3000,http://localhost:3001}
+      - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS:-GET,POST,PUT,PATCH,DELETE,OPTIONS}
+      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS:-Authorization,Content-Type,X-Request-ID}
+      - CORS_EXPOSE_HEADERS=${CORS_EXPOSE_HEADERS:-X-Request-ID,X-Response-Time-ms,X-DB-Queries,X-DB-Time-ms}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-false}
       - JWT_SECRET=${JWT_SECRET:-change_me_super_secret}
       - JWT_ACCESS_TTL_MIN=${JWT_ACCESS_TTL_MIN:-60}
       - JWT_REFRESH_TTL_DAYS=${JWT_REFRESH_TTL_DAYS:-30}
+      - AUTH_TOKEN_PEPPER=${AUTH_TOKEN_PEPPER:-}
       - TOKEN_PEPPER=${TOKEN_PEPPER:-dev_token_pepper_change_in_production}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - NEO4J_ENABLED=${NEO4J_ENABLED:-false}
       - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
-      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-change_me}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-false}
       - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      - ELASTICSEARCH_INDEX_PREFIX=${ELASTICSEARCH_INDEX_PREFIX:-platform}
+      - ELASTICSEARCH_REQUEST_TIMEOUT_MS=${ELASTICSEARCH_REQUEST_TIMEOUT_MS:-2000}
+      - ELASTICSEARCH_BULK_BATCH_SIZE=${ELASTICSEARCH_BULK_BATCH_SIZE:-500}
+      - ELASTICSEARCH_RETRY_MAX=${ELASTICSEARCH_RETRY_MAX:-5}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENV=${ENV:-dev}
       - PROJECT_NAME=${PROJECT_NAME:-Medical Exam Platform API}
@@ -125,12 +145,28 @@ services:
       - EMAIL_FROM=${EMAIL_FROM:-noreply@local.test}
       - EMAIL_USE_TLS=${EMAIL_USE_TLS:-false}
       - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
+      - GO_RANKING_ENABLED=${GO_RANKING_ENABLED:-false}
+      - RANKING_GO_URL=${RANKING_GO_URL:-http://ranking-go:8080}
+      - SKIP_SEED=${SKIP_SEED:-false}
+      - EXAM_MODE=${EXAM_MODE:-false}
+      - ENABLE_HSTS=${ENABLE_HSTS:-false}
+      - ENABLE_CSP=${ENABLE_CSP:-false}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ../../../backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - exam_platform_network
+
+  ranking-go:
+    build:
+      context: ../../../services/ranking-go
+      dockerfile: Dockerfile
+    container_name: exam_platform_ranking_go
+    profiles:
+      - ranking-go
     networks:
       - exam_platform_network
 
@@ -145,19 +181,43 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/v1}
       - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Exam Prep Platform}
       - NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV:-development}
+      - NEXT_PUBLIC_FEATURE_STUDENT_CONCEPT_EXPLORER=${NEXT_PUBLIC_FEATURE_STUDENT_CONCEPT_EXPLORER:-false}
       - BACKEND_URL=${BACKEND_URL:-http://backend:8000}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - ACCESS_COOKIE_MAXAGE_SECONDS=${ACCESS_COOKIE_MAXAGE_SECONDS:-900}
       - REFRESH_COOKIE_MAXAGE_SECONDS=${REFRESH_COOKIE_MAXAGE_SECONDS:-1209600}
+      # Optimized Node options for Next.js 16 + Turbopack
+      - NODE_OPTIONS=--max-old-space-size=4096
+      # File watching optimizations for Docker on Windows
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+        reservations:
+          memory: 2g
     depends_on:
       - backend
     volumes:
-      - ../../../frontend:/app
-      - /app/node_modules
-      - /app/.next
-    command: npm run dev
+      # Isolated node_modules to avoid Windows filesystem overhead
+      - frontend_node_modules:/app/node_modules
+      # Mount .next cache for Turbopack persistence
+      - frontend_next_cache:/app/.next
+      # Only mount source directories
+      - ../../../frontend/app:/app/app
+      - ../../../frontend/components:/app/components
+      - ../../../frontend/lib:/app/lib
+      - ../../../frontend/store:/app/store
+      - ../../../frontend/public:/app/public
+      - ../../../frontend/next.config.js:/app/next.config.js
+      - ../../../frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ../../../frontend/tsconfig.json:/app/tsconfig.json
+      - ../../../frontend/postcss.config.js:/app/postcss.config.js
+    command: pnpm run dev
     networks:
       - exam_platform_network
 
@@ -167,6 +227,8 @@ volumes:
   neo4j_data:
   neo4j_logs:
   elasticsearch_data:
+  frontend_node_modules:
+  frontend_next_cache:
 
 networks:
   exam_platform_network:

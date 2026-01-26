@@ -180,6 +180,23 @@ async def update_difficulty_from_attempt(
     if occurred_at is None:
         occurred_at = datetime.now(UTC)
 
+    # Check if IRT is active for scoring
+    from app.learning_engine.irt.runtime import get_irt_scope, is_irt_active
+
+    irt_active = await is_irt_active(db)
+    irt_scope = await get_irt_scope(db)
+
+    # If IRT is active and scope includes scoring, use IRT-based scoring
+    # TODO: Implement IRT-based scoring when IRT scoring module is ready
+    # For now, always use baseline (ELO difficulty)
+    if irt_active and irt_scope in ("scoring_only", "selection_and_scoring"):
+        logger.info(
+            f"IRT is active with scope {irt_scope}, but IRT scoring not yet implemented. "
+            "Falling back to baseline (ELO difficulty)."
+        )
+        # When IRT scoring is implemented, call it here:
+        # irt_score = await irt_compute_score(...)
+
     # Resolve active algorithm version and params
     algo_version, algo_params = await resolve_active(db, AlgoKey.DIFFICULTY)
     if not algo_version or not algo_params:

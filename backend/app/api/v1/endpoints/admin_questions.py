@@ -3,14 +3,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.common.pagination import PaginatedResponse, PaginationParams, pagination_params
 from app.core.dependencies import require_roles
 from app.db.session import get_db
 from app.models.question import QuestionLegacy as Question
 from app.models.syllabus import Theme
 from app.models.user import User, UserRole
-from app.schemas.question import QuestionCreate, QuestionResponse, QuestionUpdate
+from app.schemas.question import (
+    QuestionCreate,
+    QuestionLegacyListItem,
+    QuestionResponse,
+    QuestionUpdate,
+)
 
-router = APIRouter(prefix="/admin/questions", tags=["Admin - Questions"])
+router = APIRouter(prefix="/admin/questions-legacy", tags=["Admin - Questions (Legacy)"])
 
 
 # ============================================================================
@@ -20,18 +26,17 @@ router = APIRouter(prefix="/admin/questions", tags=["Admin - Questions"])
 
 @router.get(
     "",
-    response_model=list[QuestionResponse],
+    response_model=PaginatedResponse[QuestionLegacyListItem],
     summary="List questions",
     description="List all questions with optional filtering and pagination.",
 )
 async def list_questions(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    pagination: PaginationParams = Depends(pagination_params),
     published: bool | None = Query(None, description="Filter by published status"),
     theme_id: int | None = Query(None, gt=0, description="Filter by theme ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER)),
-) -> list[QuestionResponse]:
+) -> PaginatedResponse[QuestionLegacyListItem]:
     """List all questions (admin view - includes all statuses)."""
     query = db.query(Question)
 
@@ -42,9 +47,31 @@ async def list_questions(
         query = query.filter(Question.theme_id == theme_id)
 
     # Apply pagination
-    questions = query.offset(skip).limit(limit).all()
+    total = query.count()
+    questions = query.offset(pagination.offset).limit(pagination.page_size).all()
 
-    return [QuestionResponse.model_validate(question) for question in questions]
+    items: list[QuestionLegacyListItem] = []
+    for q in questions:
+        text = (q.question_text or "").strip()
+        snippet = (text[:200] + "…") if len(text) > 200 else (text or "")
+        items.append(
+            QuestionLegacyListItem(
+                question_id=q.id,
+                stem_snippet=snippet,
+                status="PUBLISHED" if q.is_published else "DRAFT",
+                theme_id=q.theme_id,
+                difficulty=q.difficulty,
+                cognitive=None,
+                updated_at=q.updated_at,
+            )
+        )
+
+    return PaginatedResponse(
+        items=items,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        total=total,
+    )
 
 
 @router.post(

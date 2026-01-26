@@ -1,0 +1,158 @@
+-- Transform: MART_BLOCK_COMPARISONS_DAILY
+-- Computes daily block-level comparison metrics for cohort analysis
+-- Run daily after CURATED_ATTEMPT and CURATED_MASTERY are updated
+
+-- Full refresh
+-- TRUNCATE TABLE MART_BLOCK_COMPARISONS_DAILY;
+
+-- INSERT INTO MART_BLOCK_COMPARISONS_DAILY
+-- SELECT
+--     DATE(m.snapshot_at) AS snapshot_date,
+--     s.block_id,
+--     s.year,
+--     
+--     -- Performance metrics
+--     AVG(m.mastery_prob) AS avg_mastery,
+--     PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.mastery_prob) AS median_mastery,
+--     AVG(a.attempts_per_user) AS avg_attempts_per_user,
+--     AVG(CASE WHEN a.attempts_per_user > 0 THEN a.correct_per_user::FLOAT / a.attempts_per_user ELSE 0 END) AS avg_correct_rate,
+--     
+--     -- User counts
+--     COUNT(DISTINCT m.user_id) AS total_users,
+--     COUNT(DISTINCT CASE 
+--         WHEN EXISTS (
+--             SELECT 1 FROM CURATED_ATTEMPT a2 
+--             WHERE a2.user_id = m.user_id 
+--             AND DATE(a2.attempted_at) = DATE(m.snapshot_at)
+--         ) THEN m.user_id 
+--     END) AS active_users,
+--     COUNT(DISTINCT CASE 
+--         WHEN NOT EXISTS (
+--             SELECT 1 FROM CURATED_ATTEMPT a3 
+--             WHERE a3.user_id = m.user_id 
+--             AND DATE(a3.attempted_at) < DATE(m.snapshot_at)
+--             AND a3.block_id = s.block_id
+--         ) THEN m.user_id 
+--     END) AS new_users,
+--     
+--     -- Theme-level aggregates
+--     COUNT(DISTINCT s.theme_id) AS theme_count,
+--     AVG(themes_per_user.theme_count) AS avg_themes_per_user,
+--     
+--     CURRENT_TIMESTAMP() AS computed_at,
+--     m.algo_profile,
+--     m.algo_version_mastery
+-- FROM CURATED_MASTERY m
+-- INNER JOIN RAW_DIM_SYLLABUS s ON m.concept_id = s.concept_id
+-- LEFT JOIN (
+--     SELECT 
+--         user_id,
+--         block_id,
+--         DATE(snapshot_at) AS snapshot_date,
+--         COUNT(DISTINCT theme_id) AS theme_count
+--     FROM CURATED_MASTERY m2
+--     INNER JOIN RAW_DIM_SYLLABUS s2 ON m2.concept_id = s2.concept_id
+--     GROUP BY user_id, block_id, DATE(snapshot_at)
+-- ) themes_per_user ON themes_per_user.user_id = m.user_id 
+--     AND themes_per_user.block_id = s.block_id 
+--     AND themes_per_user.snapshot_date = DATE(m.snapshot_at)
+-- LEFT JOIN (
+--     SELECT 
+--         user_id,
+--         block_id,
+--         DATE(attempted_at) AS attempt_date,
+--         COUNT(*) AS attempts_per_user,
+--         SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct_per_user
+--     FROM CURATED_ATTEMPT
+--     GROUP BY user_id, block_id, DATE(attempted_at)
+-- ) a ON a.user_id = m.user_id 
+--     AND a.block_id = s.block_id 
+--     AND a.attempt_date = DATE(m.snapshot_at)
+-- WHERE DATE(m.snapshot_at) >= DATEADD(day, -90, CURRENT_DATE())
+-- GROUP BY 
+--     DATE(m.snapshot_at),
+--     s.block_id,
+--     s.year,
+--     m.algo_profile,
+--     m.algo_version_mastery;
+
+-- Incremental update (for daily runs)
+-- MERGE INTO MART_BLOCK_COMPARISONS_DAILY AS target
+-- USING (
+--     SELECT
+--         DATE(m.snapshot_at) AS snapshot_date,
+--         s.block_id,
+--         s.year,
+--         AVG(m.mastery_prob) AS avg_mastery,
+--         PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.mastery_prob) AS median_mastery,
+--         AVG(COALESCE(a.attempts_per_user, 0)) AS avg_attempts_per_user,
+--         AVG(CASE WHEN COALESCE(a.attempts_per_user, 0) > 0 
+--             THEN COALESCE(a.correct_per_user, 0)::FLOAT / a.attempts_per_user 
+--             ELSE 0 END) AS avg_correct_rate,
+--         COUNT(DISTINCT m.user_id) AS total_users,
+--         COUNT(DISTINCT CASE 
+--             WHEN EXISTS (
+--                 SELECT 1 FROM CURATED_ATTEMPT a2 
+--                 WHERE a2.user_id = m.user_id 
+--                 AND DATE(a2.attempted_at) = DATE(m.snapshot_at)
+--             ) THEN m.user_id 
+--         END) AS active_users,
+--         COUNT(DISTINCT CASE 
+--             WHEN NOT EXISTS (
+--                 SELECT 1 FROM CURATED_ATTEMPT a3 
+--                 WHERE a3.user_id = m.user_id 
+--                 AND DATE(a3.attempted_at) < DATE(m.snapshot_at)
+--                 AND a3.block_id = s.block_id
+--             ) THEN m.user_id 
+--         END) AS new_users,
+--         COUNT(DISTINCT s.theme_id) AS theme_count,
+--         AVG(COALESCE(themes_per_user.theme_count, 0)) AS avg_themes_per_user,
+--         CURRENT_TIMESTAMP() AS computed_at,
+--         m.algo_profile,
+--         m.algo_version_mastery
+--     FROM CURATED_MASTERY m
+--     INNER JOIN RAW_DIM_SYLLABUS s ON m.concept_id = s.concept_id
+--     LEFT JOIN (
+--         SELECT user_id, block_id, DATE(attempted_at) AS attempt_date,
+--             COUNT(*) AS attempts_per_user,
+--             SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct_per_user
+--         FROM CURATED_ATTEMPT
+--         GROUP BY user_id, block_id, DATE(attempted_at)
+--     ) a ON a.user_id = m.user_id AND a.block_id = s.block_id AND a.attempt_date = DATE(m.snapshot_at)
+--     LEFT JOIN (
+--         SELECT user_id, block_id, DATE(snapshot_at) AS snapshot_date,
+--             COUNT(DISTINCT theme_id) AS theme_count
+--         FROM CURATED_MASTERY m2
+--         INNER JOIN RAW_DIM_SYLLABUS s2 ON m2.concept_id = s2.concept_id
+--         GROUP BY user_id, block_id, DATE(snapshot_at)
+--     ) themes_per_user ON themes_per_user.user_id = m.user_id 
+--         AND themes_per_user.block_id = s.block_id 
+--         AND themes_per_user.snapshot_date = DATE(m.snapshot_at)
+--     WHERE DATE(m.snapshot_at) = CURRENT_DATE() - 1
+--     GROUP BY DATE(m.snapshot_at), s.block_id, s.year, m.algo_profile, m.algo_version_mastery
+-- ) AS source
+-- ON target.snapshot_date = source.snapshot_date 
+--     AND target.block_id = source.block_id 
+--     AND target.year = source.year
+-- WHEN MATCHED THEN UPDATE SET
+--     avg_mastery = source.avg_mastery,
+--     median_mastery = source.median_mastery,
+--     avg_attempts_per_user = source.avg_attempts_per_user,
+--     avg_correct_rate = source.avg_correct_rate,
+--     total_users = source.total_users,
+--     active_users = source.active_users,
+--     new_users = source.new_users,
+--     theme_count = source.theme_count,
+--     avg_themes_per_user = source.avg_themes_per_user,
+--     computed_at = source.computed_at
+-- WHEN NOT MATCHED THEN INSERT (
+--     snapshot_date, block_id, year, avg_mastery, median_mastery,
+--     avg_attempts_per_user, avg_correct_rate, total_users, active_users,
+--     new_users, theme_count, avg_themes_per_user, computed_at,
+--     algo_profile, algo_version_mastery
+-- ) VALUES (
+--     source.snapshot_date, source.block_id, source.year, source.avg_mastery, source.median_mastery,
+--     source.avg_attempts_per_user, source.avg_correct_rate, source.total_users, source.active_users,
+--     source.new_users, source.theme_count, source.avg_themes_per_user, source.computed_at,
+--     source.algo_profile, source.algo_version_mastery
+-- );

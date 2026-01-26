@@ -4,13 +4,13 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.question_cms import Question, QuestionVersion
 
 
 async def freeze_question(
-    db: AsyncSession, question_id: UUID
+    db: Session, question_id: UUID
 ) -> tuple[UUID | None, dict[str, Any] | None]:
     """
     Freeze question content for a session.
@@ -36,7 +36,7 @@ async def freeze_question(
         .order_by(QuestionVersion.version_number.desc())
         .limit(1)
     )
-    version_result = await db.execute(version_stmt)
+    version_result = db.execute(version_stmt)
     latest_version = version_result.scalar_one_or_none()
 
     if latest_version:
@@ -45,7 +45,7 @@ async def freeze_question(
 
     # Fallback: create snapshot from current question
     question_stmt = select(Question).where(Question.id == question_id)
-    question_result = await db.execute(question_stmt)
+    question_result = db.execute(question_stmt)
     question = question_result.scalar_one_or_none()
 
     if not question:
@@ -73,7 +73,7 @@ async def freeze_question(
 
 
 async def get_frozen_content(
-    db: AsyncSession,
+    db: Session,
     question_id: UUID,
     version_id: UUID | None,
     snapshot: dict[str, Any] | None,
@@ -93,7 +93,7 @@ async def get_frozen_content(
     if version_id:
         # Load from version
         version_stmt = select(QuestionVersion).where(QuestionVersion.id == version_id)
-        version_result = await db.execute(version_stmt)
+        version_result = db.execute(version_stmt)
         version = version_result.scalar_one_or_none()
 
         if not version:

@@ -48,9 +48,14 @@ class ImportSchema(Base):
     version = Column(Integer, nullable=False, default=1)
     is_active = Column(Boolean, nullable=False, default=False)
 
-    # File parsing config
+    # File parsing config (values_callable so we persist "csv"/"json", not "CSV"/"JSON")
     file_type = Column(
-        Enum(ImportFileType, name="import_file_type", create_type=True),
+        Enum(
+            ImportFileType,
+            name="import_file_type",
+            create_type=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         nullable=False,
         default=ImportFileType.CSV,
     )
@@ -102,7 +107,12 @@ class ImportJob(Base):
     )
     filename = Column(String(500), nullable=False)
     file_type = Column(
-        Enum(ImportFileType, name="import_file_type", create_type=False),
+        Enum(
+            ImportFileType,
+            name="import_file_type",
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         nullable=False,
     )
     dry_run = Column(Boolean, nullable=False, default=False)

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.learning_engine.adaptive.v0 import select_questions_v0
 from app.learning_engine.constants import AlgoKey
+from app.learning_engine.irt.runtime import get_irt_scope, is_irt_active
 from app.learning_engine.registry import resolve_active
 from app.learning_engine.runs import log_run_failure, log_run_start, log_run_success
 
@@ -53,6 +54,21 @@ async def adaptive_select_v0(
             }
 
         params = params_obj.params_json
+
+        # Check if IRT is active for selection
+        irt_active = await is_irt_active(db)
+        irt_scope = await get_irt_scope(db)
+
+        # If IRT is active and scope includes selection, use IRT-based selection
+        # TODO: Implement IRT-based selection when IRT selection module is ready
+        # For now, always use baseline (adaptive v0)
+        if irt_active and irt_scope in ("selection_only", "selection_and_scoring"):
+            logger.info(
+                f"IRT is active with scope {irt_scope}, but IRT selection not yet implemented. "
+                "Falling back to baseline (adaptive v0)."
+            )
+            # When IRT selection is implemented, call it here:
+            # question_ids = await irt_select_questions(...)
 
         # Start run logging
         run = await log_run_start(

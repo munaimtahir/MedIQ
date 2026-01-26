@@ -1,36 +1,30 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import Link from "next/link";
-import gsap from "gsap";
+import { motion } from "framer-motion";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
   rightPanel: React.ReactNode;
 }
 
+const container = {
+  hidden: { opacity: 1 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0 },
+};
+
 export function AuthLayout({ children, rightPanel }: AuthLayoutProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) return;
-
-    if (contentRef.current) {
-      const children = Array.from(contentRef.current.children) as HTMLElement[];
-      gsap.fromTo(
-        children,
-        { y: 12, opacity: 1 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.6,
-          stagger: 0.1,
-          ease: "power3.out",
-        },
-      );
-    }
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
@@ -50,17 +44,22 @@ export function AuthLayout({ children, rightPanel }: AuthLayoutProps) {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div ref={contentRef} className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2"
+        >
           {/* Left: Auth Card */}
-          <div className="flex w-full justify-center lg:justify-end">
+          <motion.div variants={item} className="flex w-full justify-center lg:justify-end">
             <div className="w-full max-w-[420px]">{children}</div>
-          </div>
+          </motion.div>
 
           {/* Right: Value Panel (Desktop only) */}
-          <div className="hidden lg:block">
+          <motion.div variants={item} className="hidden lg:block">
             <div className="max-w-md">{rightPanel}</div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
 
       {/* Footer */}

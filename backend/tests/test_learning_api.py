@@ -11,7 +11,7 @@ from app.models.learning_mastery import UserThemeMastery
 from app.models.mistakes import MistakeLog
 from app.models.question_cms import Question
 from app.models.session import SessionAnswer, SessionQuestion, TestSession
-from app.models.syllabus import AcademicYear, Block, Theme
+from app.models.syllabus import Year, Block, Theme
 from app.models.user import User
 
 # ============================================================================
@@ -20,23 +20,32 @@ from app.models.user import User
 
 
 @pytest.mark.asyncio
-async def test_student_cannot_recompute_mastery_for_another_user(db: AsyncSession):
+async def test_student_cannot_recompute_mastery_for_another_user(db_session: AsyncSession):
     """Test that students can only recompute mastery for themselves."""
+    from app.core.security import hash_password
+    from app.models.user import UserRole
+    
     # Create two students
     student1 = User(
         id=uuid4(),
         email="student1@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Student One",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
     student2 = User(
         id=uuid4(),
         email="student2@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Student Two",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add_all([student1, student2])
-    await db.commit()
+    db_session.add_all([student1, student2])
+    await db_session.flush()
 
     # Try to recompute mastery for student2 as student1
     from app.api.v1.endpoints.learning import assert_user_scope
@@ -48,23 +57,29 @@ async def test_student_cannot_recompute_mastery_for_another_user(db: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def test_admin_can_recompute_mastery_for_another_user(db: AsyncSession):
+async def test_admin_can_recompute_mastery_for_another_user(db_session: AsyncSession):
     """Test that admins can recompute mastery for any user."""
     # Create admin and student
     admin = User(
         id=uuid4(),
         email="admin@example.com",
-        hashed_password="hashed",
-        role="ADMIN",
+        password_hash=hash_password("Test123!"),
+        full_name="Test Admin",
+        role=UserRole.ADMIN.value,
+        is_active=True,
+        email_verified=True,
     )
     student = User(
         id=uuid4(),
         email="student@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add_all([admin, student])
-    await db.commit()
+    db_session.add_all([admin, student])
+    await db_session.flush()
 
     # Admin can specify another user
     from app.api.v1.endpoints.learning import assert_user_scope
@@ -74,22 +89,28 @@ async def test_admin_can_recompute_mastery_for_another_user(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_session_ownership_enforced_for_student(db: AsyncSession):
+async def test_session_ownership_enforced_for_student(db_session: AsyncSession):
     """Test that students can only access their own sessions."""
     # Create two students
     student1 = User(
         id=uuid4(),
         email="student1@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
     student2 = User(
         id=uuid4(),
         email="student2@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add_all([student1, student2])
+    db_session.add_all([student1, student2])
 
     # Create session owned by student2
     session = TestSession(
@@ -99,8 +120,8 @@ async def test_session_ownership_enforced_for_student(db: AsyncSession):
         status="SUBMITTED",
         count=0,
     )
-    db.add(session)
-    await db.commit()
+    db_session.add(session)
+    await db_session.flush()
 
     # Student1 tries to access student2's session
     from app.api.v1.endpoints.learning import assert_session_ownership
@@ -112,22 +133,28 @@ async def test_session_ownership_enforced_for_student(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_admin_can_access_any_session(db: AsyncSession):
+async def test_admin_can_access_any_session(db_session: AsyncSession):
     """Test that admins can access any session."""
     # Create admin and student
     admin = User(
         id=uuid4(),
         email="admin@example.com",
-        hashed_password="hashed",
-        role="ADMIN",
+        password_hash=hash_password("Test123!"),
+        full_name="Test Admin",
+        role=UserRole.ADMIN.value,
+        is_active=True,
+        email_verified=True,
     )
     student = User(
         id=uuid4(),
         email="student@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add_all([admin, student])
+    db_session.add_all([admin, student])
 
     # Create session owned by student
     session = TestSession(
@@ -137,8 +164,8 @@ async def test_admin_can_access_any_session(db: AsyncSession):
         status="SUBMITTED",
         count=0,
     )
-    db.add(session)
-    await db.commit()
+    db_session.add(session)
+    await db_session.flush()
 
     # Admin can access student's session
     from app.api.v1.endpoints.learning import assert_session_ownership
@@ -153,16 +180,19 @@ async def test_admin_can_access_any_session(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_difficulty_update_idempotency(db: AsyncSession):
+async def test_difficulty_update_idempotency(db_session: AsyncSession):
     """Test that calling difficulty update twice doesn't duplicate records."""
     # Setup: user, question, session, answer
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     question = Question(
         id=uuid4(),
@@ -172,7 +202,7 @@ async def test_difficulty_update_idempotency(db: AsyncSession):
         stem_text="Q1",
         status="PUBLISHED",
     )
-    db.add(question)
+    db_session.add(question)
 
     session = TestSession(
         id=uuid4(),
@@ -182,7 +212,7 @@ async def test_difficulty_update_idempotency(db: AsyncSession):
         count=1,
         submitted_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     sq = SessionQuestion(
         id=uuid4(),
@@ -190,7 +220,7 @@ async def test_difficulty_update_idempotency(db: AsyncSession):
         question_id=question.id,
         order_index=0,
     )
-    db.add(sq)
+    db_session.add(sq)
 
     answer = SessionAnswer(
         id=uuid4(),
@@ -201,9 +231,9 @@ async def test_difficulty_update_idempotency(db: AsyncSession):
         is_correct=True,
         changed_count=0,
     )
-    db.add(answer)
+    db_session.add(answer)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call difficulty update twice
     from app.learning_engine.difficulty.service import update_question_difficulty_v0_for_session
@@ -219,23 +249,26 @@ async def test_difficulty_update_idempotency(db: AsyncSession):
     from app.models.learning_difficulty import QuestionDifficulty
 
     stmt = select(QuestionDifficulty).where(QuestionDifficulty.question_id == question.id)
-    result = await db.execute(stmt)
+    result = await db_session.execute(stmt)
     difficulties = result.scalars().all()
 
     assert len(difficulties) == 1  # Not duplicated
 
 
 @pytest.mark.asyncio
-async def test_mistakes_classify_idempotency(db: AsyncSession):
+async def test_mistakes_classify_idempotency(db_session: AsyncSession):
     """Test that calling mistakes classify twice doesn't duplicate records."""
     # Setup: user, question, session, wrong answer
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     question = Question(
         id=uuid4(),
@@ -245,7 +278,7 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
         stem_text="Q1",
         status="PUBLISHED",
     )
-    db.add(question)
+    db_session.add(question)
 
     session = TestSession(
         id=uuid4(),
@@ -255,7 +288,7 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
         count=1,
         submitted_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     sq = SessionQuestion(
         id=uuid4(),
@@ -263,7 +296,7 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
         question_id=question.id,
         order_index=0,
     )
-    db.add(sq)
+    db_session.add(sq)
 
     answer = SessionAnswer(
         id=uuid4(),
@@ -274,9 +307,9 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
         is_correct=False,  # Wrong
         changed_count=0,
     )
-    db.add(answer)
+    db_session.add(answer)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call mistakes classify twice
     from app.learning_engine.mistakes.service import classify_mistakes_v0_for_session
@@ -293,7 +326,7 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
         MistakeLog.session_id == session.id,
         MistakeLog.question_id == question.id,
     )
-    result = await db.execute(stmt)
+    result = await db_session.execute(stmt)
     mistakes = result.scalars().all()
 
     assert len(mistakes) == 1  # Not duplicated
@@ -305,22 +338,25 @@ async def test_mistakes_classify_idempotency(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_mastery_recompute_returns_run_id(db: AsyncSession):
+async def test_mastery_recompute_returns_run_id(db_session: AsyncSession):
     """Test that mastery recompute always returns run_id."""
     # Setup: user, year, block, theme
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -329,9 +365,9 @@ async def test_mastery_recompute_returns_run_id(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call mastery recompute
     from app.learning_engine.mastery.service import recompute_mastery_v0_for_user
@@ -344,24 +380,27 @@ async def test_mastery_recompute_returns_run_id(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_revision_plan_returns_run_id(db: AsyncSession):
+async def test_revision_plan_returns_run_id(db_session: AsyncSession):
     """Test that revision plan always returns run_id."""
     # Setup: user, year, block
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    db_session.add(block)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call revision plan
     from app.learning_engine.revision.service import generate_revision_queue_v0
@@ -380,22 +419,25 @@ async def test_revision_plan_returns_run_id(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_select_returns_run_id(db: AsyncSession):
+async def test_adaptive_select_returns_run_id(db_session: AsyncSession):
     """Test that adaptive select always returns run_id."""
     # Setup: user, year, block, theme, questions
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -404,7 +446,7 @@ async def test_adaptive_select_returns_run_id(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create questions
     for i in range(5):
@@ -416,9 +458,9 @@ async def test_adaptive_select_returns_run_id(db: AsyncSession):
             stem_text=f"Q{i}",
             status="PUBLISHED",
         )
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call adaptive select
     from app.learning_engine.adaptive.service import adaptive_select_v0
@@ -445,22 +487,25 @@ async def test_adaptive_select_returns_run_id(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_mastery_recompute_dry_run(db: AsyncSession):
+async def test_mastery_recompute_dry_run(db_session: AsyncSession):
     """Test that dry_run doesn't write to database."""
     # Setup: user, year, block, theme
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -469,9 +514,9 @@ async def test_mastery_recompute_dry_run(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call with dry_run=True
     from app.learning_engine.mastery.service import recompute_mastery_v0_for_user
@@ -484,7 +529,7 @@ async def test_mastery_recompute_dry_run(db: AsyncSession):
 
     # Verify no records written
     stmt = select(UserThemeMastery).where(UserThemeMastery.user_id == user.id)
-    mastery_result = await db.execute(stmt)
+    mastery_result = await db_session.execute(stmt)
     mastery_records = mastery_result.scalars().all()
 
     assert len(mastery_records) == 0  # Dry run doesn't write
@@ -497,16 +542,19 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
     block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -515,7 +563,7 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create 10 questions
     for i in range(10):
@@ -527,9 +575,9 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
             stem_text=f"Q{i}",
             status="PUBLISHED",
         )
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.flush()
 
     # Call adaptive select twice with same inputs
     from app.learning_engine.adaptive.service import adaptive_select_v0
@@ -567,11 +615,14 @@ async def test_user_scope_defaults_to_current_user(db: AsyncSession):
     student = User(
         id=uuid4(),
         email="student@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(student)
-    await db.commit()
+    db_session.add(student)
+    await db_session.flush()
 
     # Call with user_id=None
     from app.api.v1.endpoints.learning import assert_user_scope

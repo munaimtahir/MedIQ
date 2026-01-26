@@ -37,7 +37,7 @@ def create_admin_user(
                 # Update existing user to admin
                 existing_user.role = UserRole.ADMIN.value
                 existing_user.password_hash = hash_password(password)
-                existing_user.name = name
+                existing_user.full_name = name
                 existing_user.is_active = True
                 existing_user.email_verified = True
                 existing_user.onboarding_completed = True
@@ -50,7 +50,7 @@ def create_admin_user(
 
         # Create new admin user
         admin = User(
-            name=name,
+            full_name=name,
             email=email,
             password_hash=hash_password(password),
             role=UserRole.ADMIN.value,

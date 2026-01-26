@@ -1,14 +1,26 @@
 "use client";
 
-import { AccuracyTrendChart } from "@/components/student/analytics/AccuracyTrendChart";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getThemeAnalytics } from "@/lib/api/analyticsApi";
 import type { ThemeAnalytics } from "@/lib/types/analytics";
 import { ArrowLeft, BookOpen, CheckCircle2, Target } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Lazy load chart component
+const AccuracyTrendChart = dynamic(
+  () => import("@/components/student/analytics/AccuracyTrendChart").then((mod) => ({ 
+    default: mod.AccuracyTrendChart 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[200px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
 
 export default function ThemeAnalyticsPage() {
   const params = useParams();

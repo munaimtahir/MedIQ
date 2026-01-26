@@ -4,22 +4,31 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.question_cms import ChangeKind, MediaRole, QuestionStatus
+
+# Validation caps (input hardening)
+STEM_MAX_LENGTH = 4000
+EXPLANATION_MAX_LENGTH = 12000
+OPTION_MAX_LENGTH = 500
 
 
 class QuestionBase(BaseModel):
     """Base schema for question (shared fields)."""
 
-    stem: str | None = Field(None, description="Question stem (supports markdown/latex)")
-    option_a: str | None = Field(None, description="Option A")
-    option_b: str | None = Field(None, description="Option B")
-    option_c: str | None = Field(None, description="Option C")
-    option_d: str | None = Field(None, description="Option D")
-    option_e: str | None = Field(None, description="Option E")
+    stem: str | None = Field(
+        None, max_length=STEM_MAX_LENGTH, description="Question stem (supports markdown/latex)"
+    )
+    option_a: str | None = Field(None, max_length=OPTION_MAX_LENGTH, description="Option A")
+    option_b: str | None = Field(None, max_length=OPTION_MAX_LENGTH, description="Option B")
+    option_c: str | None = Field(None, max_length=OPTION_MAX_LENGTH, description="Option C")
+    option_d: str | None = Field(None, max_length=OPTION_MAX_LENGTH, description="Option D")
+    option_e: str | None = Field(None, max_length=OPTION_MAX_LENGTH, description="Option E")
     correct_index: int | None = Field(None, ge=0, le=4, description="Correct option index (0-4)")
-    explanation_md: str | None = Field(None, description="Explanation in markdown")
+    explanation_md: str | None = Field(
+        None, max_length=EXPLANATION_MAX_LENGTH, description="Explanation in markdown"
+    )
     year_id: int | None = Field(None, description="Year ID")
     block_id: int | None = Field(None, description="Block ID")
     theme_id: int | None = Field(None, description="Theme ID")
@@ -33,22 +42,27 @@ class QuestionBase(BaseModel):
 
 
 class QuestionCreate(QuestionBase):
-    """Schema for creating a question."""
+    """Schema for creating a question. Exactly 5 options required."""
 
-    pass
+    @model_validator(mode="after")
+    def exactly_five_options(self) -> "QuestionCreate":
+        opts = [self.option_a, self.option_b, self.option_c, self.option_d, self.option_e]
+        if any(opt is None or not str(opt).strip() for opt in opts):
+            raise ValueError("All 5 options (option_a through option_e) must be non-empty")
+        return self
 
 
 class QuestionUpdate(BaseModel):
     """Schema for updating a question (all fields optional)."""
 
-    stem: str | None = None
-    option_a: str | None = None
-    option_b: str | None = None
-    option_c: str | None = None
-    option_d: str | None = None
-    option_e: str | None = None
+    stem: str | None = Field(None, max_length=STEM_MAX_LENGTH)
+    option_a: str | None = Field(None, max_length=OPTION_MAX_LENGTH)
+    option_b: str | None = Field(None, max_length=OPTION_MAX_LENGTH)
+    option_c: str | None = Field(None, max_length=OPTION_MAX_LENGTH)
+    option_d: str | None = Field(None, max_length=OPTION_MAX_LENGTH)
+    option_e: str | None = Field(None, max_length=OPTION_MAX_LENGTH)
     correct_index: int | None = Field(None, ge=0, le=4)
-    explanation_md: str | None = None
+    explanation_md: str | None = Field(None, max_length=EXPLANATION_MAX_LENGTH)
     year_id: int | None = None
     block_id: int | None = None
     theme_id: int | None = None
@@ -89,6 +103,8 @@ class QuestionListOut(BaseModel):
     theme_id: int | None
     difficulty: str | None
     cognitive_level: str | None
+    source_book: str | None = None
+    source_page: str | None = None
     created_at: datetime
     updated_at: datetime | None
 
@@ -166,6 +182,6 @@ class QuestionListQuery(BaseModel):
     difficulty: str | None = None
     cognitive_level: str | None = None
     source_book: str | None = None
-    q: str | None = Field(None, description="Text search on stem")
+    q: str | None = Field(None, max_length=500, description="Text search on stem")
     page: int = Field(1, ge=1, description="Page number")
     page_size: int = Field(20, ge=1, le=100, description="Page size")

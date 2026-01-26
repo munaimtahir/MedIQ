@@ -1,6 +1,7 @@
 """SMTP email provider."""
 
 import smtplib
+import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -43,7 +44,8 @@ class SMTPEmailProvider(EmailProvider):
         subject: str,
         body_text: str,
         body_html: str | None = None,
-    ) -> None:
+        meta: dict | None = None,
+    ) -> str:
         """Send email via SMTP."""
         try:
             # Create message
@@ -73,9 +75,13 @@ class SMTPEmailProvider(EmailProvider):
             server.send_message(msg)
             server.quit()
 
+            # Generate message ID (SMTP doesn't return one, so we create a unique identifier)
+            message_id = f"smtp:{uuid.uuid4()}"
+
             logger.info(
-                f"Email sent successfully to {to}", extra={"email_to": to, "email_subject": subject}
+                f"Email sent successfully to {to}", extra={"email_to": to, "email_subject": subject, "message_id": message_id}
             )
+            return message_id
         except Exception as e:
             logger.error(f"Failed to send email to {to}: {str(e)}", exc_info=True)
             raise

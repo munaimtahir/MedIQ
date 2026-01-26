@@ -4,12 +4,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const cookies = request.headers.get("cookie") || "";
     const body = await request.json();
 
-    const { data } = await backendFetch<unknown>(`/admin/syllabus/blocks/${params.id}`, {
+    const { data } = await backendFetch<unknown>(`/admin/syllabus/blocks/${id}`, {
       method: "PUT",
       cookies,
       body,

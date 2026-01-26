@@ -1,8 +1,11 @@
 """Student endpoints for reading syllabus (Years, Blocks, Themes)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
+from app.cache.helpers import syllabus_blocks_key, syllabus_themes_key
+from app.cache.redis import get_json, set_json
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.syllabus import Block, Theme, Year
@@ -42,6 +45,12 @@ async def get_blocks(
     Get active blocks for a year.
     Year can be specified by name (e.g., "1st Year") or ID.
     """
+    # Cache (6h) - stable, high-hit
+    cache_key = syllabus_blocks_key(year)
+    cached = get_json(cache_key)
+    if isinstance(cached, list) and cached:
+        return cached
+
     # Try to find year by ID first (if year is numeric)
     year_obj = None
     if year.isdigit():
@@ -64,7 +73,10 @@ async def get_blocks(
         .all()
     )
 
-    return [BlockResponse.model_validate(block) for block in blocks]
+    out = [BlockResponse.model_validate(block) for block in blocks]
+    # Fail-open cache set
+    set_json(cache_key, jsonable_encoder(out), ttl_seconds=6 * 60 * 60)
+    return out
 
 
 @router.get(
@@ -79,6 +91,12 @@ async def get_themes(
     current_user: User = Depends(get_current_user),
 ) -> list[ThemeResponse]:
     """Get active themes for a block."""
+    # Cache (6h) - stable, high-hit
+    cache_key = syllabus_themes_key(block_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list) and cached:
+        return cached
+
     # Verify block exists and is active
     block = db.query(Block).filter(Block.id == block_id, Block.is_active.is_(True)).first()
     if not block:
@@ -94,4 +112,6 @@ async def get_themes(
         .all()
     )
 
-    return [ThemeResponse.model_validate(theme) for theme in themes]
+    out = [ThemeResponse.model_validate(theme) for theme in themes]
+    set_json(cache_key, jsonable_encoder(out), ttl_seconds=6 * 60 * 60)
+    return out

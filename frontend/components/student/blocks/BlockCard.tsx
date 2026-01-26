@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { memo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,40 +9,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Block, Theme, syllabusAPI } from "@/lib/api";
 import { BookOpen, Play } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { logger } from "@/lib/logger";
 // Tooltip component not available, using title attribute instead
 
 interface BlockCardProps {
   block: Block;
+  themes?: Theme[]; // Now passed from parent to prevent API waterfall
   isAllowed?: boolean; // Deprecated - always true now
   loading?: boolean;
 }
 
-export function BlockCard({
+export const BlockCard = memo(function BlockCard({
   block,
+  themes = [],
   isAllowed: _isAllowed, // eslint-disable-line @typescript-eslint/no-unused-vars
   loading,
 }: BlockCardProps) {
   const router = useRouter();
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [loadingThemes, setLoadingThemes] = useState(false);
   const [showAllThemes, setShowAllThemes] = useState(false);
-
-  useEffect(() => {
-    loadThemes();
-  }, [block.id]);
-
-  async function loadThemes() {
-    setLoadingThemes(true);
-    try {
-      const themesData = await syllabusAPI.getThemes(block.id);
-      setThemes(themesData);
-    } catch (error) {
-      console.error("Failed to load themes:", error);
-      setThemes([]);
-    } finally {
-      setLoadingThemes(false);
-    }
-  }
 
   const displayedThemes = showAllThemes ? themes : themes.slice(0, 6);
   const remainingCount = themes.length - 6;
@@ -90,12 +74,7 @@ export function BlockCard({
         </div>
 
         {/* Themes preview */}
-        {loadingThemes ? (
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-          </div>
-        ) : themes.length > 0 ? (
+        {themes.length > 0 ? (
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               {displayedThemes.map((theme) => (
@@ -147,4 +126,4 @@ export function BlockCard({
       </CardContent>
     </Card>
   );
-}
+});

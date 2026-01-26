@@ -30,8 +30,8 @@ def get_redis_client() -> redis.Redis | None:
             _redis_client = redis.from_url(
                 settings.REDIS_URL,
                 decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
+                socket_connect_timeout=1,  # Fast fail on connect (production hardening)
+                socket_timeout=1,  # Fast fail on operations (production hardening)
                 retry_on_timeout=True,
                 health_check_interval=30,
             )

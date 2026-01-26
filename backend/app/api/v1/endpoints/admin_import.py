@@ -18,8 +18,10 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.dependencies import require_roles
 from app.db.session import get_db
+from app.security.exam_mode_gate import require_not_exam_mode
 from app.models.import_schema import (
     ImportFileType,
     ImportJob,
@@ -42,8 +44,8 @@ from app.services.importer import CSVParser, QuestionValidator, QuestionWriter, 
 
 router = APIRouter(prefix="/admin/import", tags=["Admin - Import"])
 
-# Max file size: 10MB
-MAX_FILE_SIZE = 10 * 1024 * 1024
+# Max rejected rows to persist (full raw + errors). Beyond that we still count and error_counts.
+REJECTED_ROWS_STORAGE_CAP = 2000
 
 
 # ============================================================================
@@ -228,7 +230,11 @@ async def download_template(
 # ============================================================================
 
 
-@router.post("/questions", response_model=ImportJobResultOut)
+@router.post(
+    "/questions",
+    response_model=ImportJobResultOut,
+    dependencies=[Depends(require_not_exam_mode("bulk_question_import"))],
+)
 async def import_questions(
     file: UploadFile = File(...),
     schema_id: Annotated[str | None, Form()] = None,
@@ -236,16 +242,22 @@ async def import_questions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> ImportJobResultOut:
-    """Import questions from CSV file."""
-    # Check file size
-    file.file.seek(0, 2)  # Seek to end
+    """Import questions from CSV (bulk operation, blocked during exam mode)."""
+    # Note: dry_run is still allowed even during exam mode (read-only operation)
+    # The dependency will block non-dry-run imports
+    max_bytes = settings.MAX_BODY_BYTES_IMPORT
+    file.file.seek(0, 2)
     file_size = file.file.tell()
-    file.file.seek(0)  # Reset
+    file.file.seek(0)
 
-    if file_size > MAX_FILE_SIZE:
+    if file_size > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE / 1024 / 1024}MB",
+            detail={
+                "code": "PAYLOAD_TOO_LARGE",
+                "message": "File too large",
+                "details": {"limit": max_bytes},
+            },
         )
 
     # Resolve schema
@@ -262,10 +274,8 @@ async def import_questions(
                 detail="No active schema found. Please specify schema_id.",
             )
 
-    # Read file content
     file_content = await file.read()
 
-    # Create import job
     job = ImportJob(
         schema_id=schema.id,
         schema_name=schema.name,
@@ -280,57 +290,76 @@ async def import_questions(
     db.add(job)
     db.flush()
 
-    try:
-        # Update status to RUNNING
-        job.status = ImportJobStatus.RUNNING
+    max_rows = settings.IMPORT_MAX_ROWS
 
-        # Parse CSV
+    def _truncate_raw(row: dict) -> dict:
+        """Truncate raw row values to avoid storing huge payloads."""
+        max_val = 400
+        out: dict = {}
+        for k, v in row.items():
+            s = str(v) if v is not None else ""
+            if len(s) > max_val:
+                s = s[: max_val - 3] + "..."
+            out[k] = s
+        return out
+
+    try:
+        job.status = ImportJobStatus.RUNNING
         parser = CSVParser(schema)
         mapper = RowMapper(schema)
         validator = QuestionValidator(schema, db)
         writer = QuestionWriter(db, current_user.id)
 
-        accepted = []
-        rejected = []
+        accepted: list[dict] = []
+        rejected_count = 0
+        stored_rejected = 0
         error_counts: dict[str, int] = {}
 
         for row_number, raw_row in parser.parse(file_content):
-            # Map to canonical fields
-            canonical = mapper.map_row(raw_row)
+            if (len(accepted) + rejected_count) >= max_rows:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={
+                        "code": "VALIDATION_LIMIT_EXCEEDED",
+                        "message": "Import row count exceeds maximum allowed",
+                        "details": {"limit": max_rows},
+                    },
+                )
 
-            # Validate
+            canonical = mapper.map_row(raw_row)
             errors = validator.validate(canonical)
 
             if errors:
-                # Rejected
-                rejected_row = ImportJobRow(
-                    job_id=job.id,
-                    row_number=row_number,
-                    external_id=canonical.get("external_id"),
-                    raw_row_json=raw_row,
-                    errors_json=[e.to_dict() for e in errors],
-                )
-                db.add(rejected_row)
-                rejected.append(rejected_row)
-
-                # Count errors
-                for error in errors:
-                    error_counts[error.code] = error_counts.get(error.code, 0) + 1
+                rejected_count += 1
+                for e in errors:
+                    error_counts[e.code] = error_counts.get(e.code, 0) + 1
+                if stored_rejected < REJECTED_ROWS_STORAGE_CAP:
+                    truncated = _truncate_raw(raw_row)
+                    rejected_row = ImportJobRow(
+                        job_id=job.id,
+                        row_number=row_number,
+                        external_id=canonical.get("external_id"),
+                        raw_row_json=truncated,
+                        errors_json=[e.to_dict() for e in errors],
+                    )
+                    db.add(rejected_row)
+                    stored_rejected += 1
             else:
-                # Accepted
                 accepted.append(canonical)
 
-        # Insert accepted questions (unless dry run)
         if not dry_run and accepted:
             writer.bulk_insert(accepted)
-        else:
-            pass
 
-        # Update job stats
-        job.total_rows = len(accepted) + len(rejected)
+        job.total_rows = len(accepted) + rejected_count
         job.accepted_rows = len(accepted)
-        job.rejected_rows = len(rejected)
-        job.summary_json = {"error_counts": error_counts, "dry_run": dry_run}
+        job.rejected_rows = rejected_count
+        summary: dict = {
+            "error_counts": error_counts,
+            "dry_run": dry_run,
+        }
+        if stored_rejected < rejected_count:
+            summary["rejected_csv_max_rows"] = REJECTED_ROWS_STORAGE_CAP
+        job.summary_json = summary
         job.status = ImportJobStatus.COMPLETED
         job.completed_at = datetime.utcnow()
 
@@ -346,6 +375,8 @@ async def import_questions(
             summary_json=job.summary_json,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         job.status = ImportJobStatus.FAILED
         job.error_message = str(e)

@@ -22,10 +22,13 @@ from app.core.oauth import (
 from app.core.security import create_access_token, create_refresh_token, hash_token
 from app.core.security_logging import log_security_event
 from app.db.session import get_db
-from app.models.auth import RefreshToken
+from app.models.auth import AuthSession, RefreshToken
 from app.models.oauth import OAuthIdentity, OAuthProvider
 from app.models.user import User, UserRole
 from app.schemas.auth import TokensResponse, UserResponse
+
+# Import the token creation function from auth module
+from app.api.v1.endpoints.auth import _create_tokens_for_user
 from app.schemas.oauth import (
     OAuthExchangeRequest,
     OAuthExchangeResponse,
@@ -70,42 +73,6 @@ def _build_frontend_redirect(
     if params:
         url = f"{url}?{urlencode(params)}"
     return url
-
-
-def _create_tokens_for_user(user: User, db: Session) -> TokensResponse:
-    """Create access and refresh tokens for a user (same as auth.py)."""
-    from datetime import timedelta
-
-    # Create access token
-    access_token = create_access_token(str(user.id), user.role)
-
-    # Create refresh token
-    refresh_token = create_refresh_token()
-    token_hash = hash_token(refresh_token)
-
-    # Calculate expiry
-    expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    # Revoke old refresh tokens for this user (single session per user)
-    db.query(RefreshToken).filter(
-        RefreshToken.user_id == user.id,
-        RefreshToken.revoked_at.is_(None),
-    ).update({"revoked_at": datetime.now(UTC)})
-
-    # Create new refresh token record
-    db_refresh_token = RefreshToken(
-        user_id=user.id,
-        token_hash=token_hash,
-        expires_at=expires_at,
-    )
-    db.add(db_refresh_token)
-    db.commit()
-
-    return TokensResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-    )
 
 
 @router.get(
@@ -316,7 +283,7 @@ async def oauth_callback(
         db.commit()
 
         # Create tokens
-        tokens = _create_tokens_for_user(user, db)
+        tokens, session = _create_tokens_for_user(user, db, request)
 
         # Log successful OAuth login
         log_security_event(
@@ -359,7 +326,7 @@ async def oauth_callback(
 
     # Create new user and identity
     user = User(
-        name=name,
+        full_name=name,
         email=email.lower() if email else f"{provider_subject}@{provider}.local",
         password_hash=None,  # No password for OAuth-only users
         role=UserRole.STUDENT.value,
@@ -398,7 +365,7 @@ async def oauth_callback(
         return RedirectResponse(url=_build_frontend_redirect(code=exchange_code))
 
     # Create tokens
-    tokens = _create_tokens_for_user(user, db)
+    tokens, session = _create_tokens_for_user(user, db, request)
 
     # Log OAuth account creation
     log_security_event(

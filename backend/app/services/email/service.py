@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 _email_service: EmailProvider | None = None
 
 
-def get_email_service() -> EmailProvider:
+def get_email_service() -> EmailProvider:  # type: ignore
     """
     Get the email service provider.
 

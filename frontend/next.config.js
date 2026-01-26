@@ -1,28 +1,34 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Explicitly transpile @radix-ui/react-toast to ensure proper module resolution
+  
+  // Transpile packages for proper module resolution
   transpilePackages: ["@radix-ui/react-toast"],
-  // Turbopack configuration (Next.js 16 uses Turbopack by default)
-  turbopack: {},
-  // ESLint configuration
-  eslint: {
-    // Disable ESLint during builds (we run it separately in CI)
-    ignoreDuringBuilds: false,
-    // Specify directories to lint
-    dirs: ["app", "components", "lib"],
+  
+  // React 19 compiler for automatic optimizations
+  reactCompiler: true,
+  
+  // Experimental features for performance
+  experimental: {
+    // Optimize CSS handling
+    optimizeCss: true,
   },
-  // Webpack configuration for compatibility (when not using Turbopack)
-  webpack: (config, { isServer }) => {
-    // Fix module resolution for packages using "exports" field
-    config.resolve.conditionNames = ["require", "node", "default"];
-
-    // Ensure proper resolution of @radix-ui packages
-    config.resolve.alias = {
-      ...config.resolve.alias,
-    };
-
-    return config;
+  
+  // Image optimization
+  images: {
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    minimumCacheTTL: 60,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  
+  // Optimize on-demand entries
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
   },
 };
 

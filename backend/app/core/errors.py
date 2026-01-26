@@ -38,22 +38,32 @@ async def validation_exception_handler(
     request_id = get_request_id(request)
     errors = exc.errors()
 
-    # Format validation errors into details
-    details = [
-        {
+    details: list[dict[str, Any]] = []
+    use_limit_code = False
+    for error in errors:
+        ctx = error.get("ctx") or {}
+        lim = ctx.get("max_length") or ctx.get("max_inclusive") or ctx.get("ge")
+        t = error.get("type", "")
+        if "too_long" in t or "too_short" in t or "greater_than" in t:
+            use_limit_code = True
+        d: dict[str, Any] = {
             "field": ".".join(str(loc) for loc in error.get("loc", [])),
             "issue": error.get("msg", "Validation error"),
             "type": error.get("type", "validation_error"),
         }
-        for error in errors
-    ]
+        if lim is not None:
+            d["limit"] = int(lim) if isinstance(lim, (int, float)) else lim
+        details.append(d)
+
+    code = "VALIDATION_LIMIT_EXCEEDED" if use_limit_code else "VALIDATION_ERROR"
+    message = "Validation limit exceeded" if use_limit_code else "Invalid request data"
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=ErrorResponse(
             error=ErrorDetail(
-                code="VALIDATION_ERROR",
-                message="Invalid request data",
+                code=code,
+                message=message,
                 details=details,
                 request_id=request_id,
             )

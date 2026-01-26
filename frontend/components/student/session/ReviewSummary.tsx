@@ -5,7 +5,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { format } from "@/lib/dateUtils";
 import type { SessionMeta } from "@/lib/types/session";
 
 interface ReviewSummaryProps {

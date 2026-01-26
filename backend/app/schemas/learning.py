@@ -80,11 +80,11 @@ class AdaptiveNextRequest(BaseModel):
 
     user_id: UUID | None = None
     year: int = Field(..., ge=1, le=6)
-    block_ids: list[UUID] = Field(..., min_length=1)
-    theme_ids: list[UUID] | None = None
+    block_ids: list[int] = Field(..., min_length=1, max_length=200)
+    theme_ids: list[int] | None = Field(None, max_length=200)
     count: int = Field(..., ge=1, le=100)
-    mode: str = Field(..., pattern="^(tutor|exam)$")
-    source: str = Field(default="weakness", pattern="^(revision|weakness)$")
+    mode: str = Field(..., pattern="^(tutor|exam|revision)$")
+    source: str = Field(default="mixed", pattern="^(mixed|revision|weakness)$")
 
     @field_validator("block_ids")
     @classmethod
@@ -95,12 +95,62 @@ class AdaptiveNextRequest(BaseModel):
 
 
 class AdaptiveNextSummary(BaseModel):
-    """Summary of adaptive question selection."""
+    """Summary of adaptive question selection (v0 format)."""
 
     count: int
-    themes_used: list[UUID]
+    themes_used: list[int]
     difficulty_distribution: dict[str, int]
     question_ids: list[UUID]
+
+
+# =============================================================================
+# Adaptive v1 Schemas (Thompson Sampling with constraints)
+# =============================================================================
+
+
+class ThemePlanItem(BaseModel):
+    """Single theme in the selection plan."""
+
+    theme_id: int
+    quota: int
+    base_priority: float
+    sampled_y: float
+    final_score: float
+
+
+class PlanStats(BaseModel):
+    """Statistics from question selection."""
+
+    excluded_recent: int = 0
+    explore_used: int = 0
+    avg_p_correct: float = 0.0
+
+
+class ChallengeBand(BaseModel):
+    """Elo challenge band parameters."""
+
+    low: float
+    high: float
+
+
+class AdaptivePlanV1(BaseModel):
+    """Full selection plan for v1 response."""
+
+    themes: list[ThemePlanItem]
+    due_ratio: float
+    p_band: ChallengeBand
+    stats: PlanStats
+
+
+class AdaptiveNextResponseV1(BaseModel):
+    """Response for adaptive question selection v1."""
+
+    ok: bool = True
+    run_id: UUID
+    algo: AlgoInfo
+    params_id: UUID | None
+    question_ids: list[UUID]
+    plan: AdaptivePlanV1
 
 
 # ============================================================================

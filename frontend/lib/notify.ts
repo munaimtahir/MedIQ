@@ -39,10 +39,22 @@ export function info(title: string, description?: string) {
 }
 
 /**
+ * Show a warning toast notification
+ */
+export function warning(title: string, description?: string) {
+  toast({
+    title,
+    description,
+    variant: "default",
+  });
+}
+
+/**
  * Notification helper object
  */
 export const notify = {
   success,
   error,
   info,
+  warning,
 };

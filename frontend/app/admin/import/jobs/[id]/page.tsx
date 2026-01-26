@@ -12,7 +12,7 @@ import { SkeletonTable } from "@/components/status/SkeletonTable";
 import { ErrorState } from "@/components/status/ErrorState";
 import { notify } from "@/lib/notify";
 import { ArrowLeft, Download, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@/lib/dateUtils";
 
 const STATUS_COLORS = {
   PENDING: "bg-gray-500",

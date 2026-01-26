@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.session import SessionAnswer, SessionQuestion, SessionStatus, TestSession
+from app.models.mistakes import MistakeLog
+from app.models.session import AttemptEvent, SessionAnswer, SessionQuestion, SessionStatus, TestSession
 from app.models.syllabus import Block, Theme
 
 logger = logging.getLogger(__name__)
@@ -210,13 +211,16 @@ async def get_overview(db: AsyncSession, user_id: UUID) -> dict[str, Any]:
         else None
     )
 
+    # Compute avg_time_sec_per_question from telemetry
+    avg_time_sec = await _compute_avg_time_per_question(db, user_id, session_ids)
+
     return {
         "sessions_completed": sessions_completed,
         "questions_seen": questions_seen,
         "questions_answered": questions_answered,
         "correct": correct,
         "accuracy_pct": accuracy_pct,
-        "avg_time_sec_per_question": None,  # TODO: compute from telemetry
+        "avg_time_sec_per_question": avg_time_sec,
         "by_block": by_block,
         "weakest_themes": weakest_themes,
         "trend": trend,
@@ -407,6 +411,9 @@ async def get_theme_analytics(
     # Trend
     trend = _compute_trend_for_items(sessions, theme_questions, answers)
 
+    # Compute common mistakes from mistake_log
+    common_mistakes = await _compute_common_mistakes(db, user_id, theme_id)
+
     return {
         "theme_id": theme_id,
         "theme_name": theme.title,
@@ -416,7 +423,7 @@ async def get_theme_analytics(
         "correct": correct,
         "accuracy_pct": accuracy_pct,
         "trend": trend,
-        "common_mistakes": [],  # Placeholder for future
+        "common_mistakes": common_mistakes,
     }
 
 
@@ -503,3 +510,222 @@ def _empty_theme_analytics(theme: Theme, block: Block | None) -> dict[str, Any]:
         "trend": [],
         "common_mistakes": [],
     }
+
+
+async def get_recent_sessions(
+    db: AsyncSession, user_id: UUID, limit: int = 10
+) -> list[dict[str, Any]]:
+    """
+    Get recent sessions for a user (both active and completed).
+
+    Args:
+        db: Database session
+        user_id: User ID
+        limit: Maximum number of sessions to return
+
+    Returns:
+        List of session summaries
+    """
+    # Get recent sessions (both active and completed)
+    sessions_stmt = (
+        select(TestSession)
+        .where(TestSession.user_id == user_id)
+        .order_by(TestSession.started_at.desc())
+        .limit(limit)
+    )
+    sessions_result = await db.execute(sessions_stmt)
+    sessions = sessions_result.scalars().all()
+
+    if not sessions:
+        return []
+
+    # Get block/theme info from first question of each session
+    session_ids = [s.id for s in sessions]
+    questions_stmt = (
+        select(SessionQuestion)
+        .where(SessionQuestion.session_id.in_(session_ids))
+        .order_by(SessionQuestion.session_id, SessionQuestion.position)
+    )
+    questions_result = await db.execute(questions_stmt)
+    all_questions = questions_result.scalars().all()
+
+    # Group questions by session and get first question for block/theme
+    session_questions_map: dict[UUID, SessionQuestion] = {}
+    for q in all_questions:
+        if q.session_id not in session_questions_map:
+            session_questions_map[q.session_id] = q
+
+    # Get block and theme names
+    block_ids = set()
+    theme_ids = set()
+    for q in session_questions_map.values():
+        block_id, theme_id = get_block_theme_from_frozen(q)
+        if block_id:
+            block_ids.add(block_id)
+        if theme_id:
+            theme_ids.add(theme_id)
+
+    blocks_map = {}
+    if block_ids:
+        blocks_stmt = select(Block).where(Block.id.in_(block_ids))
+        blocks_result = await db.execute(blocks_stmt)
+        blocks_map = {b.id: b for b in blocks_result.scalars().all()}
+
+    themes_map = {}
+    if theme_ids:
+        themes_stmt = select(Theme).where(Theme.id.in_(theme_ids))
+        themes_result = await db.execute(themes_stmt)
+        themes_map = {t.id: t for t in themes_result.scalars().all()}
+
+    # Build response
+    result = []
+    for session in sessions:
+        # Determine status
+        if session.status == SessionStatus.ACTIVE:
+            status = "in_progress"
+        elif session.status in (SessionStatus.SUBMITTED, SessionStatus.EXPIRED):
+            status = "completed"
+        else:
+            status = "abandoned"
+
+        # Get block/theme from first question
+        first_question = session_questions_map.get(session.id)
+        block_id = None
+        theme_id = None
+        block_name = None
+        theme_name = None
+
+        if first_question:
+            block_id, theme_id = get_block_theme_from_frozen(first_question)
+            if block_id and block_id in blocks_map:
+                block_name = blocks_map[block_id].name
+            if theme_id and theme_id in themes_map:
+                theme_name = themes_map[theme_id].title
+
+        # Build title
+        if block_name and theme_name:
+            title = f"{block_name} → {theme_name}"
+        elif block_name:
+            title = block_name
+        elif session.blocks_json:
+            # Fallback to block codes
+            block_codes = session.blocks_json if isinstance(session.blocks_json, list) else []
+            title = f"Block{'s' if len(block_codes) > 1 else ''} {', '.join(block_codes)}"
+        else:
+            title = "Practice Session"
+
+        result.append({
+            "session_id": str(session.id),
+            "title": title,
+            "status": status,
+            "score_correct": session.score_correct,
+            "score_total": session.score_total,
+            "score_pct": float(session.score_pct) if session.score_pct else None,
+            "block_id": block_id,
+            "theme_id": theme_id,
+            "started_at": session.started_at,
+            "submitted_at": session.submitted_at,
+        })
+
+    return result
+
+
+async def _compute_avg_time_per_question(
+    db: AsyncSession, user_id: UUID, session_ids: list[UUID]
+) -> float | None:
+    """
+    Compute average time per question from telemetry events.
+    
+    Calculates time between QUESTION_VIEWED and ANSWER_SELECTED events for each question.
+    """
+    try:
+        # Get QUESTION_VIEWED and ANSWER_SELECTED events for these sessions
+        events_stmt = select(AttemptEvent).where(
+            AttemptEvent.session_id.in_(session_ids),
+            AttemptEvent.user_id == user_id,
+            AttemptEvent.event_type.in_(["QUESTION_VIEWED", "ANSWER_SELECTED"]),
+        ).order_by(AttemptEvent.session_id, AttemptEvent.question_id, AttemptEvent.event_ts)
+        
+        events_result = await db.execute(events_stmt)
+        events = events_result.scalars().all()
+        
+        if not events:
+            return None
+        
+        # Group events by (session_id, question_id) and calculate time differences
+        question_times: dict[tuple[UUID, UUID], list[float]] = {}
+        view_times: dict[tuple[UUID, UUID], datetime] = {}
+        
+        for event in events:
+            if not event.question_id:
+                continue
+            key = (event.session_id, event.question_id)
+            
+            if event.event_type == "QUESTION_VIEWED":
+                # Use client_ts if available, otherwise event_ts
+                view_times[key] = event.client_ts or event.event_ts
+            elif event.event_type == "ANSWER_SELECTED" and key in view_times:
+                # Calculate time difference
+                answer_ts = event.client_ts or event.event_ts
+                time_diff = (answer_ts - view_times[key]).total_seconds()
+                if time_diff > 0 and time_diff < 3600:  # Sanity check: 0-3600 seconds
+                    if key not in question_times:
+                        question_times[key] = []
+                    question_times[key].append(time_diff)
+        
+        # Calculate average across all questions
+        if not question_times:
+            return None
+        
+        all_times = []
+        for times in question_times.values():
+            # Use first time for each question (in case of multiple answers)
+            all_times.append(times[0])
+        
+        if not all_times:
+            return None
+        
+        avg_time = sum(all_times) / len(all_times)
+        return round(avg_time, 2)
+    except Exception as e:
+        logger.warning(f"Failed to compute avg_time_per_question: {e}")
+        return None
+
+
+async def _compute_common_mistakes(
+    db: AsyncSession, user_id: UUID, theme_id: int | None = None
+) -> list[dict[str, Any]]:
+    """
+    Compute common mistakes from mistake_log.
+    
+    Returns list of mistake types with counts, ordered by frequency.
+    """
+    try:
+        # Build query
+        stmt = (
+            select(
+                MistakeLog.mistake_type,
+                func.count(MistakeLog.id).label("count"),
+            )
+            .where(MistakeLog.user_id == user_id)
+            .group_by(MistakeLog.mistake_type)
+            .order_by(func.count(MistakeLog.id).desc())
+            .limit(10)
+        )
+        
+        if theme_id:
+            stmt = stmt.where(MistakeLog.theme_id == theme_id)
+        
+        result = await db.execute(stmt)
+        rows = result.all()
+        
+        return [
+            {
+                "mistake_type": row.mistake_type,
+                "count": row.count,
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to compute common_mistakes: {e}")
+        return []

@@ -20,7 +20,7 @@ import { EmptyState } from "@/components/status/EmptyState";
 import { ErrorState } from "@/components/status/ErrorState";
 import { notify } from "@/lib/notify";
 import { FileText, Download, CheckCircle, Plus } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@/lib/dateUtils";
 
 export default function ImportSchemasPage() {
   const router = useRouter();

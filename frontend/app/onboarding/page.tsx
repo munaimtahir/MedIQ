@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { authClient, type User } from "@/lib/authClient";
 import { onboardingAPI, type OnboardingYearOption } from "@/lib/api";
-import { useUserStore } from "@/store/userStore";
+import { useUserStore, selectFetchUser } from "@/store/userStore";
 import { OnboardingWizardShell } from "@/components/auth/OnboardingWizardShell";
 import { StepContainer } from "@/components/auth/StepContainer";
 import { SelectableCard, SelectableChip } from "@/components/auth/SelectableCard";
@@ -23,7 +23,7 @@ interface OnboardingState {
 export default function OnboardingPage() {
   const router = useRouter();
   const contentRef = useRef<HTMLDivElement>(null);
-  const { fetchUser } = useUserStore();
+  const fetchUser = useUserStore(selectFetchUser);
 
   // Data state
   const [years, setYears] = useState<OnboardingYearOption[]>([]);

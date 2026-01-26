@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface StepContainerProps {
@@ -18,48 +17,21 @@ export function StepContainer({
   direction = "forward",
   className,
 }: StepContainerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const prevKeyRef = useRef<string | number>(stepKey);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (!containerRef.current) return;
-
-    // Determine animation direction based on step change
-    const isForward = direction === "forward";
-    const fromX = isForward ? 40 : -40;
-
-    if (prevKeyRef.current !== stepKey) {
-      if (prefersReducedMotion) {
-        // Simple fade for reduced motion
-        gsap.fromTo(
-          containerRef.current,
-          { opacity: 0 },
-          { opacity: 1, duration: 0.25, ease: "power2.out" },
-        );
-      } else {
-        // Full slide animation
-        gsap.fromTo(
-          containerRef.current,
-          { x: fromX, opacity: 0 },
-          { x: 0, opacity: 1, duration: 0.3, ease: "power2.out" },
-        );
-      }
-      prevKeyRef.current = stepKey;
-    } else {
-      // Initial render - simple fade in
-      gsap.fromTo(
-        containerRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.25, ease: "power2.out" },
-      );
-    }
-  }, [stepKey, direction]);
+  const isForward = direction === "forward";
+  const fromX = isForward ? 40 : -40;
 
   return (
-    <div ref={containerRef} className={cn("w-full", className)}>
-      {children}
-    </div>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={stepKey}
+        initial={{ x: fromX, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: -fromX, opacity: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className={cn("w-full", className)}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
 }

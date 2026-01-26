@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,8 +15,20 @@ interface BlockProgressCardProps {
   error?: Error | null;
 }
 
-export function BlockProgressCard({ blocks, loading, error }: BlockProgressCardProps) {
+export const BlockProgressCard = memo(function BlockProgressCard({ 
+  blocks, 
+  loading, 
+  error 
+}: BlockProgressCardProps) {
   const router = useRouter();
+  
+  // Memoize progress calculations
+  const blocksWithProgress = useMemo(() => {
+    return blocks.map((block) => ({
+      ...block,
+      progress: Math.floor((block.id % 3) * 33 + 10),
+    }));
+  }, [blocks]);
 
   if (loading) {
     return (
@@ -68,11 +81,6 @@ export function BlockProgressCard({ blocks, loading, error }: BlockProgressCardP
     );
   }
 
-  // Mock progress for now (will be replaced with real data later)
-  const getMockProgress = (blockId: number) => {
-    return Math.floor((blockId % 3) * 33 + 10);
-  };
-
   return (
     <Card className="col-span-full md:col-span-1">
       <CardHeader>
@@ -83,40 +91,37 @@ export function BlockProgressCard({ blocks, loading, error }: BlockProgressCardP
         <CardDescription>Your progress by block</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {blocks.map((block) => {
-          const progress = getMockProgress(block.id);
-          return (
-            <div key={block.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{block.name}</p>
-                  <p className="text-xs text-muted-foreground">Code: {block.code}</p>
-                </div>
-                <span className="text-xs text-muted-foreground">{progress}%</span>
+        {blocksWithProgress.map((block) => (
+          <div key={block.id} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{block.name}</p>
+                <p className="text-xs text-muted-foreground">Code: {block.code}</p>
               </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/student/blocks/${block.id}`)}
-                >
-                  <BookOpen className="mr-1 h-3 w-3" />
-                  Open
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/student/practice/build?block=${block.id}`)}
-                >
-                  <Play className="mr-1 h-3 w-3" />
-                  Practice
-                </Button>
-              </div>
+              <span className="text-xs text-muted-foreground">{block.progress}%</span>
             </div>
-          );
-        })}
+            <Progress value={block.progress} className="h-2" />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/student/blocks/${block.id}`)}
+              >
+                <BookOpen className="mr-1 h-3 w-3" />
+                Open
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/student/practice/build?block=${block.id}`)}
+              >
+                <Play className="mr-1 h-3 w-3" />
+                Practice
+              </Button>
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
-}
+});

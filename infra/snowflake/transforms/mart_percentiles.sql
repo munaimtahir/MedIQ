@@ -1,0 +1,110 @@
+-- Transform: MART_THEME_PERCENTILES_DAILY
+-- Computes daily percentile distributions of mastery by theme
+-- Run daily after CURATED_MASTERY is updated
+
+-- Full refresh (for backfill or corrections)
+-- TRUNCATE TABLE MART_THEME_PERCENTILES_DAILY;
+
+-- INSERT INTO MART_THEME_PERCENTILES_DAILY
+-- SELECT
+--     DATE(m.snapshot_at) AS snapshot_date,
+--     s.theme_id,
+--     s.year,
+--     s.block_id,
+--     
+--     -- Percentiles using PERCENTILE_CONT
+--     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY m.mastery_prob) AS p25_mastery,
+--     PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.mastery_prob) AS p50_mastery,
+--     PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY m.mastery_prob) AS p75_mastery,
+--     PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY m.mastery_prob) AS p90_mastery,
+--     PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY m.mastery_prob) AS p95_mastery,
+--     PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY m.mastery_prob) AS p99_mastery,
+--     
+--     -- Counts
+--     COUNT(DISTINCT m.user_id) AS user_count,
+--     COUNT(DISTINCT CASE 
+--         WHEN EXISTS (
+--             SELECT 1 FROM CURATED_ATTEMPT a 
+--             WHERE a.user_id = m.user_id 
+--             AND a.attempted_at >= DATEADD(day, -30, CURRENT_DATE())
+--         ) THEN m.user_id 
+--     END) AS active_user_count,
+--     
+--     -- Aggregates
+--     AVG(m.mastery_prob) AS avg_mastery,
+--     AVG(m.attempts_total) AS avg_attempts,
+--     AVG(CASE WHEN m.attempts_total > 0 THEN m.correct_total::FLOAT / m.attempts_total ELSE 0 END) AS avg_correct_rate,
+--     
+--     CURRENT_TIMESTAMP() AS computed_at,
+--     m.algo_profile,
+--     m.algo_version_mastery
+-- FROM CURATED_MASTERY m
+-- INNER JOIN RAW_DIM_SYLLABUS s ON m.concept_id = s.concept_id
+-- WHERE DATE(m.snapshot_at) >= DATEADD(day, -90, CURRENT_DATE())  -- Last 90 days
+-- GROUP BY 
+--     DATE(m.snapshot_at),
+--     s.theme_id,
+--     s.year,
+--     s.block_id,
+--     m.algo_profile,
+--     m.algo_version_mastery;
+
+-- Incremental update (for daily runs)
+-- INSERT INTO MART_THEME_PERCENTILES_DAILY
+-- SELECT
+--     DATE(m.snapshot_at) AS snapshot_date,
+--     s.theme_id,
+--     s.year,
+--     s.block_id,
+--     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY m.mastery_prob) AS p25_mastery,
+--     PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY m.mastery_prob) AS p50_mastery,
+--     PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY m.mastery_prob) AS p75_mastery,
+--     PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY m.mastery_prob) AS p90_mastery,
+--     PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY m.mastery_prob) AS p95_mastery,
+--     PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY m.mastery_prob) AS p99_mastery,
+--     COUNT(DISTINCT m.user_id) AS user_count,
+--     COUNT(DISTINCT CASE 
+--         WHEN EXISTS (
+--             SELECT 1 FROM CURATED_ATTEMPT a 
+--             WHERE a.user_id = m.user_id 
+--             AND a.attempted_at >= DATEADD(day, -30, CURRENT_DATE())
+--         ) THEN m.user_id 
+--     END) AS active_user_count,
+--     AVG(m.mastery_prob) AS avg_mastery,
+--     AVG(m.attempts_total) AS avg_attempts,
+--     AVG(CASE WHEN m.attempts_total > 0 THEN m.correct_total::FLOAT / m.attempts_total ELSE 0 END) AS avg_correct_rate,
+--     CURRENT_TIMESTAMP() AS computed_at,
+--     m.algo_profile,
+--     m.algo_version_mastery
+-- FROM CURATED_MASTERY m
+-- INNER JOIN RAW_DIM_SYLLABUS s ON m.concept_id = s.concept_id
+-- WHERE DATE(m.snapshot_at) = CURRENT_DATE() - 1  -- Yesterday's data
+-- GROUP BY 
+--     DATE(m.snapshot_at),
+--     s.theme_id,
+--     s.year,
+--     s.block_id,
+--     m.algo_profile,
+--     m.algo_version_mastery
+-- ON CONFLICT (snapshot_date, theme_id) DO UPDATE SET
+--     p25_mastery = EXCLUDED.p25_mastery,
+--     p50_mastery = EXCLUDED.p50_mastery,
+--     p75_mastery = EXCLUDED.p75_mastery,
+--     p90_mastery = EXCLUDED.p90_mastery,
+--     p95_mastery = EXCLUDED.p95_mastery,
+--     p99_mastery = EXCLUDED.p99_mastery,
+--     user_count = EXCLUDED.user_count,
+--     active_user_count = EXCLUDED.active_user_count,
+--     avg_mastery = EXCLUDED.avg_mastery,
+--     avg_attempts = EXCLUDED.avg_attempts,
+--     avg_correct_rate = EXCLUDED.avg_correct_rate,
+--     computed_at = EXCLUDED.computed_at;
+
+-- Note: Snowflake uses MERGE for upserts, not ON CONFLICT
+-- MERGE INTO MART_THEME_PERCENTILES_DAILY AS target
+-- USING (
+--     SELECT ... (same query as above)
+-- ) AS source
+-- ON target.snapshot_date = source.snapshot_date AND target.theme_id = source.theme_id
+-- WHEN MATCHED THEN UPDATE SET ...
+-- WHEN NOT MATCHED THEN INSERT ...;

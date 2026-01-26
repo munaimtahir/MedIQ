@@ -10,6 +10,7 @@ class AlgoKey(str, Enum):
     REVISION = "revision"
     DIFFICULTY = "difficulty"
     ADAPTIVE = "adaptive"
+    ADAPTIVE_V1 = "adaptive_selection"
     MISTAKES = "mistakes"
     BKT = "bkt"
 

@@ -77,6 +77,16 @@ class TestSession(Base):
     score_total = Column(Integer, nullable=True)
     score_pct = Column(Numeric(5, 2), nullable=True)  # 0.00 to 100.00
 
+    # Algorithm snapshot (captured at session start for continuity)
+    algo_profile_at_start = Column(String(50), nullable=False, server_default="V1_PRIMARY")  # "V1_PRIMARY" | "V0_FALLBACK"
+    algo_overrides_at_start = Column(JSONB, nullable=False, server_default="{}")  # Per-module overrides at session start
+    algo_policy_version_at_start = Column(String(50), nullable=True)  # Bridge policy version at session start
+
+    # Exam mode snapshot (captured at session start - no mid-session effect)
+    exam_mode_at_start = Column(Boolean, nullable=False, server_default="false")
+    # Freeze-updates snapshot (captured at session start - no mid-session effect)
+    freeze_updates_at_start = Column(Boolean, nullable=False, server_default="false")
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
@@ -87,11 +97,18 @@ class TestSession(Base):
     )
     answers = relationship("SessionAnswer", back_populates="session", cascade="all, delete-orphan")
     events = relationship("AttemptEvent", back_populates="session", cascade="all, delete-orphan")
+    runtime_snapshot = relationship(
+        "SessionRuntimeSnapshot",
+        back_populates="session",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_test_sessions_user_created", "user_id", "created_at"),
         Index("ix_test_sessions_status", "status"),
         Index("ix_test_sessions_expires_at", "expires_at"),
+        Index("ix_test_sessions_algo_profile", "algo_profile_at_start"),
     )
 
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import type { QuestionListItem, QuestionStatus } from "@/lib/types/question-cms";
 import { FileEdit } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "@/lib/dateUtils";
 
 interface QuestionsTableProps {
   questions: QuestionListItem[];
@@ -33,22 +34,23 @@ const STATUS_LABELS: Record<QuestionStatus, string> = {
   PUBLISHED: "Published",
 };
 
-export function QuestionsTable({ questions }: QuestionsTableProps) {
+// Helper functions outside component to prevent recreation
+const truncateText = (text: string | null, maxLength = 100): string => {
+  if (!text) return "—";
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+};
+
+const formatDate = (dateStr: string | null): string => {
+  if (!dateStr) return "—";
+  try {
+    return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
+  } catch {
+    return dateStr;
+  }
+};
+
+export const QuestionsTable = memo(function QuestionsTable({ questions }: QuestionsTableProps) {
   const router = useRouter();
-
-  const truncateText = (text: string | null, maxLength = 100) => {
-    if (!text) return "—";
-    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
-  };
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "—";
-    try {
-      return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
-    } catch {
-      return dateStr;
-    }
-  };
 
   return (
     <Table>
@@ -143,4 +145,4 @@ export function QuestionsTable({ questions }: QuestionsTableProps) {
       </TableBody>
     </Table>
   );
-}
+});

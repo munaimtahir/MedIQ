@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Upload } from "lucide-react";
-import { SyllabusManager } from "@/components/admin/syllabus/SyllabusManager";
 import { CsvImportDialog } from "@/components/admin/syllabus/CsvImportDialog";
 import { TemplatesMenu } from "@/components/admin/syllabus/TemplatesMenu";
+
+// Lazy load heavy syllabus manager component
+const SyllabusManager = dynamic(
+  () => import("@/components/admin/syllabus/SyllabusManager").then((mod) => ({ 
+    default: mod.SyllabusManager 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[600px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
 
 export default function SyllabusPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);

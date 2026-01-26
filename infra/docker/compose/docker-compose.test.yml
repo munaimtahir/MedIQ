@@ -1,0 +1,100 @@
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: exam_platform_postgres_test
+    environment:
+      POSTGRES_DB: ${TEST_DATABASE_NAME:-exam_platform_test}
+      POSTGRES_USER: ${TEST_DATABASE_USER:-exam_user}
+      POSTGRES_PASSWORD: ${TEST_DATABASE_PASSWORD:-test_password}
+    ports:
+      - "${TEST_POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_DATABASE_USER:-exam_user}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test_network
+    tmpfs:
+      - /var/lib/postgresql/data  # Use tmpfs for faster tests (data lost on container stop)
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: exam_platform_redis_test
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test_network
+    tmpfs:
+      - /data  # Use tmpfs for faster tests
+
+  backend-test:
+    build:
+      context: ../../../backend
+      dockerfile: Dockerfile
+    container_name: exam_platform_backend_test
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://exam_user:test_password@postgres-test:5432/exam_platform_test
+      - TEST_DATABASE_URL=postgresql+psycopg2://exam_user:test_password@postgres-test:5432/exam_platform_test
+      - REDIS_URL=redis://redis-test:6379/0
+      - ENV=test
+      - LOG_LEVEL=WARNING
+      - SKIP_SEED=false
+      - JWT_SECRET=test_jwt_secret
+      - TOKEN_PEPPER=test_token_pepper
+      - NEO4J_ENABLED=false
+      - ELASTICSEARCH_ENABLED=false
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ../../../backend:/app
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        until python -c 'import psycopg2; psycopg2.connect(\"postgresql://exam_user:test_password@postgres-test:5432/exam_platform_test\")' 2>/dev/null; do
+          sleep 1
+        done &&
+        echo 'Running migrations...' &&
+        alembic upgrade head &&
+        echo 'Running tests...' &&
+        pytest -v --tb=short
+      "
+    networks:
+      - test_network
+    profiles:
+      - test
+
+  frontend-test:
+    build:
+      context: ../../../frontend
+      dockerfile: Dockerfile
+    container_name: exam_platform_frontend_test
+    environment:
+      - NODE_ENV=test
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE_URL=/api
+      - CI=true
+    volumes:
+      - ../../../frontend:/app
+    command: >
+      sh -c "
+        echo 'Installing dependencies...' &&
+        pnpm install --frozen-lockfile &&
+        echo 'Running tests...' &&
+        pnpm run test:ci
+      "
+    networks:
+      - test_network
+    profiles:
+      - test
+
+networks:
+  test_network:
+    driver: bridge

@@ -23,30 +23,19 @@ This will:
 
 ## Manual Setup (Development)
 
-### Backend Setup
+**Use Docker only.** No virtual environments. All backend work (run, test, migrations) happens in containers.
+
+### Backend (Docker)
 
 ```bash
-cd backend
+# From project root. Ensure .env exists (copy from .env.example).
+docker compose -f infra/docker/compose/docker-compose.dev.yml up -d --build
 
-# Create virtual environment
-python -m venv venv
+# Run tests
+docker compose -f infra/docker/compose/docker-compose.dev.yml run --rm backend python -m pytest tests/ -v
 
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables (create .env file)
-DATABASE_URL=postgresql://examplatform:examplatform@localhost:5432/examplatform
-CORS_ORIGINS=http://localhost:3000
-
-# Start PostgreSQL (if not using Docker)
-# Then run:
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Backend shell
+docker compose -f infra/docker/compose/docker-compose.dev.yml exec backend bash
 
 # Seed database (if needed)
 curl -X POST http://localhost:8000/seed
@@ -58,13 +47,14 @@ curl -X POST http://localhost:8000/seed
 cd frontend
 
 # Install dependencies
-npm install
+pnpm install
 
 # Set environment variables (create .env.local file)
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# Copy from .env.example and update values
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/v1
 
 # Start development server
-npm run dev
+pnpm run dev
 ```
 
 ## Demo Users

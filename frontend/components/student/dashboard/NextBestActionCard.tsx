@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { NextAction } from "@/lib/dashboard/types";
@@ -13,7 +14,11 @@ interface NextBestActionCardProps {
   error?: Error | null;
 }
 
-export function NextBestActionCard({ nextAction, loading, error }: NextBestActionCardProps) {
+export const NextBestActionCard = memo(function NextBestActionCard({ 
+  nextAction, 
+  loading, 
+  error 
+}: NextBestActionCardProps) {
   const router = useRouter();
 
   if (loading) {
@@ -92,4 +97,4 @@ export function NextBestActionCard({ nextAction, loading, error }: NextBestActio
       </CardContent>
     </Card>
   );
-}
+});

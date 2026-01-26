@@ -1,5 +1,7 @@
 """Console email provider (fallback for local dev)."""
 
+import uuid
+
 from app.core.logging import get_logger
 from app.services.email.base import EmailProvider
 
@@ -15,8 +17,10 @@ class ConsoleEmailProvider(EmailProvider):
         subject: str,
         body_text: str,
         body_html: str | None = None,
-    ) -> None:
+        meta: dict | None = None,
+    ) -> str:
         """Log email to console."""
+        message_id = f"console:{uuid.uuid4()}"
         logger.info(
             "EMAIL (Console Provider)",
             extra={
@@ -24,6 +28,7 @@ class ConsoleEmailProvider(EmailProvider):
                 "email_subject": subject,
                 "email_body_text": body_text,
                 "email_body_html": body_html,
+                "message_id": message_id,
             },
         )
         # Also print to console for visibility
@@ -32,6 +37,7 @@ class ConsoleEmailProvider(EmailProvider):
         print("=" * 80)
         print(f"To: {to}")
         print(f"Subject: {subject}")
+        print(f"Message ID: {message_id}")
         print("-" * 80)
         print("Body (Text):")
         print(body_text)
@@ -40,3 +46,4 @@ class ConsoleEmailProvider(EmailProvider):
             print("Body (HTML):")
             print(body_html)
         print("=" * 80 + "\n")
+        return message_id

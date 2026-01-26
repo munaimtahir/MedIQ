@@ -7,7 +7,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
-from app.common.request_id import RequestIDMiddleware
 from app.core.config import settings
 from app.core.errors import (
     general_exception_handler,
@@ -17,6 +16,10 @@ from app.core.errors import (
 from app.core.logging import setup_logging
 from app.core.redis_client import init_redis
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.middleware.body_size_limit import BodySizeLimitMiddleware
+from app.middleware.cache_headers import CacheHeadersMiddleware
+from app.middleware.request_timing import RequestTimingMiddleware
+from app.core.seed_academic import seed_academic_structure
 from app.core.seed_auth import seed_demo_accounts
 from app.core.seed_syllabus import seed_syllabus_structure
 from app.db.base import Base
@@ -32,8 +35,9 @@ async def lifespan(app: FastAPI):
     # Initialize Redis
     init_redis()
     # Create tables (in production, use migrations)
-    if settings.ENV == "dev":
-        Base.metadata.create_all(bind=engine)
+    # Disabled: Using Alembic migrations for all environments
+    # if settings.ENV == "dev":
+    #     Base.metadata.create_all(bind=engine)
     # Seed demo accounts if enabled
     seed_demo_accounts()
     # Seed syllabus structure (years and blocks) if empty
@@ -48,6 +52,21 @@ async def lifespan(app: FastAPI):
             print("Syllabus structure seeded successfully")
     except Exception as e:
         print(f"Error seeding syllabus structure: {e}")
+    finally:
+        db.close()
+
+    # Seed academic structure (onboarding years/blocks/subjects) if empty
+    db = SessionLocal()
+    try:
+        from app.models.academic import AcademicYear
+
+        academic_year_count = db.query(AcademicYear).count()
+        if academic_year_count == 0:
+            print("No academic years found, seeding academic structure...")
+            seed_academic_structure(db)
+            print("Academic structure seeded successfully")
+    except Exception as e:
+        print(f"Error seeding academic structure: {e}")
     finally:
         db.close()
     yield
@@ -68,15 +87,21 @@ def create_app() -> FastAPI:
     )
 
     # Add middleware (order matters - first added is outermost)
+    # RequestTimingMiddleware must be outermost to guarantee headers even on exceptions.
+    app.add_middleware(RequestTimingMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
-    app.add_middleware(RequestIDMiddleware)
+    # CORS: Deny-by-default with env allowlists (no wildcards)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=settings.cors_allow_origins_list,
+        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+        allow_methods=settings.cors_allow_methods_list,
+        allow_headers=settings.cors_allow_headers_list,
+        expose_headers=settings.cors_expose_headers_list,
     )
+    # Cache headers: Ensure API responses are never cached (CDN-safe)
+    app.add_middleware(CacheHeadersMiddleware)
 
     # Add exception handlers
     app.add_exception_handler(RequestValidationError, validation_exception_handler)

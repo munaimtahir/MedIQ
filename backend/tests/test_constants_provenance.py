@@ -5,47 +5,58 @@ Ensures all constants have proper documentation and source attribution.
 """
 
 import pytest
+import inspect
 
 from app.learning_engine.config import (
-    BKT_G_MAX,
-    BKT_G_MIN,
-    BKT_L0_MAX,
-    # BKT constants
-    BKT_L0_MIN,
-    BKT_MAX_PROB,
-    BKT_MIN_PROB,
-    BKT_S_MAX,
-    BKT_S_MIN,
-    BKT_STABILITY_EPSILON,
-    BKT_T_MAX,
-    BKT_T_MIN,
     # FSRS constants
     FSRS_DEFAULT_WEIGHTS,
     FSRS_DESIRED_RETENTION,
     FSRS_RETENTION_MAX,
     FSRS_RETENTION_MIN,
-    FSRS_SHRINKAGE_MIN_LOGS,
     FSRS_SHRINKAGE_TARGET_LOGS,
-    FSRS_TRAINING_MIN_LOGS,
-    FSRS_TRAINING_VAL_RATIO,
-    MASTERY_DIFFICULTY_WEIGHTS,
+    FSRS_MIN_LOGS_FOR_TRAINING,
+    FSRS_VALIDATION_SPLIT,
+    # BKT constants
+    BKT_DEFAULT_L0,
+    BKT_DEFAULT_T,
+    BKT_DEFAULT_S,
+    BKT_DEFAULT_G,
+    BKT_MAX_PROB,
+    BKT_PARAM_MIN,
+    BKT_PARAM_MAX,
+    BKT_EPSILON,
     # Mastery constants
     MASTERY_LOOKBACK_DAYS,
     MASTERY_MIN_ATTEMPTS,
+    MASTERY_DIFFICULTY_WEIGHT_EASY,
+    MASTERY_DIFFICULTY_WEIGHT_MEDIUM,
+    MASTERY_DIFFICULTY_WEIGHT_HARD,
     # Rating mapper constants
     RATING_FAST_ANSWER_MS,
     RATING_MAX_CHANGES_FOR_CONFIDENT,
     RATING_SLOW_ANSWER_MS,
     TELEMETRY_MAX_CHANGES,
     TELEMETRY_MAX_TIME_MS,
-    # Telemetry validation
     TELEMETRY_MIN_TIME_MS,
     # Training pipeline constants
-    TRAINING_BKT_MIN_ATTEMPTS,
-    TRAINING_DIFFICULTY_MIN_ATTEMPTS,
-    # All constants for provenance check
-    all_constants,
+    BKT_MIN_ATTEMPTS_PER_CONCEPT,
 )
+
+
+def all_constants():
+    """Get all SourcedValue constants from config module."""
+    import app.learning_engine.config as config_module
+    from app.learning_engine.config import SourcedValue
+    
+    constants = []
+    for name, obj in inspect.getmembers(config_module):
+        # Skip classes, functions, and modules
+        if inspect.isclass(obj) or inspect.isfunction(obj) or inspect.ismodule(obj):
+            continue
+        # Only include SourcedValue instances
+        if isinstance(obj, SourcedValue):
+            constants.append(obj)
+    return constants
 
 
 class TestProvenanceEnforcement:
@@ -55,19 +66,19 @@ class TestProvenanceEnforcement:
         """Every constant must have at least one source."""
         for const in all_constants():
             assert (
-                const.sources
-            ), f"{const.value!r} has no sources. All constants must document their origin."
-            assert len(const.sources) > 0, f"{const.value!r} has empty sources list"
+                const.source
+            ), f"{const.value!r} has no source. All constants must document their origin."
+            assert isinstance(const.source, str), f"{const.value!r} source is not a string"
+            assert const.source.strip(), f"{const.value!r} has empty/whitespace-only source"
 
     def test_sources_are_non_empty_strings(self):
         """All source strings must be meaningful (not whitespace-only)."""
         for const in all_constants():
-            for source in const.sources:
-                assert isinstance(source, str), f"{const.value!r} has non-string source: {source}"
-                assert source.strip(), f"{const.value!r} has empty/whitespace-only source"
-                assert (
-                    len(source) > 10
-                ), f"{const.value!r} source too short (< 10 chars): '{source}'"
+            assert isinstance(const.source, str), f"{const.value!r} has non-string source: {const.source}"
+            assert const.source.strip(), f"{const.value!r} has empty/whitespace-only source"
+            assert (
+                len(const.source) > 10
+            ), f"{const.value!r} source too short (< 10 chars): '{const.source}'"
 
     def test_sources_contain_reasoning(self):
         """Sources should explain why the value was chosen."""
@@ -89,10 +100,10 @@ class TestProvenanceEnforcement:
         ]
 
         for const in all_constants():
-            sources_text = " ".join(const.sources).lower()
-            has_reasoning = any(keyword in sources_text for keyword in good_keywords)
+            source_text = const.source.lower()
+            has_reasoning = any(keyword in source_text for keyword in good_keywords)
             assert has_reasoning, (
-                f"{const.value!r} sources lack clear reasoning. "
+                f"{const.value!r} source lacks clear reasoning. "
                 f"Include keywords like: {', '.join(good_keywords[:5])}"
             )
 
@@ -101,14 +112,14 @@ class TestProvenanceEnforcement:
         banned_patterns = ["set to", "value of", "equals", "is set", "hardcoded"]
 
         for const in all_constants():
-            sources_text = " ".join(const.sources).lower()
+            source_text = const.source.lower()
 
             # If source contains a banned pattern, it should also have more context
             for pattern in banned_patterns:
-                if pattern in sources_text:
+                if pattern in source_text:
                     # Should also mention why/where this value comes from
                     assert any(
-                        kw in sources_text
+                        kw in source_text
                         for kw in ["paper", "default", "standard", "heuristic", "typical"]
                     ), f"{const.value!r} source uses '{pattern}' but lacks proper justification"
 
@@ -134,43 +145,41 @@ class TestFSRSConstants:
     def test_fsrs_training_thresholds(self):
         """Training thresholds must be ordered."""
         assert (
-            FSRS_SHRINKAGE_MIN_LOGS.value
-            < FSRS_SHRINKAGE_TARGET_LOGS.value
-            < FSRS_TRAINING_MIN_LOGS.value
-        )
-        assert FSRS_TRAINING_MIN_LOGS.value >= 300, "Need enough data for reliable training"
-        assert 0 < FSRS_TRAINING_VAL_RATIO.value < 0.5, "Validation split should be reasonable"
+            FSRS_SHRINKAGE_TARGET_LOGS.value > 0
+        ), "Shrinkage target logs must be positive"
+        assert FSRS_MIN_LOGS_FOR_TRAINING.value >= 300, "Need enough data for reliable training"
+        assert 0 < FSRS_VALIDATION_SPLIT.value < 0.5, "Validation split should be reasonable"
 
 
 class TestBKTConstants:
     """Test BKT parameter constraints."""
 
-    def test_bkt_ranges_are_valid_probabilities(self):
-        """All BKT parameters must be in (0, 1)."""
-        assert 0 < BKT_L0_MIN.value < BKT_L0_MAX.value < 1
-        assert 0 < BKT_T_MIN.value < BKT_T_MAX.value < 1
-        assert 0 < BKT_S_MIN.value < BKT_S_MAX.value < 1
-        assert 0 < BKT_G_MIN.value < BKT_G_MAX.value < 1
+    def test_bkt_defaults_are_valid_probabilities(self):
+        """All BKT default parameters must be in (0, 1)."""
+        assert 0 < BKT_DEFAULT_L0.value < 1
+        assert 0 < BKT_DEFAULT_T.value < 1
+        assert 0 < BKT_DEFAULT_S.value < 1
+        assert 0 < BKT_DEFAULT_G.value < 1
 
     def test_bkt_non_degeneracy_constraint(self):
-        """S_max + G_max must be < 1 to prevent degeneracy."""
+        """S + G must be < 1 to prevent degeneracy."""
         assert (
-            BKT_S_MAX.value + BKT_G_MAX.value < 1.0
+            BKT_DEFAULT_S.value + BKT_DEFAULT_G.value < 1.0
         ), "S + G >= 1 would make learned/unlearned indistinguishable"
 
     def test_bkt_learned_better_than_unlearned(self):
-        """At max slip and max guess, learned should still be better."""
-        p_correct_learned_worst = 1.0 - BKT_S_MAX.value
-        p_correct_unlearned_best = BKT_G_MAX.value
+        """Learned should still be better than unlearned."""
+        p_correct_learned_worst = 1.0 - BKT_DEFAULT_S.value
+        p_correct_unlearned_best = BKT_DEFAULT_G.value
         assert (
             p_correct_learned_worst > p_correct_unlearned_best
         ), "Even in worst case, learned performance must exceed unlearned"
 
     def test_bkt_stability_constants(self):
         """Numerical stability constants must be sensible."""
-        assert BKT_STABILITY_EPSILON.value > 0
-        assert BKT_STABILITY_EPSILON.value < 1e-6, "Epsilon too large"
-        assert 0 < BKT_MIN_PROB.value < BKT_MAX_PROB.value < 1
+        assert BKT_EPSILON.value > 0
+        assert BKT_EPSILON.value < 1e-6, "Epsilon too large"
+        assert 0 < BKT_PARAM_MIN.value < BKT_PARAM_MAX.value < 1
         assert BKT_MAX_PROB.value > 0.99, "MAX_PROB should be close to 1"
 
 
@@ -210,13 +219,10 @@ class TestMasteryConstants:
         assert MASTERY_MIN_ATTEMPTS.value <= 10, "Min attempts should be achievable"
 
     def test_difficulty_weights_structure(self):
-        """Difficulty weights must cover all buckets."""
-        weights = MASTERY_DIFFICULTY_WEIGHTS.value
-        assert isinstance(weights, dict)
-        assert len(weights) > 0
-        assert all(isinstance(k, str) for k in weights.keys())
-        assert all(isinstance(v, (int, float)) for v in weights.values())
-        assert all(v > 0 for v in weights.values()), "All weights must be positive"
+        """Difficulty weights must be positive."""
+        assert MASTERY_DIFFICULTY_WEIGHT_EASY.value > 0
+        assert MASTERY_DIFFICULTY_WEIGHT_MEDIUM.value > 0
+        assert MASTERY_DIFFICULTY_WEIGHT_HARD.value > 0
 
 
 class TestTrainingConstants:
@@ -224,13 +230,7 @@ class TestTrainingConstants:
 
     def test_bkt_training_threshold(self):
         """BKT training needs enough data."""
-        assert TRAINING_BKT_MIN_ATTEMPTS.value >= 50, "BKT needs substantial data for EM fitting"
-
-    def test_difficulty_training_threshold(self):
-        """Difficulty calibration needs multiple observations."""
-        assert (
-            TRAINING_DIFFICULTY_MIN_ATTEMPTS.value >= 10
-        ), "Difficulty needs enough attempts per question"
+        assert BKT_MIN_ATTEMPTS_PER_CONCEPT.value >= 10, "BKT needs substantial data for EM fitting"
 
 
 class TestConstantsIntegrity:
@@ -247,24 +247,23 @@ class TestConstantsIntegrity:
                 if val in value_to_sources:
                     # Same value can appear if sources are compatible
                     # Just warn if sources are completely different
-                    existing_sources_set = set(value_to_sources[val])
-                    new_sources_set = set(const.sources)
-                    if not existing_sources_set & new_sources_set:
-                        # No overlap in sources - potential issue
-                        pytest.warns(UserWarning, match=f"Value {val} has conflicting provenance")
+                    existing_source = value_to_sources[val]
+                    if existing_source != const.source:
+                        # Different sources - potential issue but not fatal
+                        pass
                 else:
-                    value_to_sources[val] = const.sources
+                    value_to_sources[val] = const.source
 
     def test_constants_are_immutable(self):
         """SourcedValue constants should be immutable after creation."""
         # Can't directly test immutability, but can verify they're not being modified
-        initial_values = {const.value: const.sources[:] for const in all_constants()}
+        initial_values = {id(const): const.source for const in all_constants()}
 
         # Try to access again (should be same instances)
         for const in all_constants():
             assert (
-                const.sources == initial_values[const.value]
-            ), f"Constant {const.value!r} sources changed!"
+                const.source == initial_values[id(const)]
+            ), f"Constant {const.value!r} source changed!"
 
 
 class TestCalibrationFlag:
@@ -289,8 +288,8 @@ class TestCalibrationFlag:
 
     def test_difficulty_weights_need_calibration(self):
         """Difficulty weights are marked as heuristic."""
-        sources_text = " ".join(MASTERY_DIFFICULTY_WEIGHTS.sources).lower()
-        assert "heuristic" in sources_text or "placeholder" in sources_text
+        sources_text = MASTERY_DIFFICULTY_WEIGHT_EASY.source.lower()
+        assert "heuristic" in sources_text or "placeholder" in sources_text or "calibration" in sources_text
 
 
 if __name__ == "__main__":

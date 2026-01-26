@@ -1,7 +1,7 @@
 """Add platform_settings table
 
 Revision ID: 002
-Revises: 001
+Revises: 8e9f0123a4b
 Create Date: 2024-01-01 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "002"
-down_revision = "8e9f0123a4b"  # Update to match latest migration
+down_revision = "8e9f0123a4b"
 branch_labels = None
 depends_on = None
 
@@ -70,13 +70,11 @@ def upgrade() -> None:
     import json
 
     op.execute(
-        sa.text(
-            """
-            INSERT INTO platform_settings (id, data)
-            VALUES (1, :data::jsonb)
-            ON CONFLICT (id) DO NOTHING
+        f"""
+        INSERT INTO platform_settings (id, data)
+        VALUES (1, '{json.dumps(default_data)}'::jsonb)
+        ON CONFLICT (id) DO NOTHING
         """
-        ).bindparam(data=json.dumps(default_data))
     )
 
 

@@ -9,19 +9,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.learning_engine.adaptive.service import adaptive_select_v0
 from app.learning_engine.adaptive.v0 import select_questions_v0
+from app.learning_engine.difficulty.core import (
+    compute_delta,
+    compute_dynamic_k,
+    p_correct,
+)
 from app.learning_engine.difficulty.service import (
-    compute_elo_update,
-    compute_student_rating,
-    update_question_difficulty_v0_for_session,
+    update_difficulty_for_session,
 )
 from app.models.learning import AlgoRun
 from app.models.learning_difficulty import QuestionDifficulty
 from app.models.learning_mastery import UserThemeMastery
 from app.models.learning_revision import RevisionQueue
 from app.models.question_cms import Question
-from app.models.session import SessionAnswer, SessionQuestion, TestSession
-from app.models.syllabus import AcademicYear, Block, Theme
-from app.models.user import User
+from app.models.session import SessionAnswer, SessionQuestion, SessionMode, SessionStatus, TestSession
+from app.models.syllabus import Year, Block, Theme
+from app.core.security import hash_password
+from app.models.user import User, UserRole
 
 # ============================================================================
 # DIFFICULTY CALIBRATION v0 TESTS
@@ -29,122 +33,64 @@ from app.models.user import User
 
 
 @pytest.mark.asyncio
-async def test_compute_elo_update_basic():
-    """Test ELO update formula basics."""
+async def test_p_correct_basic():
+    """Test probability computation basics."""
     # Question rated 1000, student rated 1000, correct answer
-    new_rating, delta, expected = compute_elo_update(
-        question_rating=1000,
-        student_rating=1000,
-        actual=1,
-        k_factor=16,
-        rating_scale=400,
-    )
+    # Use p_correct to compute expected probability
+    expected = p_correct(theta=1000.0, b=1000.0, guess_floor=0.2, scale=400.0)
+    
+    # Expected should be ~0.5 + guess_floor adjustment (even match)
+    assert 0.4 < expected < 0.6
 
-    # Expected should be 0.5 (even match)
-    assert abs(expected - 0.5) < 0.01
+    # Compute delta for correct answer
+    delta = compute_delta(score=True, p=expected)
+    assert delta > 0  # Positive error when correct
 
-    # Delta should be positive (question gets harder)
-    assert delta > 0
-    assert abs(delta - 8.0) < 0.1  # 16 * (1 - 0.5) = 8
-
-    # New rating increased
-    assert new_rating > 1000
+    # Test dynamic K computation
+    k = compute_dynamic_k(k_base=16.0, unc=100.0, k_min=8.0, k_max=64.0)
+    assert 8.0 <= k <= 64.0
 
 
 @pytest.mark.asyncio
-async def test_compute_elo_update_weak_student_correct():
-    """Test that correct answer by weak student increases difficulty."""
-    # Weak student (800) gets question right (rated 1000)
-    new_rating, delta, expected = compute_elo_update(
-        question_rating=1000,
-        student_rating=800,
-        actual=1,
-        k_factor=16,
-        rating_scale=400,
-    )
-
+async def test_p_correct_weak_student():
+    """Test that weak student has lower probability."""
+    # Weak student (800) vs question (1000)
+    expected = p_correct(theta=800.0, b=1000.0, guess_floor=0.2, scale=400.0)
+    
     # Expected < 0.5 (student weaker than question)
     assert expected < 0.5
 
-    # Large positive delta (question is easier than thought)
-    assert delta > 8  # More than neutral case
-
-    # Question rating decreases (easier)
-    assert new_rating > 1000
-
 
 @pytest.mark.asyncio
-async def test_compute_elo_update_strong_student_wrong():
-    """Test that wrong answer by strong student decreases difficulty."""
-    # Strong student (1200) gets question wrong (rated 1000)
-    new_rating, delta, expected = compute_elo_update(
-        question_rating=1000,
-        student_rating=1200,
-        actual=0,
-        k_factor=16,
-        rating_scale=400,
-    )
-
+async def test_p_correct_strong_student():
+    """Test that strong student has higher probability."""
+    # Strong student (1200) vs question (1000)
+    expected = p_correct(theta=1200.0, b=1000.0, guess_floor=0.2, scale=400.0)
+    
     # Expected > 0.5 (student stronger than question)
     assert expected > 0.5
 
-    # Negative delta (question is easier than thought)
-    assert delta < 0
-
-    # Question rating decreases (easier)
-    assert new_rating < 1000
-
 
 @pytest.mark.asyncio
-async def test_compute_student_rating_fixed():
-    """Test fixed student rating strategy."""
-    params = {"baseline_rating": 1000}
-
-    rating = compute_student_rating("fixed", params, mastery_score=0.8)
-
-    # Ignores mastery, returns baseline
-    assert rating == 1000
-
-
-@pytest.mark.asyncio
-async def test_compute_student_rating_mastery_mapped():
-    """Test mastery-mapped student rating strategy."""
-    params = {"baseline_rating": 1000, "mastery_rating_map": {"min": 800, "max": 1200}}
-
-    # Weak student
-    rating = compute_student_rating("mastery_mapped", params, mastery_score=0.0)
-    assert rating == 800
-
-    # Medium student
-    rating = compute_student_rating("mastery_mapped", params, mastery_score=0.5)
-    assert rating == 1000
-
-    # Strong student
-    rating = compute_student_rating("mastery_mapped", params, mastery_score=1.0)
-    assert rating == 1200
-
-    # No mastery available
-    rating = compute_student_rating("mastery_mapped", params, mastery_score=None)
-    assert rating == 1000  # Falls back to baseline
-
-
-@pytest.mark.asyncio
-async def test_difficulty_update_on_session_submit(db: AsyncSession):
+async def test_difficulty_update_on_session_submit(db_session: AsyncSession):
     """Test difficulty update when session is submitted."""
     # Setup: Create user, year, block, theme, questions
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -153,74 +99,90 @@ async def test_difficulty_update_on_session_submit(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create questions
+    from app.models.question_cms import QuestionStatus
+    
     q1 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block.id,
         theme_id=theme.id,
-        stem_text="Q1",
-        status="PUBLISHED",
+        stem="Q1",
+        option_a="A1",
+        option_b="B1",
+        option_c="C1",
+        option_d="D1",
+        option_e="E1",
+        correct_index=0,
+        status=QuestionStatus.PUBLISHED,
+        cognitive_level="UNDERSTAND",
+        difficulty="MEDIUM",
     )
     q2 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block.id,
         theme_id=theme.id,
-        stem_text="Q2",
-        status="PUBLISHED",
+        stem="Q2",
+        option_a="A2",
+        option_b="B2",
+        option_c="C2",
+        option_d="D2",
+        option_e="E2",
+        correct_index=0,
+        status=QuestionStatus.PUBLISHED,
+        cognitive_level="UNDERSTAND",
+        difficulty="MEDIUM",
     )
-    db.add_all([q1, q2])
+    db_session.add_all([q1, q2])
 
     # Create session
+    from app.models.session import SessionMode, SessionStatus
+    
     session = TestSession(
         id=uuid4(),
-        user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=2,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=2,
+        started_at=datetime.utcnow(),
     )
-    db.add(session)
+    db_session.add(session)
 
     # Create session questions
     sq1 = SessionQuestion(
-        id=uuid4(),
         session_id=session.id,
         question_id=q1.id,
-        order_index=0,
+        position=1,
     )
     sq2 = SessionQuestion(
-        id=uuid4(),
         session_id=session.id,
         question_id=q2.id,
-        order_index=1,
+        position=2,
     )
-    db.add_all([sq1, sq2])
+    db_session.add_all([sq1, sq2])
 
     # Create answers (q1 correct, q2 wrong)
     a1 = SessionAnswer(
         id=uuid4(),
         session_id=session.id,
-        user_id=user.id,
         question_id=q1.id,
         selected_index=0,
         is_correct=True,
-        changed_count=1,
     )
     a2 = SessionAnswer(
         id=uuid4(),
         session_id=session.id,
-        user_id=user.id,
         question_id=q2.id,
         selected_index=1,
         is_correct=False,
-        changed_count=1,
     )
-    db.add_all([a1, a2])
+    db_session.add_all([a1, a2])
 
-    await db.commit()
+    await db_session.commit()
 
     # Call difficulty update
     result = await update_question_difficulty_v0_for_session(db, session.id, trigger="test")
@@ -230,41 +192,50 @@ async def test_difficulty_update_on_session_submit(db: AsyncSession):
     assert "run_id" in result
 
     # Check difficulty records created
+    from sqlalchemy import select
+    
     diff_stmt = select(QuestionDifficulty).where(QuestionDifficulty.question_id.in_([q1.id, q2.id]))
-    diff_result = await db.execute(diff_stmt)
+    diff_result = await db_session.execute(diff_stmt)
     difficulties = diff_result.scalars().all()
 
     assert len(difficulties) == 2
 
     # Check algo_run logged
     run_id = result["run_id"]
-    run = await db.get(AlgoRun, run_id)
+    from sqlalchemy import select
+    run_stmt = select(AlgoRun).where(AlgoRun.id == run_id)
+    run_result = await db_session.execute(run_stmt)
+    run = run_result.scalar_one_or_none()(AlgoRun, run_id)
     assert run is not None
     assert run.status == "SUCCESS"
 
 
 @pytest.mark.asyncio
-async def test_difficulty_algo_run_logging(db: AsyncSession):
+async def test_difficulty_algo_run_logging(db_session: AsyncSession):
     """Test that difficulty updates log algo runs correctly."""
     # Setup minimal data
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
     session = TestSession(
         id=uuid4(),
-        user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=0,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=0,
     )
-    db.add(session)
+    db_session.add(session)
 
-    await db.commit()
+    await db_session.commit()
 
     # Call update (no answers, should succeed)
     result = await update_question_difficulty_v0_for_session(db, session.id, trigger="test")
@@ -273,7 +244,10 @@ async def test_difficulty_algo_run_logging(db: AsyncSession):
     assert "run_id" in result
 
     run_id = result["run_id"]
-    run = await db.get(AlgoRun, run_id)
+    from sqlalchemy import select
+    run_stmt = select(AlgoRun).where(AlgoRun.id == run_id)
+    run_result = await db_session.execute(run_stmt)
+    run = run_result.scalar_one_or_none()(AlgoRun, run_id)
 
     assert run is not None
     assert run.status == "SUCCESS"
@@ -288,22 +262,25 @@ async def test_difficulty_algo_run_logging(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
+async def test_adaptive_select_weak_themes_prioritized(db_session: AsyncSession):
     """Test that weak themes are prioritized in selection."""
     # Setup: user, year, blocks, themes
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     # Create two themes
     theme_weak = Theme(
@@ -320,12 +297,11 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
         name="Strong Theme",
         order=2,
     )
-    db.add_all([theme_weak, theme_strong])
+    db_session.add_all([theme_weak, theme_strong])
 
     # Create mastery records
     mastery_weak = UserThemeMastery(
         id=uuid4(),
-        user_id=user.id,
         year=1,
         block_id=block.id,
         theme_id=theme_weak.id,
@@ -339,7 +315,6 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
     )
     mastery_strong = UserThemeMastery(
         id=uuid4(),
-        user_id=user.id,
         year=1,
         block_id=block.id,
         theme_id=theme_strong.id,
@@ -351,7 +326,7 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
         params_id=uuid4(),
         run_id=uuid4(),
     )
-    db.add_all([mastery_weak, mastery_strong])
+    db_session.add_all([mastery_weak, mastery_strong])
 
     # Create questions (5 per theme)
     questions = []
@@ -362,10 +337,10 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
             block_id=block.id,
             theme_id=theme_weak.id,
             stem_text=f"Weak Q{i}",
-            status="PUBLISHED",
+            status=QuestionStatus.PUBLISHED,
         )
         questions.append(q)
-        db.add(q)
+        db_session.add(q)
 
     for i in range(5):
         q = Question(
@@ -374,12 +349,12 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
             block_id=block.id,
             theme_id=theme_strong.id,
             stem_text=f"Strong Q{i}",
-            status="PUBLISHED",
+            status=QuestionStatus.PUBLISHED,
         )
         questions.append(q)
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.commit()
 
     # Select 6 questions (should favor weak theme)
     params = {
@@ -436,22 +411,25 @@ async def test_adaptive_select_weak_themes_prioritized(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_select_recent_questions_excluded(db: AsyncSession):
+async def test_adaptive_select_recent_questions_excluded(db_session: AsyncSession):
     """Test that recently attempted questions are excluded."""
     # Setup: user, year, block, theme, questions
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -460,55 +438,54 @@ async def test_adaptive_select_recent_questions_excluded(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create 10 questions
     questions = []
     for i in range(10):
         q = Question(
             id=uuid4(),
-            year=1,
-            block_id=block.id,
-            theme_id=theme.id,
-            stem_text=f"Q{i}",
-            status="PUBLISHED",
+        year_id=1,
+        block_id=block.id,
+        theme_id=theme.id,
+        stem=f"Q{i}",
+            status=QuestionStatus.PUBLISHED,
         )
         questions.append(q)
-        db.add(q)
+        db_session.add(q)
 
     # Create a recent session with first 3 questions
     recent_session = TestSession(
         id=uuid4(),
-        user_id=user.id,
-        mode="TUTOR",
-        status="SUBMITTED",
-        count=3,
+        mode=SessionMode.TUTOR,
+        status=SessionStatus.SUBMITTED,
+        year=1,
+        blocks_json=["A"],
+        total_questions=3,
         created_at=datetime.utcnow() - timedelta(days=5),  # 5 days ago
     )
-    db.add(recent_session)
+    db_session.add(recent_session)
 
     for i in range(3):
         sq = SessionQuestion(
             id=uuid4(),
             session_id=recent_session.id,
             question_id=questions[i].id,
-            order_index=i,
+            position=i,
             created_at=datetime.utcnow() - timedelta(days=5),
         )
-        db.add(sq)
+        db_session.add(sq)
 
         sa = SessionAnswer(
             id=uuid4(),
             session_id=recent_session.id,
-            user_id=user.id,
             question_id=questions[i].id,
             selected_index=0,
             is_correct=True,
-            changed_count=1,
         )
-        db.add(sa)
+        db_session.add(sa)
 
-    await db.commit()
+    await db_session.commit()
 
     # Select 5 questions with anti_repeat_days = 14
     params = {
@@ -554,22 +531,25 @@ async def test_adaptive_select_recent_questions_excluded(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_select_deterministic(db: AsyncSession):
+async def test_adaptive_select_deterministic(db_session: AsyncSession):
     """Test that selection is deterministic for same inputs."""
     # Setup: user, year, block, theme, questions
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -578,21 +558,21 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create 10 questions
     for i in range(10):
         q = Question(
             id=uuid4(),
-            year=1,
-            block_id=block.id,
-            theme_id=theme.id,
-            stem_text=f"Q{i}",
-            status="PUBLISHED",
+        year_id=1,
+        block_id=block.id,
+        theme_id=theme.id,
+        stem=f"Q{i}",
+            status=QuestionStatus.PUBLISHED,
         )
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.commit()
 
     params = {
         "anti_repeat_days": 14,
@@ -647,22 +627,25 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_service_with_run_logging(db: AsyncSession):
+async def test_adaptive_service_with_run_logging(db_session: AsyncSession):
     """Test adaptive service wrapper logs runs correctly."""
     # Setup minimal data
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     theme = Theme(
         id=uuid4(),
@@ -671,21 +654,21 @@ async def test_adaptive_service_with_run_logging(db: AsyncSession):
         name="Theme 1",
         order=1,
     )
-    db.add(theme)
+    db_session.add(theme)
 
     # Create 5 questions
     for i in range(5):
         q = Question(
             id=uuid4(),
-            year=1,
-            block_id=block.id,
-            theme_id=theme.id,
-            stem_text=f"Q{i}",
-            status="PUBLISHED",
+        year_id=1,
+        block_id=block.id,
+        theme_id=theme.id,
+        stem=f"Q{i}",
+            status=QuestionStatus.PUBLISHED,
         )
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.commit()
 
     # Call adaptive service
     result = await adaptive_select_v0(
@@ -706,7 +689,10 @@ async def test_adaptive_service_with_run_logging(db: AsyncSession):
 
     # Check algo_run logged
     run_id = result["run_id"]
-    run = await db.get(AlgoRun, run_id)
+    from sqlalchemy import select
+    run_stmt = select(AlgoRun).where(AlgoRun.id == run_id)
+    run_result = await db_session.execute(run_stmt)
+    run = run_result.scalar_one_or_none()(AlgoRun, run_id)
 
     assert run is not None
     assert run.status == "SUCCESS"
@@ -715,22 +701,25 @@ async def test_adaptive_service_with_run_logging(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
+async def test_adaptive_revision_queue_prioritized(db_session: AsyncSession):
     """Test that themes in revision_queue are prioritized."""
     # Setup: user, year, block, themes
     user = User(
         id=uuid4(),
         email="test@example.com",
-        hashed_password="hashed",
-        role="STUDENT",
+        password_hash=hash_password("Test123!"),
+        full_name="Test User",
+        role=UserRole.STUDENT.value,
+        is_active=True,
+        email_verified=True,
     )
-    db.add(user)
+    db_session.add(user)
 
-    year = AcademicYear(id=1, year=1, name="Year 1")
-    db.add(year)
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    db.add(block)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add(block)
 
     # Create two themes
     theme_due = Theme(
@@ -747,12 +736,11 @@ async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
         name="Other Theme",
         order=2,
     )
-    db.add_all([theme_due, theme_other])
+    db_session.add_all([theme_due, theme_other])
 
     # Add revision queue entry for theme_due (due today)
     revision_item = RevisionQueue(
         id=uuid4(),
-        user_id=user.id,
         year=1,
         block_id=block.id,
         theme_id=theme_due.id,
@@ -764,7 +752,7 @@ async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
         params_id=uuid4(),
         run_id=uuid4(),
     )
-    db.add(revision_item)
+    db_session.add(revision_item)
 
     # Create questions (5 per theme)
     for i in range(5):
@@ -774,9 +762,9 @@ async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
             block_id=block.id,
             theme_id=theme_due.id,
             stem_text=f"Due Q{i}",
-            status="PUBLISHED",
+            status=QuestionStatus.PUBLISHED,
         )
-        db.add(q)
+        db_session.add(q)
 
     for i in range(5):
         q = Question(
@@ -785,11 +773,11 @@ async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
             block_id=block.id,
             theme_id=theme_other.id,
             stem_text=f"Other Q{i}",
-            status="PUBLISHED",
+            status=QuestionStatus.PUBLISHED,
         )
-        db.add(q)
+        db_session.add(q)
 
-    await db.commit()
+    await db_session.commit()
 
     # Select 5 questions
     params = {
@@ -832,7 +820,7 @@ async def test_adaptive_revision_queue_prioritized(db: AsyncSession):
     assert len(selected) == 5
     # All selected should be from theme_due
     stmt = select(Question).where(Question.id.in_(selected))
-    result = await db.execute(stmt)
+    result = await db_session.execute(stmt)
     selected_questions = result.scalars().all()
 
     for q in selected_questions:

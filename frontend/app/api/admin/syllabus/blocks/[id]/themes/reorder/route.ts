@@ -4,13 +4,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const cookies = request.headers.get("cookie") || "";
     const body = await request.json();
 
     const { data } = await backendFetch<unknown>(
-      `/admin/syllabus/blocks/${params.id}/themes/reorder`,
+      `/admin/syllabus/blocks/${id}/themes/reorder`,
       {
         method: "POST",
         cookies,

@@ -422,159 +422,91 @@ validate_all_constants()
 # Probability Model Parameters
 ELO_GUESS_FLOOR = SourcedValue(
     value=0.20,
-    sources=[
-        "5-option MCQ: random guessing yields 1/5 = 0.20 probability",
-        "Standard multiple-choice testing theory: P(guess) = 1 / number_of_options",
-    ],
+    source="5-option MCQ: random guessing yields 1/5 = 0.20 probability; Standard multiple-choice testing theory: P(guess) = 1 / number_of_options",
 )
 
 ELO_SCALE = SourcedValue(
     value=400.0,
-    sources=[
-        "Standard Elo scaling factor: 400 points ≈ 10x performance difference",
-        "Derived from chess Elo where 400-point difference implies ~91% expected score",
-        "Equivalent to logistic scale: 400 / ln(10) ≈ 173.7 (but 400 is conventional)",
-    ],
+    source="Standard Elo scaling factor: 400 points ≈ 10x performance difference; Derived from chess Elo where 400-point difference implies ~91% expected score",
 )
 
 # Base K Values (before uncertainty modulation)
 ELO_K_BASE_USER = SourcedValue(
     value=32.0,
-    sources=[
-        "Standard Elo K-factor for active players (FIDE uses 10-40 range)",
-        "Higher than chess default (16) due to MCQ noise and learning effects",
-        "Placeholder - to be tuned via cross-validation on historical data",
-    ],
+    source="Standard Elo K-factor for active players (FIDE uses 10-40 range); Higher than chess default (16) due to MCQ noise and learning effects",
 )
 
 ELO_K_BASE_QUESTION = SourcedValue(
     value=24.0,
-    sources=[
-        "Slightly lower than user K to prioritize user ability adaptation",
-        "Questions are more stable than users (no learning curve for items)",
-        "Placeholder - to be tuned from data; initial heuristic is 75% of user K",
-    ],
+    source="Slightly lower than user K to prioritize user ability adaptation; Questions are more stable than users (no learning curve for items)",
 )
 
 ELO_K_MIN = SourcedValue(
     value=8.0,
-    sources=[
-        "Minimum K for mature ratings with low uncertainty",
-        "Prevents complete stagnation while maintaining stability",
-        "Heuristic: 25% of base K for well-established ratings",
-    ],
+    source="Minimum K for mature ratings with low uncertainty; Prevents complete stagnation while maintaining stability",
 )
 
 ELO_K_MAX = SourcedValue(
     value=64.0,
-    sources=[
-        "Maximum K for new items with high uncertainty",
-        "Enables fast adaptation in early stages",
-        "Heuristic: 2x base K for maximum learning rate",
-    ],
+    source="Maximum K for new items with high uncertainty; Enables fast adaptation in early stages",
 )
 
 # Uncertainty Dynamics
 ELO_UNC_INIT_USER = SourcedValue(
     value=350.0,
-    sources=[
-        "Initial rating deviation for new users",
-        "Similar to Glicko-2 RD_0 = 350 (standard for online rating systems)",
-        "Represents ~87% confidence interval of ±1.4 * 350 ≈ ±490 rating points",
-    ],
+    source="Initial rating deviation for new users; Similar to Glicko-2 RD_0 = 350 (standard for online rating systems)",
 )
 
 ELO_UNC_INIT_QUESTION = SourcedValue(
     value=250.0,
-    sources=[
-        "Lower initial uncertainty for questions (assumed more stable than users)",
-        "Heuristic: ~70% of user initial uncertainty",
-        "Questions don't learn, so uncertainty primarily reflects estimation noise",
-    ],
+    source="Lower initial uncertainty for questions (assumed more stable than users); Heuristic: ~70% of user initial uncertainty",
 )
 
 ELO_UNC_FLOOR = SourcedValue(
     value=50.0,
-    sources=[
-        "Minimum uncertainty floor (never fully certain)",
-        "Represents irreducible measurement noise in MCQ performance",
-        "Glicko-2 typically converges to RD ≈ 30-50 for active players",
-    ],
+    source="Minimum uncertainty floor (never fully certain); Represents irreducible measurement noise in MCQ performance",
 )
 
 ELO_UNC_DECAY_PER_ATTEMPT = SourcedValue(
     value=0.9,
-    sources=[
-        "Uncertainty multiplier per attempt: unc *= 0.9 each time",
-        "Geometric decay toward floor: after 20 attempts, unc ≈ 0.9^20 ≈ 0.12 of initial",
-        "Heuristic - to be calibrated from variance of rating changes over time",
-    ],
+    source="Uncertainty multiplier per attempt: unc *= 0.9 each time; Geometric decay toward floor",
 )
 
 ELO_UNC_AGE_INCREASE_PER_DAY = SourcedValue(
     value=1.0,
-    sources=[
-        "Uncertainty increase per day of inactivity",
-        "Models drift and forgetting (user ability may change; question difficulty may shift due to curriculum changes)",
-        "Heuristic: ~1 point/day; 90 days inactivity adds ~90 points RD (modest drift)",
-    ],
+    source="Uncertainty increase per day of inactivity; Models drift and forgetting",
 )
 
 # Theme Rating Activation Thresholds
 ELO_MIN_ATTEMPTS_THEME_USER = SourcedValue(
     value=5,
-    sources=[
-        "Minimum attempts in a theme before creating theme-specific user rating",
-        "Heuristic: Require some exposure before splitting from global rating",
-        "Prevents noisy theme ratings with insufficient data",
-    ],
+    source="Minimum attempts in a theme before creating theme-specific user rating; Prevents noisy theme ratings with insufficient data",
 )
 
 ELO_MIN_ATTEMPTS_THEME_QUESTION = SourcedValue(
     value=3,
-    sources=[
-        "Minimum attempts on a question in a theme before theme-specific difficulty",
-        "Lower than user threshold (questions more stable)",
-        "Heuristic - to be validated with hierarchical model evaluation",
-    ],
+    source="Minimum attempts on a question in a theme before theme-specific difficulty; Lower than user threshold (questions more stable)",
 )
 
 ELO_THEME_UPDATE_WEIGHT = SourcedValue(
     value=0.5,
-    sources=[
-        "Weight for theme rating update relative to global",
-        "0.5 = equal update to both global and theme ratings",
-        "Hierarchical model: total update split between levels",
-        "Placeholder - to be tuned via nested cross-validation",
-    ],
+    source="Weight for theme rating update relative to global; 0.5 = equal update to both global and theme ratings",
 )
 
 # Drift Control (Recenter)
 ELO_RECENTER_ENABLED = SourcedValue(
     value=True,
-    sources=[
-        "Enable periodic recentering to prevent rating inflation/deflation",
-        "Standard practice in Elo systems (FIDE periodically adjusts baselines)",
-        "Preserves relative differences while normalizing absolute scale",
-    ],
+    source="Enable periodic recentering to prevent rating inflation/deflation; Standard practice in Elo systems",
 )
 
 ELO_RECENTER_EVERY_N_UPDATES = SourcedValue(
     value=10000,
-    sources=[
-        "Recenter after every 10,000 updates (global)",
-        "Heuristic: Frequent enough to prevent drift, infrequent enough to avoid instability",
-        "Typical platform with 1,000 students × 50 questions/month ⇒ recenter ~monthly",
-    ],
+    source="Recenter after every 10,000 updates (global); Heuristic: Frequent enough to prevent drift, infrequent enough to avoid instability",
 )
 
 ELO_RATING_INIT = SourcedValue(
     value=0.0,
-    sources=[
-        "Initial rating for new users and questions (mean-centered)",
-        "Elo convention: start at system average (often 1500 in chess, but 0 for normalized scale)",
-        "0-centered scale simplifies interpretation: positive = above average, negative = below average",
-    ],
+    source="Initial rating for new users and questions (mean-centered); 0-centered scale simplifies interpretation",
 )
 
 
@@ -630,4 +562,559 @@ def get_elo_defaults() -> dict:
         "recenter_enabled": ELO_RECENTER_ENABLED.value,
         "recenter_every_n_updates": ELO_RECENTER_EVERY_N_UPDATES.value,
         "rating_init": ELO_RATING_INIT.value,
+    }
+
+
+# =============================================================================
+# Adaptive Selection v1 (Constrained Thompson Sampling Bandit) Constants
+# =============================================================================
+
+# Beta Prior Parameters (Uniform prior = maximum uncertainty)
+ADAPTIVE_BETA_PRIOR_A = SourcedValue(
+    value=1.0,
+    source="Beta(1,1) = Uniform distribution (uninformative prior)",
+    notes="Starting with no preference allows learning from data. "
+    "Could use Beta(2,2) for slightly conservative prior centered at 0.5.",
+    validated=True,
+)
+
+ADAPTIVE_BETA_PRIOR_B = SourcedValue(
+    value=1.0,
+    source="Beta(1,1) = Uniform distribution (uninformative prior)",
+    notes="Symmetric with alpha for balanced initial exploration.",
+    validated=True,
+)
+
+# Epsilon Floor (prevents zeroing low-history arms)
+ADAPTIVE_EPSILON_FLOOR = SourcedValue(
+    value=0.10,
+    source="Epsilon-greedy hybrid: minimum exploration rate",
+    notes="Ensures themes with low history still get some chance. "
+    "final_score = base_priority * (epsilon + sampled_y). "
+    "10% floor prevents complete neglect of any theme.",
+    validated=False,
+)
+
+# Theme Selection Constraints
+ADAPTIVE_MAX_CANDIDATE_THEMES = SourcedValue(
+    value=30,
+    source="Performance constraint: limit candidate set size",
+    notes="Prevents excessive computation for users with many themes. "
+    "Most medical syllabi have 20-50 themes per block.",
+    validated=False,
+)
+
+ADAPTIVE_MIN_THEME_COUNT = SourcedValue(
+    value=2,
+    source="Curriculum coverage: minimum theme diversity per session",
+    notes="Ensures sessions cover at least 2 themes for variety. "
+    "Can be relaxed if total questions < 10.",
+    validated=False,
+)
+
+ADAPTIVE_MAX_THEME_COUNT = SourcedValue(
+    value=5,
+    source="Focus constraint: maximum themes per session",
+    notes="Too many themes reduces depth. 5 themes for ~20 questions = ~4 per theme minimum.",
+    validated=False,
+)
+
+ADAPTIVE_MIN_PER_THEME = SourcedValue(
+    value=3,
+    source="Statistical reliability: minimum questions per theme",
+    notes="Ensures meaningful exposure to each selected theme. "
+    "Below 3 questions, learning signal is too weak.",
+    validated=False,
+)
+
+ADAPTIVE_MAX_PER_THEME = SourcedValue(
+    value=20,
+    source="Balance constraint: maximum questions per theme",
+    notes="Prevents over-concentration on single theme. "
+    "Typical session of 20-30 questions should span multiple themes.",
+    validated=False,
+)
+
+# Repeat Exclusion (Anti-repeat policy)
+ADAPTIVE_EXCLUDE_SEEN_WITHIN_DAYS = SourcedValue(
+    value=14,
+    source="Spaced repetition principle: minimum interval before repeat",
+    notes="Questions seen in last 14 days are excluded unless supply is low. "
+    "Prevents cramming same questions repeatedly.",
+    validated=False,
+)
+
+ADAPTIVE_EXCLUDE_SEEN_WITHIN_SESSIONS = SourcedValue(
+    value=3,
+    source="Short-term memory: recent session exclusion",
+    notes="Questions from last 3 sessions excluded regardless of days. "
+    "Prevents immediate repeats even if days threshold allows.",
+    validated=False,
+)
+
+ADAPTIVE_MAX_REPEATS_IN_SESSION = SourcedValue(
+    value=0,
+    source="Session integrity: no duplicates within single session",
+    notes="Each question appears at most once per session.",
+    validated=True,
+)
+
+ADAPTIVE_ALLOW_REPEAT_IF_SUPPLY_LOW = SourcedValue(
+    value=True,
+    source="Graceful degradation: allow repeats when supply exhausted",
+    notes="If exclusion filters leave too few questions, relax anti-repeat. "
+    "Better to repeat than to under-serve the requested count.",
+    validated=False,
+)
+
+# Revision Mode Constraints
+ADAPTIVE_REVISION_DUE_RATIO_MIN = SourcedValue(
+    value=0.60,
+    source="Revision priority: minimum fraction from FSRS due concepts",
+    notes="In revision mode, at least 60% of questions should target due concepts. "
+    "Ensures revision sessions actually address forgetting.",
+    validated=False,
+)
+
+ADAPTIVE_REVISION_DUE_RATIO_MAX = SourcedValue(
+    value=0.85,
+    source="Balance: leave room for reinforcement and new material",
+    notes="Cap at 85% to allow some weak-concept questions even in revision mode.",
+    validated=False,
+)
+
+ADAPTIVE_DUE_CONCEPT_FALLBACK_TO_WEAK = SourcedValue(
+    value=True,
+    source="Graceful fallback: if not enough due concepts, use weak concepts",
+    notes="Prevents empty revision sessions when FSRS queue is small.",
+    validated=True,
+)
+
+# Elo Challenge Band (target probability of correctness)
+ADAPTIVE_P_LOW = SourcedValue(
+    value=0.55,
+    source="Desirable difficulty: lower bound for p(correct)",
+    notes="Questions too easy (p > 0.85) waste time; too hard (p < 0.55) cause frustration. "
+    "55% lower bound ensures manageable challenge. "
+    "Reference: Bjork's desirable difficulties research suggests ~60-80% optimal.",
+    validated=False,
+)
+
+ADAPTIVE_P_HIGH = SourcedValue(
+    value=0.80,
+    source="Desirable difficulty: upper bound for p(correct)",
+    notes="80% upper bound ensures questions are still challenging. "
+    "Within [0.55, 0.80] band optimizes learning efficiency.",
+    validated=False,
+)
+
+ADAPTIVE_EXPLORE_NEW_QUESTION_RATE = SourcedValue(
+    value=0.10,
+    source="Exploration: fraction of questions from new/unrated pool",
+    notes="10% of selection reserved for questions with insufficient Elo data. "
+    "Helps calibrate new questions while maintaining session quality.",
+    validated=False,
+)
+
+ADAPTIVE_EXPLORE_HIGH_UNCERTAINTY_RATE = SourcedValue(
+    value=0.05,
+    source="Uncertainty exploration: questions with high rating uncertainty",
+    notes="5% reserved for questions where Elo uncertainty is high. "
+    "Reduces uncertainty in item difficulty estimates.",
+    validated=False,
+)
+
+# Base Priority Feature Weights
+ADAPTIVE_W_WEAKNESS = SourcedValue(
+    value=0.45,
+    source="Priority weighting: weakness (1 - mastery) importance",
+    notes="45% weight on weakness signal (low BKT mastery). "
+    "Primary driver of theme selection for learning.",
+    validated=False,
+)
+
+ADAPTIVE_W_DUE = SourcedValue(
+    value=0.35,
+    source="Priority weighting: FSRS due concepts importance",
+    notes="35% weight on due concepts. "
+    "Second priority: address forgetting before it happens.",
+    validated=False,
+)
+
+ADAPTIVE_W_UNCERTAINTY = SourcedValue(
+    value=0.10,
+    source="Priority weighting: rating uncertainty importance",
+    notes="10% weight on Elo uncertainty. "
+    "Encourages exploring themes where user ability is uncertain.",
+    validated=False,
+)
+
+ADAPTIVE_W_RECENCY_PENALTY = SourcedValue(
+    value=0.10,
+    source="Priority weighting: recency penalty importance",
+    notes="10% penalty for recently practiced themes. "
+    "Prevents over-focusing on same themes repeatedly.",
+    validated=False,
+)
+
+ADAPTIVE_SUPPLY_MIN_QUESTIONS = SourcedValue(
+    value=10,
+    source="Minimum viable theme: questions needed to be selectable",
+    notes="Theme must have at least 10 eligible questions (after exclusions). "
+    "Prevents selecting themes with insufficient content.",
+    validated=False,
+)
+
+# Reward Computation (Bandit Learning)
+ADAPTIVE_REWARD_WINDOW = SourcedValue(
+    value="session",
+    source="Reward scope: compute reward after session completion",
+    notes="Reward is computed once per session, not per question. "
+    "Aggregates learning signal over the session.",
+    validated=True,
+)
+
+ADAPTIVE_REWARD_TYPE = SourcedValue(
+    value="bkt_delta",
+    source="Reward signal: BKT mastery delta",
+    notes="Reward = normalized mastery improvement on concepts in the theme. "
+    "Direct measure of learning, not just correctness.",
+    validated=True,
+)
+
+ADAPTIVE_REWARD_MIN_ATTEMPTS_PER_THEME = SourcedValue(
+    value=3,
+    source="Statistical reliability: minimum attempts to update Beta",
+    notes="Only update Beta posterior if theme had >= 3 questions in session. "
+    "Prevents noisy updates from low-exposure themes.",
+    validated=False,
+)
+
+# =============================================================================
+# Operational Constants
+# =============================================================================
+
+# Performance Sampling
+PERF_SAMPLE_RATE = SourcedValue(
+    value=0.05,
+    source="Heuristic: 5% sampling rate for API performance tracking",
+    notes="Sample 5% of requests to api_perf_sample table to manage volume. "
+    "Can be adjusted via PERF_SAMPLE_RATE environment variable.",
+    validated=False,
+)
+
+# Job System
+JOB_LOCK_DURATION_MINUTES = SourcedValue(
+    value=120,
+    source="Heuristic: 2 hour lock duration for long-running jobs",
+    notes="Job locks expire after 2 hours to prevent deadlocks from crashed processes.",
+    validated=False,
+)
+
+REVISION_QUEUE_REGEN_BATCH_SIZE = SourcedValue(
+    value=200,
+    source="Heuristic: process 200 users per batch",
+    notes="Chunk size for processing users in revision queue regeneration job. "
+    "Balances memory usage and transaction size.",
+    validated=False,
+)
+
+# FSRS Optimizer Trigger
+FSRS_OPTIMIZER_COOLDOWN_DAYS = SourcedValue(
+    value=7,
+    source="Heuristic: weekly cooldown for FSRS training",
+    notes="Minimum days between FSRS optimizer training runs per user. "
+    "Prevents excessive training and allows time for new data to accumulate.",
+    validated=False,
+)
+
+FSRS_AB_SPLIT_RATIO = SourcedValue(
+    value=0.5,
+    source="A/B testing: 50/50 split between baseline and tuned",
+    notes="50% of eligible users get BASELINE_GLOBAL, 50% get TUNED_ELIGIBLE. "
+    "Assignment is stable (seeded by user_id hash).",
+    validated=True,
+)
+
+# Evaluation Harness
+EVAL_CONFIDENCE_THRESHOLD = SourcedValue(
+    value=0.5,
+    source="Heuristic: conservative confidence threshold for model fallback",
+    notes="If model prediction confidence < 0.5, fallback to v0 rules. "
+    "Initially conservative; can be calibrated from validation data.",
+    validated=False,
+)
+
+EVAL_REGRESSION_THRESHOLD_PCT = SourcedValue(
+    value=0.10,
+    source="Heuristic: 10% degradation threshold for regression detection",
+    notes="If logloss increases by >10% vs baseline, flag as regression in shadow dashboard.",
+    validated=False,
+)
+
+# =============================================================================
+# IRT (Item Response Theory) - Shadow/Offline Calibration Only
+# =============================================================================
+
+# Priors (configurable; logged in dataset_spec or run config)
+IRT_PRIOR_THETA_MEAN = SourcedValue(
+    value=0.0,
+    source="IRT convention: theta ~ N(0,1) standard scale",
+    notes="Ability prior mean. Theta scale anchored via standardization post-fit.",
+    validated=True,
+)
+
+IRT_PRIOR_THETA_SD = SourcedValue(
+    value=1.0,
+    source="IRT convention: theta ~ N(0,1)",
+    notes="Ability prior standard deviation.",
+    validated=True,
+)
+
+IRT_PRIOR_A_MEAN = SourcedValue(
+    value=1.0,
+    source="Heuristic: discrimination centered near 1",
+    notes="Log-normal or transformed a prior mean. a > 0 via softplus.",
+    validated=False,
+)
+
+IRT_PRIOR_B_MEAN = SourcedValue(
+    value=0.0,
+    source="Heuristic: difficulty centered at 0 (theta scale)",
+    notes="Difficulty prior mean. Cold-start from ELO or p-value logit.",
+    validated=False,
+)
+
+IRT_PRIOR_B_SD = SourcedValue(
+    value=1.0,
+    source="Heuristic: moderate spread",
+    notes="Difficulty prior standard deviation.",
+    validated=False,
+)
+
+# 3PL guessing: c in [0, 1/K], K = option_count
+IRT_C_PRIOR_IMPLIED_BY_1K = SourcedValue(
+    value=0.2,
+    source="5-option MCQ: 1/5 = 0.2 guessing floor",
+    notes="Default when K unknown. Otherwise use 1/option_count.",
+    validated=True,
+)
+
+# Cold-start seeding
+IRT_INIT_A_MODEST = SourcedValue(
+    value=1.0,
+    source="Prior mean; do not hardcode magic constants",
+    notes="Initial a when no Elo/prior. Read from config.",
+    validated=False,
+)
+
+IRT_LOW_DISCRIMINATION_THRESHOLD = SourcedValue(
+    value=0.3,
+    source="Heuristic: flag items with a < 0.3 for review",
+    notes="Low discrimination -> flag low_discrimination.",
+    validated=False,
+)
+
+# =============================================================================
+# IRT Activation Policy Constants (Gate Thresholds)
+# =============================================================================
+
+# Gate A: Minimum Data Sufficiency
+IRT_ACTIVATION_MIN_USERS = SourcedValue(
+    value=500,
+    source="IRT activation policy v1: minimum users for reliable calibration",
+    notes="Cold-start blocker. IRT requires sufficient user diversity for stable parameter estimation.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_ITEMS = SourcedValue(
+    value=1000,
+    source="IRT activation policy v1: minimum items for reliable calibration",
+    notes="Cold-start blocker. Need sufficient item diversity for stable discrimination/difficulty estimates.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_ATTEMPTS = SourcedValue(
+    value=100000,
+    source="IRT activation policy v1: minimum total attempts",
+    notes="Cold-start blocker. Need large sample size for stable IRT parameter estimation.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_ATTEMPTS_PER_ITEM = SourcedValue(
+    value=50,
+    source="IRT activation policy v1: minimum attempts per item (median)",
+    notes="Ensures each item has sufficient data for reliable parameter estimation.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_ATTEMPTS_PER_USER = SourcedValue(
+    value=100,
+    source="IRT activation policy v1: minimum attempts per user (median)",
+    notes="Ensures each user has sufficient data for reliable ability estimation.",
+    validated=False,
+)
+
+# Gate B: Holdout Predictive Superiority vs Baseline
+IRT_ACTIVATION_DELTA_LOGLOSS = SourcedValue(
+    value=0.005,
+    source="IRT activation policy v1: minimum logloss improvement vs baseline",
+    notes="IRT must improve logloss by at least 0.005 vs baseline (ELO+BKT+FSRS) to activate.",
+    validated=False,
+)
+
+IRT_ACTIVATION_DELTA_BRIER = SourcedValue(
+    value=0.003,
+    source="IRT activation policy v1: minimum brier score improvement vs baseline",
+    notes="IRT must improve brier score by at least 0.003 vs baseline to activate.",
+    validated=False,
+)
+
+IRT_ACTIVATION_DELTA_ECE = SourcedValue(
+    value=0.005,
+    source="IRT activation policy v1: minimum ECE improvement vs baseline",
+    notes="IRT must improve expected calibration error by at least 0.005 vs baseline to activate.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_FOLDS = SourcedValue(
+    value=3,
+    source="IRT activation policy v1: minimum evaluation folds for stability",
+    notes="Improvement must hold in at least 3 evaluation replays or time-sliced folds.",
+    validated=False,
+)
+
+# Gate C: Calibration Sanity
+IRT_ACTIVATION_A_MIN = SourcedValue(
+    value=0.25,
+    source="IRT activation policy v1: minimum discrimination threshold",
+    notes="Items with a < A_MIN are flagged as 'too_low_a'.",
+    validated=False,
+)
+
+IRT_ACTIVATION_B_ABS_MAX = SourcedValue(
+    value=4.0,
+    source="IRT activation policy v1: maximum absolute difficulty",
+    notes="Items with |b| > B_ABS_MAX are flagged as 'b_out_of_range'.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MAX_PCT_LOW_A = SourcedValue(
+    value=0.15,
+    source="IRT activation policy v1: maximum percentage of items with low discrimination",
+    notes="If >15% of items have a < A_MIN, gate fails.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MAX_PCT_C_CAP = SourcedValue(
+    value=0.10,
+    source="IRT activation policy v1: maximum percentage of items with c near cap (3PL only)",
+    notes="If >10% of items have c > 0.95*(1/K), gate fails.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MAX_PCT_B_OOR = SourcedValue(
+    value=0.05,
+    source="IRT activation policy v1: maximum percentage of items with b out of range",
+    notes="If >5% of items have |b| > B_ABS_MAX, gate fails.",
+    validated=False,
+)
+
+# Gate D: Parameter Stability Over Time
+IRT_ACTIVATION_MIN_CORR_B = SourcedValue(
+    value=0.90,
+    source="IRT activation policy v1: minimum Spearman correlation for difficulty (b)",
+    notes="Difficulty parameters must correlate >= 0.90 with previous eligible run.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_CORR_A = SourcedValue(
+    value=0.80,
+    source="IRT activation policy v1: minimum Spearman correlation for discrimination (a)",
+    notes="Discrimination parameters must correlate >= 0.80 with previous eligible run.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_CORR_C = SourcedValue(
+    value=0.70,
+    source="IRT activation policy v1: minimum Spearman correlation for guessing (c, 3PL only)",
+    notes="Guessing parameters must correlate >= 0.70 with previous eligible run (3PL only).",
+    validated=False,
+)
+
+IRT_ACTIVATION_MAX_MEDIAN_DELTA_B = SourcedValue(
+    value=0.15,
+    source="IRT activation policy v1: maximum median absolute delta for difficulty",
+    notes="Median |delta_b| must be <= 0.15 to pass stability gate.",
+    validated=False,
+)
+
+# Gate E: Measurement Precision (Information / SE)
+IRT_ACTIVATION_MAX_MEDIAN_SE = SourcedValue(
+    value=0.35,
+    source="IRT activation policy v1: maximum median standard error for ability",
+    notes="Median theta SE must be <= 0.35 for acceptable measurement precision.",
+    validated=False,
+)
+
+IRT_ACTIVATION_MIN_PCT_SE_GOOD = SourcedValue(
+    value=0.60,
+    source="IRT activation policy v1: minimum percentage of users with SE below target",
+    notes="At least 60% of users must have theta SE <= SE_TARGET.",
+    validated=False,
+)
+
+IRT_ACTIVATION_SE_TARGET = SourcedValue(
+    value=0.30,
+    source="IRT activation policy v1: target standard error for ability",
+    notes="Target SE for 'good' precision. Used in Gate E percentage calculation.",
+    validated=False,
+)
+
+# Gate F: Coverage + Fairness Sanity
+IRT_ACTIVATION_MAX_SUBGROUP_PENALTY = SourcedValue(
+    value=0.02,
+    source="IRT activation policy v1: maximum logloss penalty for subgroups",
+    notes="No subgroup (year/block) can have logloss > overall + 0.02.",
+    validated=False,
+)
+
+
+def get_adaptive_v1_defaults() -> dict:
+    """Get Adaptive Selection v1 defaults as a dict."""
+    return {
+        # Beta prior
+        "beta_prior_a": ADAPTIVE_BETA_PRIOR_A.value,
+        "beta_prior_b": ADAPTIVE_BETA_PRIOR_B.value,
+        "epsilon_floor": ADAPTIVE_EPSILON_FLOOR.value,
+        # Theme selection
+        "max_candidate_themes": ADAPTIVE_MAX_CANDIDATE_THEMES.value,
+        "min_theme_count": ADAPTIVE_MIN_THEME_COUNT.value,
+        "max_theme_count": ADAPTIVE_MAX_THEME_COUNT.value,
+        "min_per_theme": ADAPTIVE_MIN_PER_THEME.value,
+        "max_per_theme": ADAPTIVE_MAX_PER_THEME.value,
+        # Repeat exclusion
+        "exclude_seen_within_days": ADAPTIVE_EXCLUDE_SEEN_WITHIN_DAYS.value,
+        "exclude_seen_within_sessions": ADAPTIVE_EXCLUDE_SEEN_WITHIN_SESSIONS.value,
+        "max_repeats_in_session": ADAPTIVE_MAX_REPEATS_IN_SESSION.value,
+        "allow_repeat_if_supply_low": ADAPTIVE_ALLOW_REPEAT_IF_SUPPLY_LOW.value,
+        # Revision mode
+        "revision_due_ratio_min": ADAPTIVE_REVISION_DUE_RATIO_MIN.value,
+        "revision_due_ratio_max": ADAPTIVE_REVISION_DUE_RATIO_MAX.value,
+        "due_concept_fallback_to_weak": ADAPTIVE_DUE_CONCEPT_FALLBACK_TO_WEAK.value,
+        # Elo challenge band
+        "p_low": ADAPTIVE_P_LOW.value,
+        "p_high": ADAPTIVE_P_HIGH.value,
+        "explore_new_question_rate": ADAPTIVE_EXPLORE_NEW_QUESTION_RATE.value,
+        "explore_high_uncertainty_rate": ADAPTIVE_EXPLORE_HIGH_UNCERTAINTY_RATE.value,
+        # Feature weights
+        "w_weakness": ADAPTIVE_W_WEAKNESS.value,
+        "w_due": ADAPTIVE_W_DUE.value,
+        "w_uncertainty": ADAPTIVE_W_UNCERTAINTY.value,
+        "w_recency_penalty": ADAPTIVE_W_RECENCY_PENALTY.value,
+        "supply_min_questions": ADAPTIVE_SUPPLY_MIN_QUESTIONS.value,
+        # Reward
+        "reward_window": ADAPTIVE_REWARD_WINDOW.value,
+        "reward_type": ADAPTIVE_REWARD_TYPE.value,
+        "reward_min_attempts_per_theme": ADAPTIVE_REWARD_MIN_ATTEMPTS_PER_THEME.value,
     }

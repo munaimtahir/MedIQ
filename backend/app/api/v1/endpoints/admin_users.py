@@ -51,7 +51,7 @@ async def list_users(
         search_term = f"%{q.lower()}%"
         query = query.filter(
             or_(
-                User.name.ilike(search_term),
+                User.full_name.ilike(search_term),
                 User.email.ilike(search_term),
             )
         )
@@ -133,7 +133,7 @@ async def create_user(
     )
 
     user = User(
-        name=request.name,
+        full_name=request.name,
         email=request.email,
         password_hash=temp_password_hash,
         role=role_enum.value,

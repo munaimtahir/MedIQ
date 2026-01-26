@@ -44,7 +44,7 @@ def upgrade() -> None:
         "payload_json",
         existing_type=postgresql.JSONB,
         nullable=False,
-        server_default="'{}'::jsonb",
+        server_default=sa.text("'{}'::jsonb"),
     )
 
     # Create new indexes

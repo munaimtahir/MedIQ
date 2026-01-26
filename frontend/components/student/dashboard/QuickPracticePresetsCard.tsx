@@ -3,10 +3,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Zap, Clock, FileText, Shuffle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function QuickPracticePresetsCard() {
-  const router = useRouter();
 
   const presets = [
     {
@@ -51,19 +50,31 @@ export function QuickPracticePresetsCard() {
       <CardContent className="space-y-2">
         {presets.map((preset) => {
           const Icon = preset.icon;
+          if (preset.disabled) {
+            return (
+              <Button
+                key={preset.label}
+                variant="outline"
+                className="w-full justify-start"
+                disabled={true}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                <div className="flex-1 text-left">
+                  <div className="font-medium">{preset.label}</div>
+                  <div className="text-xs text-muted-foreground">{preset.description}</div>
+                </div>
+              </Button>
+            );
+          }
           return (
-            <Button
-              key={preset.label}
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => !preset.disabled && router.push(preset.href)}
-              disabled={preset.disabled}
-            >
-              <Icon className="mr-2 h-4 w-4" />
-              <div className="flex-1 text-left">
-                <div className="font-medium">{preset.label}</div>
-                <div className="text-xs text-muted-foreground">{preset.description}</div>
-              </div>
+            <Button key={preset.label} variant="outline" className="w-full justify-start" asChild>
+              <Link href={preset.href}>
+                <Icon className="mr-2 h-4 w-4" />
+                <div className="flex-1 text-left">
+                  <div className="font-medium">{preset.label}</div>
+                  <div className="text-xs text-muted-foreground">{preset.description}</div>
+                </div>
+              </Link>
             </Button>
           );
         })}

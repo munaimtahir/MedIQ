@@ -2,6 +2,7 @@
  * Question navigator grid showing all questions
  */
 
+import { memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, Flag } from "lucide-react";
@@ -13,11 +14,21 @@ interface QuestionNavigatorProps {
   onNavigate: (position: number) => void;
 }
 
-export function QuestionNavigator({
+export const QuestionNavigator = memo(function QuestionNavigator({
   questions,
   currentPosition,
   onNavigate,
 }: QuestionNavigatorProps) {
+  // Memoize processed questions to prevent unnecessary calculations
+  const processedQuestions = useMemo(() => {
+    return questions.map((q) => ({
+      ...q,
+      isCurrent: q.position === currentPosition,
+      hasAnswer: q.has_answer,
+      isMarked: q.marked_for_review,
+    }));
+  }, [questions, currentPosition]);
+  
   return (
     <div className="space-y-4">
       <div>
@@ -26,24 +37,21 @@ export function QuestionNavigator({
       </div>
 
       <div className="grid grid-cols-5 gap-2">
-        {questions.map((q) => {
-          const isCurrent = q.position === currentPosition;
-          const hasAnswer = q.has_answer;
-          const isMarked = q.marked_for_review;
+        {processedQuestions.map((q) => {
 
           return (
             <Button
               key={q.position}
-              variant={isCurrent ? "default" : hasAnswer ? "secondary" : "outline"}
+              variant={q.isCurrent ? "default" : q.hasAnswer ? "secondary" : "outline"}
               size="sm"
               onClick={() => onNavigate(q.position)}
-              className={cn("relative h-10 w-full", isCurrent && "ring-2 ring-offset-2")}
+              className={cn("relative h-10 w-full", q.isCurrent && "ring-2 ring-offset-2")}
             >
               <span>{q.position}</span>
-              {hasAnswer && !isCurrent && (
+              {q.hasAnswer && !q.isCurrent && (
                 <Check className="absolute right-0.5 top-0.5 h-3 w-3 text-green-600" />
               )}
-              {isMarked && (
+              {q.isMarked && (
                 <Flag className="absolute bottom-0.5 right-0.5 h-3 w-3 text-amber-500" />
               )}
             </Button>
@@ -72,4 +80,4 @@ export function QuestionNavigator({
       </div>
     </div>
   );
-}
+});

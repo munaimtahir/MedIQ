@@ -11,7 +11,7 @@ import { UsersError } from "@/components/admin/users/UsersError";
 import { UserFormDialog } from "@/components/admin/users/UserFormDialog";
 import { ConfirmActionDialog } from "@/components/admin/users/ConfirmActionDialog";
 import { useAdminUsers, useUserMutations, useCurrentUserId } from "@/lib/admin/users/hooks";
-import { User, UserCreate, UserUpdate } from "@/lib/admin/users/types";
+import type { User, UserCreate, UserUpdate } from "@/lib/admin/users/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function UsersPage() {

@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import write_audit
 from app.core.versioning import create_version, snapshot_question
-from app.models.question_cms import ChangeKind, Question, QuestionStatus
+from app.models.question_cms import ChangeKind, Question, QuestionStatus, QuestionVersion
 from app.models.user import User, UserRole
 from app.schemas.question_cms import QuestionCreate, QuestionUpdate
+from app.search.outbox_emit import emit_search_outbox_event
+from app.models.search_indexing import SearchOutboxEventType
 
 
 class QuestionWorkflowError(Exception):
@@ -399,6 +401,27 @@ def reject_question(
 
     db.commit()
     db.refresh(question)
+    
+    # Emit outbox event after commit if question is published (fail-open)
+    try:
+        if question.status == QuestionStatus.PUBLISHED:
+            latest_version = (
+                db.query(QuestionVersion)
+                .filter(QuestionVersion.question_id == question.id)
+                .order_by(QuestionVersion.version_no.desc())
+                .first()
+            )
+            version_id = latest_version.id if latest_version else None
+            emit_search_outbox_event(
+                db=db,
+                event_type=SearchOutboxEventType.QUESTION_UPDATED,
+                question_id=question.id,
+                version_id=version_id,
+            )
+    except Exception:
+        # Fail-open: log but don't raise
+        pass
+    
     return question
 
 
@@ -454,6 +477,27 @@ def publish_question(
 
     db.commit()
     db.refresh(question)
+    
+    # Emit outbox event after commit (fail-open)
+    try:
+        # Get the latest published version
+        latest_version = (
+            db.query(QuestionVersion)
+            .filter(QuestionVersion.question_id == question.id)
+            .order_by(QuestionVersion.version_no.desc())
+            .first()
+        )
+        version_id = latest_version.id if latest_version else None
+        emit_search_outbox_event(
+            db=db,
+            event_type=SearchOutboxEventType.QUESTION_PUBLISHED,
+            question_id=question.id,
+            version_id=version_id,
+        )
+    except Exception:
+        # Fail-open: log but don't raise
+        pass
+    
     return question
 
 

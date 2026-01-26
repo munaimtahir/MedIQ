@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.cache.helpers import invalidate_syllabus_cache
 from app.core.dependencies import require_roles
 from app.db.session import get_db
 from app.models.syllabus import Block, Theme, Year
@@ -47,6 +48,7 @@ async def seed_syllabus_structure_endpoint(
     from app.core.seed_syllabus import seed_syllabus_structure
 
     result = seed_syllabus_structure(db)
+    invalidate_syllabus_cache()
     return result
 
 
@@ -137,6 +139,7 @@ async def update_year(
             detail=f"Year with name '{request.name}' already exists",
         ) from e
 
+    invalidate_syllabus_cache()
     return YearAdminResponse.model_validate(year)
 
 
@@ -163,6 +166,7 @@ async def disable_year(
     db.commit()
     db.refresh(year)
 
+    invalidate_syllabus_cache()
     return YearAdminResponse.model_validate(year)
 
 
@@ -189,6 +193,7 @@ async def enable_year(
     db.commit()
     db.refresh(year)
 
+    invalidate_syllabus_cache()
     return YearAdminResponse.model_validate(year)
 
 
@@ -262,6 +267,7 @@ async def create_block(
             detail=f"Block with code '{request.code}' already exists in this year",
         ) from e
 
+    invalidate_syllabus_cache()
     return BlockAdminResponse.model_validate(block)
 
 
@@ -308,6 +314,7 @@ async def update_block(
             detail=f"Block with code '{request.code}' already exists in this year",
         ) from e
 
+    invalidate_syllabus_cache()
     return BlockAdminResponse.model_validate(block)
 
 
@@ -334,6 +341,7 @@ async def disable_block(
     db.commit()
     db.refresh(block)
 
+    invalidate_syllabus_cache()
     return BlockAdminResponse.model_validate(block)
 
 
@@ -360,6 +368,7 @@ async def enable_block(
     db.commit()
     db.refresh(block)
 
+    invalidate_syllabus_cache()
     return BlockAdminResponse.model_validate(block)
 
 
@@ -447,6 +456,7 @@ async def create_theme(
             detail="Failed to create theme",
         ) from e
 
+    invalidate_syllabus_cache()
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -497,6 +507,7 @@ async def update_theme(
             detail=f"Theme with title '{request.title}' already exists in this block",
         ) from e
 
+    invalidate_syllabus_cache()
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -523,6 +534,7 @@ async def disable_theme(
     db.commit()
     db.refresh(theme)
 
+    invalidate_syllabus_cache()
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -549,6 +561,7 @@ async def enable_theme(
     db.commit()
     db.refresh(theme)
 
+    invalidate_syllabus_cache()
     return ThemeAdminResponse.model_validate(theme)
 
 
@@ -609,6 +622,7 @@ async def reorder_blocks(
             detail=f"Failed to reorder blocks: {str(e)}",
         ) from e
 
+    invalidate_syllabus_cache()
     return {"message": "Blocks reordered successfully"}
 
 
@@ -664,6 +678,7 @@ async def reorder_themes(
             detail=f"Failed to reorder themes: {str(e)}",
         ) from e
 
+    invalidate_syllabus_cache()
     return {"message": "Themes reordered successfully"}
 
 
@@ -1158,7 +1173,10 @@ async def import_years(
 ) -> CSVImportResult:
     """Import years from CSV."""
     content = (await file.read()).decode("utf-8")
-    return _import_years(db, content, dry_run, auto_create)
+    result = _import_years(db, content, dry_run, auto_create)
+    if not dry_run:
+        invalidate_syllabus_cache()
+    return result
 
 
 @router.post(
@@ -1176,7 +1194,10 @@ async def import_blocks(
 ) -> CSVImportResult:
     """Import blocks from CSV."""
     content = (await file.read()).decode("utf-8")
-    return _import_blocks(db, content, dry_run, auto_create)
+    result = _import_blocks(db, content, dry_run, auto_create)
+    if not dry_run:
+        invalidate_syllabus_cache()
+    return result
 
 
 @router.post(
@@ -1194,4 +1215,7 @@ async def import_themes(
 ) -> CSVImportResult:
     """Import themes from CSV."""
     content = (await file.read()).decode("utf-8")
-    return _import_themes(db, content, dry_run, auto_create)
+    result = _import_themes(db, content, dry_run, auto_create)
+    if not dry_run:
+        invalidate_syllabus_cache()
+    return result

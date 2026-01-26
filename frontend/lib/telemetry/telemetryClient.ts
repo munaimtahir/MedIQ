@@ -4,6 +4,8 @@
  * IMPORTANT: All telemetry operations are best-effort and must NOT break the UI.
  */
 
+import { logger } from "@/lib/logger";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const BATCH_SIZE = 10;
 const FLUSH_INTERVAL = 12000; // 12 seconds
@@ -87,7 +89,7 @@ export class TelemetryClient {
       }
     } catch (err) {
       // Silent fail - telemetry must not break UI
-      console.warn("Telemetry track failed:", err);
+      logger.warn("Telemetry track failed:", err);
     }
   }
 
@@ -107,7 +109,7 @@ export class TelemetryClient {
       await this.sendBatch(eventsToSend);
     } catch (err) {
       // Silent fail - telemetry must not break UI
-      console.warn("Telemetry flush failed:", err);
+      logger.warn("Telemetry flush failed:", err);
     } finally {
       this.isFlushing = false;
     }
@@ -142,7 +144,7 @@ export class TelemetryClient {
 
       // Log if any events were rejected (for debugging)
       if (result.rejected > 0) {
-        console.debug(
+        logger.debug(
           `Telemetry: ${result.accepted} accepted, ${result.rejected} rejected`,
           result.rejected_reasons_sample,
         );
@@ -156,7 +158,7 @@ export class TelemetryClient {
       }
 
       // Give up after max retries (silent fail)
-      console.warn("Telemetry batch failed after retries:", err);
+      logger.warn("Telemetry batch failed after retries:", err);
     }
   }
 

@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useRef } from "react";
 import Link from "next/link";
-import gsap from "gsap";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface AuthCardShellProps {
@@ -14,6 +13,25 @@ interface AuthCardShellProps {
   className?: string;
 }
 
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.35,
+      ease: "easeOut",
+      staggerChildren: 0.04,
+      delayChildren: 0.15,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0 },
+};
+
 export function AuthCardShell({
   children,
   title,
@@ -21,51 +39,12 @@ export function AuthCardShell({
   footer,
   className,
 }: AuthCardShellProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (cardRef.current) {
-      if (prefersReducedMotion) {
-        // Simple fade for reduced motion
-        gsap.fromTo(
-          cardRef.current,
-          { opacity: 0 },
-          { opacity: 1, duration: 0.3, ease: "power2.out" },
-        );
-      } else {
-        // Full animation
-        gsap.fromTo(
-          cardRef.current,
-          { y: 20, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.35, ease: "power2.out" },
-        );
-
-        // Stagger children
-        if (contentRef.current) {
-          const children = contentRef.current.querySelectorAll("[data-animate]");
-          gsap.fromTo(
-            children,
-            { y: 8, opacity: 0 },
-            {
-              y: 0,
-              opacity: 1,
-              duration: 0.3,
-              stagger: 0.04,
-              ease: "power2.out",
-              delay: 0.15,
-            },
-          );
-        }
-      }
-    }
-  }, []);
 
   return (
-    <div
-      ref={cardRef}
+    <motion.div
+      variants={cardVariants}
+      initial="hidden"
+      animate="show"
       className={cn(
         "w-full max-w-[520px] rounded-2xl border border-slate-200 bg-white shadow-lg",
         className,
@@ -73,31 +52,32 @@ export function AuthCardShell({
     >
       {/* Header */}
       <div className="px-8 pb-2 pt-8">
-        <h1 data-animate className="text-2xl font-semibold tracking-tight text-slate-900">
+        <motion.h1
+          variants={itemVariants}
+          className="text-2xl font-semibold tracking-tight text-slate-900"
+        >
           {title}
-        </h1>
+        </motion.h1>
         {subtitle && (
-          <p data-animate className="mt-2 text-sm text-slate-500">
+          <motion.p variants={itemVariants} className="mt-2 text-sm text-slate-500">
             {subtitle}
-          </p>
+          </motion.p>
         )}
       </div>
 
       {/* Content */}
-      <div ref={contentRef} className="px-8 py-6">
-        {children}
-      </div>
+      <div className="px-8 py-6">{children}</div>
 
       {/* Footer */}
       {footer && (
-        <div
-          data-animate
+        <motion.div
+          variants={itemVariants}
           className="rounded-b-2xl border-t border-slate-100 bg-slate-50/50 px-8 py-4"
         >
           {footer}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

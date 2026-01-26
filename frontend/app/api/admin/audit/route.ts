@@ -20,12 +20,14 @@ export async function GET(request: NextRequest) {
     const entity_type = searchParams.get("entity_type");
     const entity_id = searchParams.get("entity_id");
     const action = searchParams.get("action");
-    const limit = searchParams.get("limit");
+    const page = searchParams.get("page");
+    const page_size = searchParams.get("page_size");
 
     if (entity_type) params.set("entity_type", entity_type);
     if (entity_id) params.set("entity_id", entity_id);
     if (action) params.set("action", action);
-    if (limit) params.set("limit", limit);
+    if (page) params.set("page", page);
+    if (page_size) params.set("page_size", page_size);
 
     const queryString = params.toString() ? `?${params.toString()}` : "";
 

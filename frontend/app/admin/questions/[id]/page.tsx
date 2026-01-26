@@ -2,12 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { QuestionEditor } from "@/components/admin/questions/QuestionEditor";
-import { WorkflowPanel } from "@/components/admin/questions/WorkflowPanel";
-import { VersionHistory } from "@/components/admin/questions/VersionHistory";
+import { Skeleton } from "@/components/ui/skeleton";
 import { adminQuestionsApi } from "@/lib/admin/questionsApi";
 import type { QuestionOut, QuestionUpdate } from "@/lib/types/question-cms";
 import { notify } from "@/lib/notify";
@@ -15,7 +14,39 @@ import { ArrowLeft, Save, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SkeletonTable } from "@/components/status/SkeletonTable";
 import { ErrorState } from "@/components/status/ErrorState";
-import { useUserStore } from "@/store/userStore";
+import { useUserStore, selectUser } from "@/store/userStore";
+import { logger } from "@/lib/logger";
+
+// Lazy load heavy editor components
+const QuestionEditor = dynamic(
+  () => import("@/components/admin/questions/QuestionEditor").then((mod) => ({ 
+    default: mod.QuestionEditor 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
+
+const WorkflowPanel = dynamic(
+  () => import("@/components/admin/questions/WorkflowPanel").then((mod) => ({ 
+    default: mod.WorkflowPanel 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[200px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
+
+const VersionHistory = dynamic(
+  () => import("@/components/admin/questions/VersionHistory").then((mod) => ({ 
+    default: mod.VersionHistory 
+  })),
+  { 
+    loading: () => <Skeleton className="h-[300px] w-full rounded-lg" />,
+    ssr: false,
+  }
+);
 
 export default function EditQuestionPage() {
   const params = useParams();
@@ -24,7 +55,7 @@ export default function EditQuestionPage() {
   const questionId = params.id as string;
   const isReviewMode = searchParams.get("mode") === "review";
 
-  const { user } = useUserStore();
+  const user = useUserStore(selectUser);
   const userRole = user?.role || "STUDENT";
 
   const [question, setQuestion] = useState<QuestionOut | null>(null);
@@ -42,7 +73,7 @@ export default function EditQuestionPage() {
       const data = await adminQuestionsApi.getQuestion(questionId);
       setQuestion(data);
     } catch (err) {
-      console.error("Failed to load question:", err);
+      logger.error("Failed to load question:", err);
       setError(err instanceof Error ? err : new Error("Failed to load question"));
     } finally {
       setLoading(false);

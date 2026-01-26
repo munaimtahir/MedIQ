@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { AccountCard } from "@/components/student/settings/AccountCard";
 import { MFACard } from "@/components/student/settings/MFACard";
 import { AcademicYearCard } from "@/components/student/settings/AcademicYearCard";
+import { LearningPreferencesCard } from "@/components/student/settings/LearningPreferencesCard";
 import { PracticePreferencesCard } from "@/components/student/settings/PracticePreferencesCard";
 import { NotificationsCard } from "@/components/student/settings/NotificationsCard";
 import { DangerZoneCard } from "@/components/student/settings/DangerZoneCard";
@@ -133,6 +134,9 @@ export default function SettingsPage() {
 
       {/* Section 4: Practice Preferences */}
       <PracticePreferencesCard />
+
+      {/* Section 4.5: Learning Preferences */}
+      <LearningPreferencesCard />
 
       {/* Section 5: Notifications */}
       <NotificationsCard />

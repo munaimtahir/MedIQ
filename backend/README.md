@@ -154,7 +154,9 @@ Configuration is managed via environment variables (see `.env.example`):
 
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET` - Secret key for JWT tokens (must be strong, random string)
-- `TOKEN_PEPPER` - Server-side pepper for token hashing (must be strong, random string)
+- `AUTH_TOKEN_PEPPER` or `TOKEN_PEPPER` - Server-side pepper for token hashing (must be strong, random string)
+- `MFA_ENCRYPTION_KEY` - Fernet key for encrypting TOTP secrets (required in production)
+  - Generate with: `docker run --rm python:3.11-slim sh -c "pip install cryptography --quiet && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"`
 - `ENV` - Environment: `dev`, `staging`, or `prod`
 
 ### Optional

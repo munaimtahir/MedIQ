@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db
 from app.learning_engine.difficulty.metrics import compute_all_metrics
 from app.learning_engine.difficulty.recenter import recenter_question_ratings
 from app.learning_engine.difficulty.service import update_difficulty_for_session

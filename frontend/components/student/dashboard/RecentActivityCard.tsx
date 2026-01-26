@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,25 @@ interface RecentActivityCardProps {
   error?: Error | null;
 }
 
-export function RecentActivityCard({ recentSessions, loading, error }: RecentActivityCardProps) {
+// Helper function outside component
+const getStatusBadge = (status: RecentSession["status"]) => {
+  switch (status) {
+    case "completed":
+      return { variant: "default" as const, label: "Completed", icon: CheckCircle2 };
+    case "in_progress":
+      return { variant: "secondary" as const, label: "In Progress", icon: Clock };
+    case "abandoned":
+      return { variant: "outline" as const, label: "Abandoned", icon: History };
+    default:
+      return { variant: "outline" as const, label: status, icon: History };
+  }
+};
+
+export const RecentActivityCard = memo(function RecentActivityCard({ 
+  recentSessions, 
+  loading, 
+  error 
+}: RecentActivityCardProps) {
   const router = useRouter();
 
   if (loading) {
@@ -76,29 +95,6 @@ export function RecentActivityCard({ recentSessions, loading, error }: RecentAct
     );
   }
 
-  const getStatusBadge = (status: RecentSession["status"]) => {
-    switch (status) {
-      case "completed":
-        return (
-          <Badge variant="default" className="bg-green-500">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Completed
-          </Badge>
-        );
-      case "in_progress":
-        return (
-          <Badge variant="default" className="bg-blue-500">
-            <Clock className="mr-1 h-3 w-3" />
-            In Progress
-          </Badge>
-        );
-      case "abandoned":
-        return <Badge variant="secondary">Abandoned</Badge>;
-      default:
-        return null;
-    }
-  };
-
   return (
     <Card className="col-span-full md:col-span-1">
       <CardHeader>
@@ -109,35 +105,43 @@ export function RecentActivityCard({ recentSessions, loading, error }: RecentAct
         <CardDescription>Your last 5 practice sessions</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {recentSessions.slice(0, 5).map((session) => (
-          <div key={session.id} className="flex items-center justify-between rounded-lg border p-3">
-            <div className="flex-1">
-              <p className="text-sm font-medium">{session.title}</p>
-              <div className="mt-1 flex items-center gap-2">
-                {getStatusBadge(session.status)}
-                {session.score !== undefined && (
-                  <span className="text-xs text-muted-foreground">
-                    Score: {session.score}/{session.scorePercentage}%
-                  </span>
-                )}
+        {recentSessions.slice(0, 5).map((session) => {
+          const statusInfo = getStatusBadge(session.status);
+          const StatusIcon = statusInfo.icon;
+          
+          return (
+            <div key={session.id} className="flex items-center justify-between rounded-lg border p-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{session.title}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Badge variant={statusInfo.variant}>
+                    <StatusIcon className="mr-1 h-3 w-3" />
+                    {statusInfo.label}
+                  </Badge>
+                  {session.score !== undefined && (
+                    <span className="text-xs text-muted-foreground">
+                      Score: {session.score}/{session.scorePercentage}%
+                    </span>
+                  )}
+                </div>
               </div>
+              <Button variant="ghost" size="sm" onClick={() => router.push(session.href)}>
+                {session.status === "in_progress" ? (
+                  <>
+                    <Play className="mr-1 h-4 w-4" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                    Review
+                  </>
+                )}
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => router.push(session.href)}>
-              {session.status === "in_progress" ? (
-                <>
-                  <Play className="mr-1 h-4 w-4" />
-                  Resume
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-1 h-4 w-4" />
-                  Review
-                </>
-              )}
-            </Button>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );
-}
+});

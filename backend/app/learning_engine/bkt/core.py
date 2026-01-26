@@ -12,18 +12,23 @@ ensure probabilities remain in valid range [0, 1].
 """
 
 from app.learning_engine.config import (
-    BKT_G_MAX,
-    BKT_G_MIN,
-    BKT_L0_MAX,
-    BKT_L0_MIN,
+    BKT_EPSILON,
     BKT_MAX_PROB,
-    BKT_MIN_PROB,
-    BKT_S_MAX,
-    BKT_S_MIN,
-    BKT_STABILITY_EPSILON,
-    BKT_T_MAX,
-    BKT_T_MIN,
+    BKT_PARAM_MAX,
+    BKT_PARAM_MIN,
 )
+
+# Aliases for backward compatibility
+BKT_STABILITY_EPSILON = BKT_EPSILON
+BKT_MIN_PROB = BKT_EPSILON
+BKT_L0_MIN = BKT_PARAM_MIN
+BKT_L0_MAX = BKT_PARAM_MAX
+BKT_T_MIN = BKT_PARAM_MIN
+BKT_T_MAX = BKT_PARAM_MAX
+BKT_S_MIN = BKT_PARAM_MIN
+BKT_S_MAX = BKT_PARAM_MAX
+BKT_G_MIN = BKT_PARAM_MIN
+BKT_G_MAX = BKT_PARAM_MAX
 
 
 def clamp_probability(p: float) -> float:

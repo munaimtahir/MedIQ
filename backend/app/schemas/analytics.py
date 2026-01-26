@@ -106,3 +106,24 @@ class ThemeAnalytics(BaseModel):
 
     # Placeholder for future
     common_mistakes: list[Any] = Field(default_factory=list)
+
+
+class RecentSessionSummary(BaseModel):
+    """Recent session summary for dashboard."""
+
+    session_id: UUID
+    title: str
+    status: str  # "completed" | "in_progress" | "abandoned"
+    score_correct: int | None
+    score_total: int | None
+    score_pct: float | None
+    block_id: int | None
+    theme_id: int | None
+    started_at: datetime
+    submitted_at: datetime | None
+
+
+class RecentSessionsResponse(BaseModel):
+    """Recent sessions response."""
+
+    sessions: list[RecentSessionSummary]

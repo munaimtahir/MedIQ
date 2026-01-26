@@ -31,8 +31,8 @@ def upgrade() -> None:
         sa.Column("position", sa.Integer(), nullable=True),
         # Frozen tags
         sa.Column("year", sa.Integer(), nullable=True),
-        sa.Column("block_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("theme_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("block_id", sa.Integer(), nullable=True),
+        sa.Column("theme_id", sa.Integer(), nullable=True),
         # Outcome
         sa.Column("is_correct", sa.Boolean(), nullable=False),
         sa.Column("mistake_type", sa.String(), nullable=False),

@@ -28,7 +28,7 @@ def seed_demo_accounts() -> None:
         # Create admin account
         if not admin_exists:
             admin = User(
-                name="Admin User",
+                full_name="Admin User",
                 email="admin@example.com",
                 password_hash=hash_password("Admin123!"),
                 role=UserRole.ADMIN.value,
@@ -42,7 +42,7 @@ def seed_demo_accounts() -> None:
         # Create student account
         if not student_exists:
             student = User(
-                name="Student User",
+                full_name="Student User",
                 email="student@example.com",
                 password_hash=hash_password("Student123!"),
                 role=UserRole.STUDENT.value,
@@ -57,7 +57,7 @@ def seed_demo_accounts() -> None:
         reviewer_exists = db.query(User).filter(User.email == "reviewer@example.com").first()
         if not reviewer_exists:
             reviewer = User(
-                name="Reviewer User",
+                full_name="Reviewer User",
                 email="reviewer@example.com",
                 password_hash=hash_password("Reviewer123!"),
                 role=UserRole.REVIEWER.value,

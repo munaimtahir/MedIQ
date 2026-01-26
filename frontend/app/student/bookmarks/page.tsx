@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +13,10 @@ import { listBookmarks, deleteBookmark } from "@/lib/api/bookmarksApi";
 import type { BookmarkWithQuestion } from "@/lib/types/bookmark";
 import { InlineAlert } from "@/components/auth/InlineAlert";
 import { format } from "date-fns";
+import { getMessageFromApiError, is401 } from "@/lib/apiError";
 
 export default function BookmarksPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarkWithQuestion[]>([]);
@@ -32,8 +35,12 @@ export default function BookmarksPage() {
       const data = await listBookmarks();
       setBookmarks(data);
     } catch (err: unknown) {
+      if (is401(err)) {
+        router.push("/login");
+        return;
+      }
       console.error("Failed to load bookmarks:", err);
-      setError(err instanceof Error ? err.message : "Failed to load bookmarks");
+      setError(getMessageFromApiError(err, "Failed to load bookmarks"));
     } finally {
       setLoading(false);
     }
@@ -47,10 +54,14 @@ export default function BookmarksPage() {
       setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
       notify.success("Bookmark removed", "Question removed from bookmarks");
     } catch (err: unknown) {
+      if (is401(err)) {
+        router.push("/login");
+        return;
+      }
       console.error("Failed to delete bookmark:", err);
       notify.error(
         "Failed to remove bookmark",
-        err instanceof Error ? err.message : "Please try again",
+        getMessageFromApiError(err, "Please try again"),
       );
     } finally {
       setDeletingId(null);

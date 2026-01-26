@@ -63,7 +63,7 @@ class PasswordResetConfirm(BaseModel):
     """Password reset confirmation schema."""
 
     token: str
-    new_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=10, max_length=128)
 
     @field_validator("new_password")
     @classmethod
@@ -152,3 +152,23 @@ class MeResponse(BaseModel):
     """Current user response schema."""
 
     user: UserResponse
+
+
+class SessionResponse(BaseModel):
+    """Session response schema."""
+
+    id: UUID
+    created_at: datetime
+    last_seen_at: datetime
+    user_agent: str | None = None
+    ip_address: str | None = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class SessionsListResponse(BaseModel):
+    """Sessions list response schema."""
+
+    sessions: list[SessionResponse]

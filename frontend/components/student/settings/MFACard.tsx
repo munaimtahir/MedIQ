@@ -9,7 +9,7 @@ import { Shield, ShieldCheck, ShieldAlert } from "lucide-react";
 import { MFASetupDialog } from "./MFASetupDialog";
 import { MFADisableDialog } from "./MFADisableDialog";
 import { getMFAStatus } from "@/lib/api/mfaApi";
-import { format } from "date-fns";
+import { format } from "@/lib/dateUtils";
 
 export function MFACard() {
   const [loading, setLoading] = useState(true);

@@ -1,0 +1,52 @@
+-- Transform: CURATED_MASTERY materialized view refresh
+-- This script refreshes the CURATED_MASTERY view with latest RAW data
+-- Run after loading new RAW_SNAPSHOT_MASTERY data
+
+-- Option 1: Refresh view (if using view)
+-- REFRESH MATERIALIZED VIEW CURATED_MASTERY;
+
+-- Option 2: Recreate as table (if using table)
+-- DROP TABLE IF EXISTS CURATED_MASTERY;
+-- CREATE TABLE CURATED_MASTERY AS
+-- SELECT DISTINCT
+--     m.snapshot_id,
+--     m.user_id,
+--     m.concept_id,
+--     m.snapshot_at,
+--     m.mastery_prob,
+--     m.attempts_total,
+--     m.correct_total,
+--     m.last_attempt_at,
+--     m.bkt_params,
+--     m.algo_profile,
+--     m.algo_version_mastery,
+--     m._export_version,
+--     m._generated_at,
+--     m._loaded_at
+-- FROM RAW_SNAPSHOT_MASTERY m
+-- WHERE m._loaded_at IS NOT NULL
+-- QUALIFY ROW_NUMBER() OVER (PARTITION BY m.snapshot_id ORDER BY m._loaded_at DESC) = 1;
+
+-- Incremental update (if using table with incremental loads)
+-- INSERT INTO CURATED_MASTERY
+-- SELECT DISTINCT
+--     m.snapshot_id,
+--     m.user_id,
+--     m.concept_id,
+--     m.snapshot_at,
+--     m.mastery_prob,
+--     m.attempts_total,
+--     m.correct_total,
+--     m.last_attempt_at,
+--     m.bkt_params,
+--     m.algo_profile,
+--     m.algo_version_mastery,
+--     m._export_version,
+--     m._generated_at,
+--     m._loaded_at
+-- FROM RAW_SNAPSHOT_MASTERY m
+-- WHERE m._loaded_at > (SELECT MAX(_loaded_at) FROM CURATED_MASTERY)
+-- QUALIFY ROW_NUMBER() OVER (PARTITION BY m.snapshot_id ORDER BY m._loaded_at DESC) = 1;
+
+-- Note: Actual implementation depends on whether CURATED_MASTERY is a view or table
+-- For now, this is a template showing the logic

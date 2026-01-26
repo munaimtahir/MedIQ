@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { syllabusAPI, onboardingAPI } from "@/lib/api";
 import { Year, Block, Theme } from "@/lib/api";
+import { logger } from "@/lib/logger";
 
 interface UseBlockDataResult {
   block: Block | null;
@@ -50,7 +51,7 @@ export function useBlockData(blockId: number): UseBlockDataResult {
             }
           }
         } catch (err) {
-          console.warn("Failed to load profile, using first year:", err);
+          logger.warn("Failed to load profile, using first year:", err);
         }
 
         // Default to first year if no profile year

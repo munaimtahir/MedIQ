@@ -13,15 +13,20 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { BlockCard } from "@/components/student/blocks/BlockCard";
 import { syllabusAPI, onboardingAPI } from "@/lib/api";
-import { Year, Block } from "@/lib/api";
+import type { Year, Block, Theme } from "@/lib/api";
 import { AlertCircle } from "lucide-react";
+import { logger } from "@/lib/logger";
+
+interface BlockWithThemes extends Block {
+  themes: Theme[];
+}
 
 export default function BlocksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [years, setYears] = useState<Year[]>([]);
   const [selectedYearId, setSelectedYearId] = useState<number | null>(null);
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [blocks, setBlocks] = useState<BlockWithThemes[]>([]);
 
   // Load years and determine selected year
   useEffect(() => {
@@ -48,7 +53,7 @@ export default function BlocksPage() {
         const profile = await onboardingAPI.getProfile();
         if (profile.selected_year) {
           const profileYearName = profile.selected_year.display_name;
-          console.log("[Blocks] User selected year from profile:", profileYearName);
+          logger.log("[Blocks] User selected year from profile:", profileYearName);
 
           // Improved matching logic (same as dashboard)
           const matchingYear = yearsData.find((y) => {
@@ -76,15 +81,15 @@ export default function BlocksPage() {
           });
 
           if (matchingYear) {
-            console.log("[Blocks] Matched year:", matchingYear.name);
+            logger.log("[Blocks] Matched year:", matchingYear.name);
             setSelectedYearId(matchingYear.id);
             return;
           } else {
-            console.warn("[Blocks] Could not match user's year, using first available");
+            logger.warn("[Blocks] Could not match user's year, using first available");
           }
         }
       } catch (err) {
-        console.warn("[Blocks] Failed to load profile, using first year:", err);
+        logger.warn("[Blocks] Failed to load profile, using first year:", err);
       }
 
       // Default to first year
@@ -92,7 +97,7 @@ export default function BlocksPage() {
         setSelectedYearId(yearsData[0].id);
       }
     } catch (err) {
-      console.error("Failed to load initial data:", err);
+      logger.error("Failed to load initial data:", err);
       setError(err instanceof Error ? err : new Error("Failed to load data"));
     } finally {
       setLoading(false);
@@ -105,9 +110,25 @@ export default function BlocksPage() {
       if (!year) return;
 
       const blocksData = await syllabusAPI.getBlocks(year.name);
-      setBlocks(blocksData);
+      
+      // Batch fetch themes for all blocks (parallel requests)
+      const themesPromises = blocksData.map((block) =>
+        syllabusAPI.getThemes(block.id).catch((err) => {
+          logger.error(`Failed to load themes for block ${block.id}:`, err);
+          return []; // Return empty array on error
+        })
+      );
+      const themesArrays = await Promise.all(themesPromises);
+      
+      // Combine blocks with their themes
+      const blocksWithThemes: BlockWithThemes[] = blocksData.map((block, index) => ({
+        ...block,
+        themes: themesArrays[index],
+      }));
+      
+      setBlocks(blocksWithThemes);
     } catch (err) {
-      console.error("Failed to load blocks:", err);
+      logger.error("Failed to load blocks:", err);
       setError(err instanceof Error ? err : new Error("Failed to load blocks"));
     }
   }
@@ -199,7 +220,7 @@ export default function BlocksPage() {
           {blocks
             .sort((a, b) => a.order_no - b.order_no)
             .map((block) => (
-              <BlockCard key={block.id} block={block} isAllowed={true} />
+              <BlockCard key={block.id} block={block} themes={block.themes} />
             ))}
         </div>
       )}

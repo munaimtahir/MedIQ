@@ -9,7 +9,8 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.models.question_cms import Question, QuestionStatus
 from app.models.session import (
@@ -23,7 +24,7 @@ from app.services.session_freeze import freeze_question, get_frozen_content
 
 
 async def select_questions(
-    db: AsyncSession,
+    db: Session,
     filters: SessionCreate,
     user_id: UUID,
     session_seed: str,
@@ -54,7 +55,7 @@ async def select_questions(
         from app.models.syllabus import Block
 
         block_stmt = select(Block.id).where(Block.code.in_(filters.blocks))
-        block_result = await db.execute(block_stmt)
+        block_result = db.execute(block_stmt)
         block_ids = [row[0] for row in block_result.all()]
         query = query.where(Question.block_id.in_(block_ids))
 
@@ -71,7 +72,7 @@ async def select_questions(
         query = query.where(Question.cognitive_level.in_(filters.cognitive))
 
     # Execute query to get eligible IDs
-    result = await db.execute(query)
+    result = db.execute(query)
     eligible_ids = [row[0] for row in result.all()]
 
     # Check if enough questions available
@@ -98,7 +99,7 @@ async def select_questions(
 
 
 async def create_session(
-    db: AsyncSession,
+    db: Session,
     user_id: UUID,
     filters: SessionCreate,
 ) -> TestSession:
@@ -140,6 +141,39 @@ async def create_session(
     if filters.duration_seconds:
         expires_at = started_at + timedelta(seconds=filters.duration_seconds)
 
+    # Snapshot algorithm runtime config for session continuity (sync DB)
+    from app.models.algo_runtime import AlgoBridgeConfig, AlgoRuntimeConfig, AlgoRuntimeProfile
+
+    runtime_row = db.query(AlgoRuntimeConfig).first()
+    if not runtime_row:
+        runtime_row = AlgoRuntimeConfig(
+            active_profile=AlgoRuntimeProfile.V1_PRIMARY,
+            config_json={
+                "profile": "V1_PRIMARY",
+                "overrides": {},
+                "safe_mode": {"freeze_updates": False, "prefer_cache": True},
+                "search_engine_mode": "postgres",
+            },
+        )
+        db.add(runtime_row)
+        db.commit()
+        db.refresh(runtime_row)
+
+    config_json = runtime_row.config_json or {}
+    algo_profile_at_start = runtime_row.active_profile.value
+    algo_overrides_at_start = (config_json.get("overrides") or {}).copy()
+
+    bridge_row = (
+        db.query(AlgoBridgeConfig).filter(AlgoBridgeConfig.policy_version == "ALGO_BRIDGE_SPEC_v1").first()
+    )
+    algo_policy_version_at_start = bridge_row.policy_version if bridge_row else "ALGO_BRIDGE_SPEC_v1"
+
+    # Snapshot exam mode and freeze-updates at session creation (no mid-session effect)
+    from app.system.flags import is_exam_mode, is_freeze_updates
+
+    exam_mode_at_start = is_exam_mode(db)
+    freeze_updates_at_start = is_freeze_updates(db)
+
     # Create session
     session = TestSession(
         id=session_id,
@@ -153,6 +187,11 @@ async def create_session(
         started_at=started_at,
         duration_seconds=filters.duration_seconds,
         expires_at=expires_at,
+        algo_profile_at_start=algo_profile_at_start,
+        algo_overrides_at_start=algo_overrides_at_start,
+        algo_policy_version_at_start=algo_policy_version_at_start,
+        exam_mode_at_start=exam_mode_at_start,
+        freeze_updates_at_start=freeze_updates_at_start,
     )
     db.add(session)
 
@@ -170,13 +209,18 @@ async def create_session(
         )
         db.add(session_question)
 
-    await db.commit()
-    await db.refresh(session)
+    # Store runtime snapshot (profile + resolved modules + flags) for no-mid-session change
+    from app.runtime_control.snapshot import build_and_store_snapshot
+
+    build_and_store_snapshot(db, session_id)
+
+    db.commit()
+    db.refresh(session)
 
     return session
 
 
-async def check_and_expire_session(db: AsyncSession, session: TestSession) -> TestSession:
+async def check_and_expire_session(db: Session, session: TestSession) -> TestSession:
     """
     Check if session has expired and auto-submit if needed (lazy expiry).
 
@@ -193,18 +237,20 @@ async def check_and_expire_session(db: AsyncSession, session: TestSession) -> Te
     if session.expires_at and datetime.utcnow() > session.expires_at:
         # Auto-submit due to expiry
         await submit_session(db, session, auto_expired=True)
-        await db.refresh(session)
+        db.refresh(session)
 
     return session
 
 
 async def submit_session(
-    db: AsyncSession,
+    db: Session,
     session: TestSession,
     auto_expired: bool = False,
 ) -> TestSession:
     """
     Submit a session and compute final score.
+    
+    Idempotent: If session is already submitted, returns existing session without error.
 
     Args:
         db: Database session
@@ -214,12 +260,15 @@ async def submit_session(
     Returns:
         Updated session with scores
     """
+    # Idempotency: If already submitted, return as-is (safe for double-submit)
     if session.status != SessionStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="Session already submitted or expired")
+        # Refresh to get latest state (including scores if already computed)
+        db.refresh(session)
+        return session
 
     # Calculate score
     answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session.id)
-    answers_result = await db.execute(answers_stmt)
+    answers_result = db.execute(answers_stmt)
     answers = answers_result.scalars().all()
 
     score_correct = sum(1 for a in answers if a.is_correct is True)
@@ -233,13 +282,13 @@ async def submit_session(
     session.score_total = score_total
     session.score_pct = score_pct
 
-    await db.commit()
-    await db.refresh(session)
+    db.commit()
+    db.refresh(session)
 
     return session
 
 
-async def get_session_progress(db: AsyncSession, session_id: UUID) -> dict[str, Any]:
+async def get_session_progress(db: Session, session_id: UUID) -> dict[str, Any]:
     """
     Get session progress summary.
 
@@ -252,7 +301,7 @@ async def get_session_progress(db: AsyncSession, session_id: UUID) -> dict[str, 
     """
     # Get answers
     answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session_id)
-    answers_result = await db.execute(answers_stmt)
+    answers_result = db.execute(answers_stmt)
     answers = answers_result.scalars().all()
 
     answered_count = sum(1 for a in answers if a.selected_index is not None)
@@ -264,7 +313,7 @@ async def get_session_progress(db: AsyncSession, session_id: UUID) -> dict[str, 
         .where(SessionQuestion.session_id == session_id)
         .order_by(SessionQuestion.position)
     )
-    questions_result = await db.execute(questions_stmt)
+    questions_result = db.execute(questions_stmt)
     questions = questions_result.scalars().all()
 
     answered_question_ids = {a.question_id for a in answers if a.selected_index is not None}
@@ -287,7 +336,7 @@ async def get_session_progress(db: AsyncSession, session_id: UUID) -> dict[str, 
 
 
 async def process_answer(
-    db: AsyncSession,
+    db: Session,
     session: TestSession,
     question_id: UUID,
     selected_index: int | None,
@@ -313,13 +362,14 @@ async def process_answer(
     session = await check_and_expire_session(db, session)
     if session.status != SessionStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Session is not active")
+    session_id = session.id  # capture before any rollback (session may be expired after)
 
     # Verify question belongs to session
     session_question_stmt = select(SessionQuestion).where(
-        SessionQuestion.session_id == session.id,
+        SessionQuestion.session_id == session_id,
         SessionQuestion.question_id == question_id,
     )
-    session_question_result = await db.execute(session_question_stmt)
+    session_question_result = db.execute(session_question_stmt)
     session_question = session_question_result.scalar_one_or_none()
 
     if not session_question:
@@ -327,15 +377,15 @@ async def process_answer(
 
     # Get or create answer
     answer_stmt = select(SessionAnswer).where(
-        SessionAnswer.session_id == session.id,
+        SessionAnswer.session_id == session_id,
         SessionAnswer.question_id == question_id,
     )
-    answer_result = await db.execute(answer_stmt)
+    answer_result = db.execute(answer_stmt)
     answer = answer_result.scalar_one_or_none()
 
     if not answer:
         answer = SessionAnswer(
-            session_id=session.id,
+            session_id=session_id,
             question_id=question_id,
         )
         db.add(answer)
@@ -366,7 +416,21 @@ async def process_answer(
     else:
         answer.is_correct = None
 
-    await db.commit()
-    await db.refresh(answer)
-
-    return answer
+    try:
+        db.commit()
+        db.refresh(answer)
+        return answer
+    except IntegrityError:
+        db.rollback()
+        # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing (idempotent).
+        db.expire(answer)  # force refetch from DB, not identity map
+        refetch = db.execute(
+            select(SessionAnswer).where(
+                SessionAnswer.session_id == session_id,
+                SessionAnswer.question_id == question_id,
+            )
+        )
+        existing = refetch.scalar_one_or_none()
+        if existing is None:
+            raise
+        return existing

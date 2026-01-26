@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { adminSyllabusAPI } from "@/lib/api";
 import { BlockAdmin, ThemeAdmin } from "@/lib/api";
 import { AttentionItem, computeAttentionItems } from "./attentionRules";
+import { logger } from "@/lib/logger";
 
 interface UseAttentionItemsResult {
   items: AttentionItem[];
@@ -37,7 +38,7 @@ export function useAttentionItems(): UseAttentionItemsResult {
           const blocks = await adminSyllabusAPI.getBlocks(year.id);
           allBlocks.push(...blocks);
         } catch (error) {
-          console.error(`Failed to load blocks for year ${year.id}:`, error);
+          logger.error(`Failed to load blocks for year ${year.id}:`, error);
         }
       }
 
@@ -48,7 +49,7 @@ export function useAttentionItems(): UseAttentionItemsResult {
           const themes = await adminSyllabusAPI.getThemes(block.id);
           allThemes.push(...themes);
         } catch (error) {
-          console.error(`Failed to load themes for block ${block.id}:`, error);
+          logger.error(`Failed to load themes for block ${block.id}:`, error);
         }
       }
 

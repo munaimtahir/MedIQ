@@ -147,3 +147,159 @@ export function useSystemInfo() {
 
   return { info, loading, error, refetch: loadInfo };
 }
+
+export interface ExamModeState {
+  enabled: boolean;
+  updated_at: string | null;
+  updated_by: { id: string; email: string } | null;
+  reason: string | null;
+  source: string;
+}
+
+export function useExamMode() {
+  const [state, setState] = useState<ExamModeState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const loadState = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/system/exam-mode", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load exam mode state");
+      }
+
+      const data: ExamModeState = await response.json();
+      setState(data);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("Failed to load exam mode state");
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadState();
+  }, [loadState]);
+
+  const toggleExamMode = useCallback(
+    async (enabled: boolean, reason: string, confirmationPhrase: string) => {
+      try {
+        const response = await fetch("/api/admin/system/exam-mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            enabled,
+            reason,
+            confirmation_phrase: confirmationPhrase,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || "Failed to toggle exam mode");
+        }
+
+        const data: ExamModeState = await response.json();
+        setState(data);
+        notify.success(
+          enabled ? "Exam mode enabled" : "Exam mode disabled",
+          "Exam mode state updated successfully",
+        );
+        return data;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error("Failed to toggle exam mode");
+        notify.error("Failed to toggle exam mode", error.message);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  return { state, loading, error, refetch: loadState, toggleExamMode };
+}
+
+export interface FreezeUpdatesState {
+  enabled: boolean;
+  updated_at: string | null;
+  updated_by: { id: string; email: string } | null;
+  reason: string | null;
+  source: string;
+}
+
+export function useFreezeUpdates() {
+  const [state, setState] = useState<FreezeUpdatesState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const loadState = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/system/freeze-updates", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load freeze-updates state");
+      }
+
+      const data: FreezeUpdatesState = await response.json();
+      setState(data);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error("Failed to load freeze-updates state");
+      setError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadState();
+  }, [loadState]);
+
+  const toggleFreezeUpdates = useCallback(
+    async (enabled: boolean, reason: string, confirmationPhrase: string) => {
+      try {
+        const response = await fetch("/api/admin/system/freeze-updates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            enabled,
+            reason,
+            confirmation_phrase: confirmationPhrase,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || "Failed to toggle freeze-updates");
+        }
+
+        const data: FreezeUpdatesState = await response.json();
+        setState(data);
+        notify.success(
+          enabled ? "Freeze updates enabled" : "Freeze updates disabled",
+          "Freeze-updates state updated successfully",
+        );
+        return data;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error("Failed to toggle freeze-updates");
+        notify.error("Failed to toggle freeze-updates", error.message);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  return { state, loading, error, refetch: loadState, toggleFreezeUpdates };
+}

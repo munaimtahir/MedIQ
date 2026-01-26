@@ -1,0 +1,113 @@
+-- Transform: MART_RANK_SIM_BASELINE
+-- Computes rank prediction simulation baseline for A/B testing
+-- Run after rank predictions are generated and actual outcomes are available
+
+-- Full refresh
+-- TRUNCATE TABLE MART_RANK_SIM_BASELINE;
+
+-- INSERT INTO MART_RANK_SIM_BASELINE
+-- SELECT
+--     DATE(pred.prediction_date) AS simulation_date,
+--     pred.user_id,
+--     pred.concept_id,
+--     
+--     -- Baseline predictions (from rank algorithm)
+--     pred.rank_score AS baseline_rank_score,
+--     pred.rank_percentile AS baseline_rank_percentile,
+--     
+--     -- Actual outcomes (from mastery/attempts)
+--     COALESCE(m.mastery_prob, 0.0) AS actual_mastery,
+--     COALESCE(m.attempts_total, 0) AS actual_attempts,
+--     CASE 
+--         WHEN COALESCE(m.attempts_total, 0) > 0 
+--         THEN m.correct_total::FLOAT / m.attempts_total 
+--         ELSE 0.0 
+--     END AS actual_correct_rate,
+--     
+--     -- Comparison metrics
+--     ABS(pred.rank_score - COALESCE(m.mastery_prob, 0.0)) AS rank_error,
+--     CASE 
+--         WHEN ABS(pred.rank_score - COALESCE(m.mastery_prob, 0.0)) <= 0.1 
+--         THEN TRUE 
+--         ELSE FALSE 
+--     END AS rank_accuracy,
+--     
+--     CURRENT_TIMESTAMP() AS computed_at,
+--     pred.algo_profile,
+--     pred.algo_version_rank
+-- FROM (
+--     -- Rank predictions (would come from rank algorithm output table)
+--     -- For now, this is a placeholder structure
+--     SELECT 
+--         user_id,
+--         concept_id,
+--         prediction_date,
+--         rank_score,
+--         rank_percentile,
+--         algo_profile,
+--         algo_version_rank
+--     FROM RAW_RANK_PREDICTIONS  -- This table would be created separately
+--     WHERE DATE(prediction_date) >= DATEADD(day, -30, CURRENT_DATE())
+-- ) pred
+-- LEFT JOIN CURATED_MASTERY m ON pred.user_id = m.user_id 
+--     AND pred.concept_id = m.concept_id
+--     AND DATE(m.snapshot_at) = DATE(pred.prediction_date)
+-- WHERE pred.algo_profile LIKE '%BASELINE%';  -- Only baseline predictions
+
+-- Incremental update (for daily runs)
+-- MERGE INTO MART_RANK_SIM_BASELINE AS target
+-- USING (
+--     SELECT
+--         DATE(pred.prediction_date) AS simulation_date,
+--         pred.user_id,
+--         pred.concept_id,
+--         pred.rank_score AS baseline_rank_score,
+--         pred.rank_percentile AS baseline_rank_percentile,
+--         COALESCE(m.mastery_prob, 0.0) AS actual_mastery,
+--         COALESCE(m.attempts_total, 0) AS actual_attempts,
+--         CASE 
+--             WHEN COALESCE(m.attempts_total, 0) > 0 
+--             THEN m.correct_total::FLOAT / m.attempts_total 
+--             ELSE 0.0 
+--         END AS actual_correct_rate,
+--         ABS(pred.rank_score - COALESCE(m.mastery_prob, 0.0)) AS rank_error,
+--         CASE 
+--             WHEN ABS(pred.rank_score - COALESCE(m.mastery_prob, 0.0)) <= 0.1 
+--             THEN TRUE 
+--             ELSE FALSE 
+--         END AS rank_accuracy,
+--         CURRENT_TIMESTAMP() AS computed_at,
+--         pred.algo_profile,
+--         pred.algo_version_rank
+--     FROM RAW_RANK_PREDICTIONS pred
+--     LEFT JOIN CURATED_MASTERY m ON pred.user_id = m.user_id 
+--         AND pred.concept_id = m.concept_id
+--         AND DATE(m.snapshot_at) = DATE(pred.prediction_date)
+--     WHERE DATE(pred.prediction_date) = CURRENT_DATE() - 1
+--         AND pred.algo_profile LIKE '%BASELINE%'
+-- ) AS source
+-- ON target.simulation_date = source.simulation_date 
+--     AND target.user_id = source.user_id 
+--     AND target.concept_id = source.concept_id
+-- WHEN MATCHED THEN UPDATE SET
+--     baseline_rank_score = source.baseline_rank_score,
+--     baseline_rank_percentile = source.baseline_rank_percentile,
+--     actual_mastery = source.actual_mastery,
+--     actual_attempts = source.actual_attempts,
+--     actual_correct_rate = source.actual_correct_rate,
+--     rank_error = source.rank_error,
+--     rank_accuracy = source.rank_accuracy,
+--     computed_at = source.computed_at
+-- WHEN NOT MATCHED THEN INSERT (
+--     simulation_date, user_id, concept_id, baseline_rank_score, baseline_rank_percentile,
+--     actual_mastery, actual_attempts, actual_correct_rate, rank_error, rank_accuracy,
+--     computed_at, algo_profile, algo_version_rank
+-- ) VALUES (
+--     source.simulation_date, source.user_id, source.concept_id, source.baseline_rank_score, source.baseline_rank_percentile,
+--     source.actual_mastery, source.actual_attempts, source.actual_correct_rate, source.rank_error, source.rank_accuracy,
+--     source.computed_at, source.algo_profile, source.algo_version_rank
+-- );
+
+-- Note: This transform assumes a RAW_RANK_PREDICTIONS table exists
+-- which would be populated by the rank prediction algorithm
+-- For now, this is a template showing the expected structure

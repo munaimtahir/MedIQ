@@ -13,6 +13,7 @@ The Learning Intelligence Engine is a versioned, auditable system for computing 
 - **Parameterized:** Parameters are separate from code versions and can be tuned independently
 - **Auditable:** Every run is logged with inputs, outputs, and execution metadata
 - **Deterministic:** Same version + same params + same data = same results
+- **Reversible:** Runtime kill switch allows instant fallback v1 ⇄ v0 without student disruption
 
 ---
 
@@ -1434,7 +1435,138 @@ theme_mistakes = await db.execute(stmt)
 - Analytics: Trend of mistake types over time
 - Recommendations: "You often change answers—trust your first instinct"
 
-### Future Enhancements (Out of Scope for v0)
+---
+
+## Mistake Engine v1 — Implemented ✅
+
+**Status:** Fully implemented (Task 123)  
+**Database Tables:** `mistake_model_version`, `mistake_training_run`, `mistake_inference_log`  
+**Algorithm:** Supervised classifier (Logistic Regression + LightGBM) with v0 fallback
+
+### Purpose
+
+Upgrade Mistake Engine from rule-based v0 to a supervised classifier that learns from historical mistake patterns. Maintains cold-start safety with v0 fallback and provides defensible, versioned outputs.
+
+### Architecture
+
+**Key Components:**
+1. **Feature Extraction** (`features.py`) - Extended features from attempt + telemetry
+2. **Weak Labeling** (`weak_labels.py`) - v0 rules → weak labels with confidence
+3. **Training Pipeline** (`train.py`) - Offline batch training (logreg + LightGBM + calibration)
+4. **Model Registry** (`registry.py`) - Artifact storage and versioning
+5. **Inference** (`infer.py`) - Runtime classification with fallback
+6. **API** (`api.py`) - FastAPI endpoints
+
+### Cold-Start Safety
+
+**Always keep v0 as fallback:**
+- If no ACTIVE model exists → use v0 rule engine
+- If model confidence < threshold → fallback to v0
+- Per-user personalization only via calibration (no per-user models)
+
+**Global model first:**
+- Single global model trained on all users
+- Per-user calibration only after user has >= K attempts (K configurable)
+- User-specific stats features have safe defaults when history is small
+
+### Feature Set (v1)
+
+**Attempt-level:**
+- `response_time_seconds` - Time spent on question
+- `response_time_zscore_user` - Z-score vs user median (percentile-based)
+- `response_time_zscore_cohort` - Z-score vs cohort median
+- `changed_answer_count` - Number of answer changes
+- `first_answer_correct` - Whether first answer was correct
+- `final_answer_correct` - Final correctness
+- `mark_for_review_used` - Whether marked for review
+- `pause_blur_count` - Tab-away/blur events
+- `time_remaining_at_answer` - Time remaining (if exam mode)
+
+**Question/context:**
+- `question_difficulty` - Elo rating or initial difficulty bucket
+- `cognitive_level` - Cognitive level tag (if available)
+- `block_id`, `theme_id`, `year` - Academic structure
+
+**User context (cold-start safe):**
+- `user_rolling_accuracy_last_n` - Rolling accuracy from last N attempts
+- `user_rolling_median_time_last_n` - Rolling median time
+- `session_pacing_indicator` - User vs cohort pacing
+
+**Important:** All "fast/slow" thresholds are defined via percentiles relative to user + cohort distributions, not fixed seconds.
+
+### Weak Labeling Strategy
+
+**Use v0 rules to assign:**
+- `weak_label` (mistake_type)
+- `label_confidence` in [0, 1]
+
+**Confidence rules:**
+- Deterministic patterns (e.g., "changed answer from correct->wrong") → high confidence (0.9-1.0)
+- Ambiguous patterns → lower confidence (0.6-0.8)
+- Fallback (KNOWLEDGE_GAP) → medium confidence (0.7)
+
+### Training Pipeline
+
+**CLI Command:**
+```bash
+python -m app.learning_engine.mistakes_v1.cli train \
+    --start 2024-01-01 \
+    --end 2024-12-31 \
+    --model lgbm \
+    --calibration isotonic
+```
+
+**Steps:**
+1. Build dataset from Postgres (join attempts + telemetry + question metadata)
+2. Generate weak labels + confidence weights
+3. Train logistic regression baseline + LightGBM primary
+4. Calibrate probabilities (sigmoid or isotonic)
+5. Compute metrics (macro F1, weighted F1, calibration ECE)
+6. Persist artifacts + metadata
+
+### Inference (Runtime)
+
+**Logic:**
+1. If no ACTIVE model → use v0 rule engine (RULE_V0)
+2. Else compute features and predict
+3. If max_prob < CONF_THRESHOLD (default: 0.5) → fallback to v0
+4. Save result to `mistake_log` with `source=MODEL_V1` or `RULE_V0`
+
+**Output:**
+- `mistake_type` - Predicted type
+- `confidence` - Prediction confidence [0, 1]
+- `top_features` - Top contributing features (explainability)
+- `model_version_id` - Model version used
+
+### Database Schema
+
+**New Tables:**
+- `mistake_model_version` - Model artifacts and metadata
+- `mistake_training_run` - Training job logs
+- `mistake_inference_log` - Runtime inference logs (sampled)
+
+**Updated `mistake_log`:**
+- `source` - RULE_V0 or MODEL_V1
+- `model_version_id` - FK to mistake_model_version (nullable)
+- `confidence` - Prediction confidence (nullable)
+
+### API Endpoints
+
+- **POST `/v1/learning/mistakes/classify`** - Classify an attempt
+- **GET `/v1/learning/mistakes/model`** - Get active model metadata
+- **POST `/v1/learning/mistakes/model/train`** (Admin) - Trigger training
+- **POST `/v1/learning/mistakes/model/activate`** (Admin) - Activate model version
+- **GET `/v1/learning/mistakes/debug/{session_id}/{question_id}`** (Admin) - Debug info
+
+### Versioning & Auditing
+
+- Model version stored in `mistake_model_version`
+- Training run metadata in `mistake_training_run`
+- Feature/label schema versions tracked
+- Git commit hash stored
+- All classifications logged with `source` and `model_version_id`
+
+### Future Enhancements (Out of Scope for v1)
 
 - **Classify correct answers** - "Lucky guess", "Confident correct", "Slow but correct"
 - **Composite types** - "Fast AND distracted wrong"
@@ -2566,6 +2698,854 @@ Tests cover:
 - Admin training endpoints
 - Shrinkage toward global weights
 - Training metrics and validation
+
+---
+
+## Adaptive Selection v1 — Constrained Thompson Sampling (Task 122)
+
+### Purpose
+
+Adaptive Selection v1 upgrades the rule-based v0 selector to a **production-grade multi-armed bandit** that:
+- Uses **Thompson Sampling** over themes (arms) for explore/exploit balance
+- Integrates **BKT mastery** (weakness), **FSRS due concepts** (forgetting prevention), and **Elo difficulty** (desirable difficulty)
+- Learns **per-user theme preferences** via Beta posteriors updated from session outcomes
+- Enforces **constraints** for curriculum coverage and safety
+
+### Model: Two-Stage Theme-Level Thompson Sampling
+
+**Stage A: Theme Selection (Bandit)**
+
+Arms = themes in user's selected blocks. For each theme, compute:
+
+1. **Base Priority** (deterministic, explainable):
+   ```
+   base_priority = w_weakness × (1 - mastery)
+                 + w_due × due_ratio
+                 + w_uncertainty × uncertainty_normalized
+                 - w_recency × recency_penalty
+   ```
+
+2. **Thompson Sample**:
+   - Maintain per-(user, theme) Beta posterior: Beta(a, b)
+   - Sample y ~ Beta(a, b) each request
+   - Final score: `base_priority × (ε_floor + y)`
+
+3. **Select** top-k themes respecting constraints.
+
+**Stage B: Question Selection (Within Theme)**
+
+For each selected theme, pick questions using:
+1. FSRS due concepts first (revision priority)
+2. BKT weak concepts next (weakness priority)
+3. Elo "challenge band" (prefer p(correct) ∈ [p_low, p_high])
+4. Exploration slots for new/uncertain questions
+
+### Database Schema
+
+#### `bandit_user_theme_state`
+
+Tracks per-user per-theme Beta posterior for Thompson Sampling.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | UUID | Composite PK |
+| `theme_id` | int | Composite PK |
+| `a` | float | Beta alpha (success count + prior) |
+| `b` | float | Beta beta (failure count + prior) |
+| `n_sessions` | int | Sessions this theme was selected |
+| `last_selected_at` | timestamp | When last selected |
+| `last_reward` | float | Reward from most recent session [0,1] |
+| `updated_at` | timestamp | Last update time |
+
+**Initialization:** Beta(1, 1) = Uniform prior (no preference).
+
+#### `adaptive_selection_log`
+
+Append-only log of selection requests for audit and debugging.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | User identifier |
+| `requested_at` | timestamp | Request time |
+| `mode` | string | tutor, exam, revision |
+| `source` | string | mixed, revision, weakness |
+| `year`, `block_ids`, `theme_ids_filter` | - | Request parameters |
+| `count` | int | Requested question count |
+| `seed` | string | Deterministic seed for reproducibility |
+| `algo_version_id`, `params_id`, `run_id` | UUID | Algo provenance |
+| `candidates_json` | jsonb | All candidate themes with computed features |
+| `selected_json` | jsonb | Selected themes with quotas |
+| `question_ids_json` | jsonb | Final ordered question IDs |
+| `stats_json` | jsonb | Stats: due_ratio, avg_p, exclusions |
+
+### Parameters (Constants Registry)
+
+All parameters are sourced from `backend/app/learning_engine/config.py`:
+
+**Theme Selection:**
+- `beta_prior_a`, `beta_prior_b`: Initial Beta parameters (default 1.0, 1.0)
+- `epsilon_floor`: Minimum exploration factor (default 0.10)
+- `min_theme_count`, `max_theme_count`: Theme bounds (default 2, 5)
+- `min_per_theme`, `max_per_theme`: Per-theme question bounds (default 3, 20)
+
+**Repeat Exclusion:**
+- `exclude_seen_within_days`: Time-based exclusion (default 14 days)
+- `exclude_seen_within_sessions`: Session-based exclusion (default 3 sessions)
+
+**Revision Mode:**
+- `revision_due_ratio_min`: Minimum fraction from due concepts (default 0.60)
+
+**Elo Challenge Band:**
+- `p_low`, `p_high`: Target p(correct) range (default 0.55, 0.80)
+- `explore_new_question_rate`: Exploration for unrated questions (default 0.10)
+
+**Feature Weights:**
+- `w_weakness`: Weight on (1 - mastery) (default 0.45)
+- `w_due`: Weight on due concepts (default 0.35)
+- `w_uncertainty`: Weight on Elo uncertainty (default 0.10)
+- `w_recency_penalty`: Penalty for recent practice (default 0.10)
+
+### Reward Computation
+
+After session completion, update Beta posteriors:
+
+1. **Compute reward** from BKT mastery delta:
+   ```
+   reward = clamp((post_mastery - pre_mastery) / (1 - pre_mastery), 0, 1)
+   ```
+
+2. **Update posterior**:
+   ```
+   a_new = a + reward
+   b_new = b + (1 - reward)
+   ```
+
+3. Only update for themes with >= `reward_min_attempts_per_theme` questions in session.
+
+**Why BKT delta?** Rewards actual learning (mastery improvement), not just correctness. This makes the bandit optimize for learning yield, not "easy wins."
+
+### Determinism
+
+Selection is **deterministic** for identical inputs:
+- Seed = hash(user_id, mode, count, block_ids, theme_ids, date_bucket)
+- Same seed produces same RNG sequence
+- Same RNG produces same Thompson samples
+- Same samples produce same theme selection and question ordering
+
+### Constraints (Safety)
+
+Hard constraints (always enforced):
+1. No duplicate questions in session
+2. Questions must be PUBLISHED
+3. Respect block/theme filters
+4. Respect min/max theme count and per-theme quotas
+
+Soft constraints (enforced with fallback):
+1. Exclude recent questions (relax if supply low)
+2. Revision due ratio (relax if not enough due concepts)
+3. Challenge band (widen if insufficient candidates)
+
+### API Response (v1)
+
+```json
+{
+  "ok": true,
+  "run_id": "uuid",
+  "algo": {
+    "key": "adaptive_selection",
+    "version": "v1"
+  },
+  "params_id": "uuid",
+  "question_ids": ["uuid1", "uuid2", "..."],
+  "plan": {
+    "themes": [
+      {
+        "theme_id": 123,
+        "quota": 10,
+        "base_priority": 0.73,
+        "sampled_y": 0.41,
+        "final_score": 0.34
+      }
+    ],
+    "due_ratio": 0.65,
+    "p_band": {"low": 0.55, "high": 0.80},
+    "stats": {
+      "excluded_recent": 12,
+      "explore_used": 2,
+      "avg_p_correct": 0.68
+    }
+  }
+}
+```
+
+### Integration Points
+
+**Practice Builder:**
+1. Student selects blocks/themes/count/mode
+2. Backend calls `select_questions_v1()`
+3. Returns ordered question_ids + plan
+4. Create session with these questions
+
+**Session Submit (Reward Update):**
+1. Session submitted and scored
+2. Compute BKT mastery delta per theme
+3. Call `update_bandit_rewards_on_session_submit()`
+4. Beta posteriors updated for future selections
+
+### Testing
+
+Tests in `backend/tests/test_adaptive_v1.py`:
+- **Determinism**: Same inputs → same outputs
+- **Constraints**: min/max themes, quotas, supply
+- **Thompson Sampling**: Beta bounds, mean convergence
+- **Reward**: BKT delta normalization, posterior updates
+- **Question Picker**: Challenge band, interleaving
+
+### Module Structure
+
+```
+backend/app/learning_engine/adaptive_v1/
+├── __init__.py          # Public API
+├── core.py              # Thompson Sampling, priority computation
+├── repo.py              # Database queries
+├── question_picker.py   # Within-theme question selection
+├── reward.py            # Bandit reward computation
+└── service.py           # Main orchestration
+```
+
+### Migration from v0
+
+- v0 remains available as fallback if v1 not configured
+- API endpoint supports both (auto-detects based on algo_version)
+- No breaking changes to request format
+- Response format extended with `plan` object
+
+### Future Enhancements
+
+- **Contextual bandit**: Include user features in arm selection
+- **Concept-level arms**: When concept graph is mature
+- **Online parameter tuning**: Bayesian optimization of weights
+- **Multi-objective optimization**: Balance learning, engagement, coverage
+
+---
+
+## IRT (Item Response Theory) — Shadow/Offline (Task 125)
+
+### Purpose
+
+IRT calibration provides 2PL and 3PL item and ability estimates for offline analysis, admin visibility, and evaluation harness integration. **IRT is completely shadow/offline by default** and **never used for student-facing decisions** unless `FEATURE_IRT_ACTIVE` is enabled. BKT, FSRS, ELO, and Adaptive remain the source of truth for selection and scoring.
+
+### Feature Flags
+
+- **`FEATURE_IRT_SHADOW`** (default `true`): Allows offline calibration and admin visibility (runs, metrics, flagged items).
+- **`FEATURE_IRT_ACTIVE`** (default `false`): When `false`, no student endpoints use IRT; no selection or scoring uses IRT.
+- **`FEATURE_IRT_MODEL`** (default `"IRT_2PL"`): Model type to use when active. Must be `"IRT_2PL"` or `"IRT_3PL"`.
+- **`FEATURE_IRT_SCOPE`** (default `"none"`): Activation scope. Ignored unless `FEATURE_IRT_ACTIVE=true`. Allowed values:
+  - `"none"` (default): IRT not used
+  - `"shadow_only"`: Equivalent to `FEATURE_IRT_ACTIVE=false`
+  - `"selection_only"`: IRT used for question selection only
+  - `"scoring_only"`: IRT used for scoring only
+  - `"selection_and_scoring"`: IRT used for both selection and scoring
+
+### Models
+
+- **2PL**: \( P(\text{correct}) = \sigma(a(\theta - b)) \). Discrimination \(a > 0\) (softplus); difficulty \(b\); ability \(\theta\).
+- **3PL**: \( P = c + (1 - c)\,\sigma(a(\theta - b)) \). Guessing \(c \in [0, 1/K]\) where \(K\) = option count (MCQ guessing floor).
+
+**Constraints**: \(a > 0\); \(c \in [0, 1/K]\); \(\theta\) standardized post-fit (e.g. \(\theta \sim N(0,1)\)).
+
+### What Is Stored
+
+- **`irt_calibration_run`**: Run metadata, `dataset_spec`, status, seed, metrics (logloss, Brier, ECE, stability, info curve), `artifact_paths`, link to `eval_run_id`.
+- **`irt_item_params`**: Per run/question: \(a\), \(b\), \(c\) (nullable for 2PL), SEs, `flags` (e.g. `low_discrimination`, `unstable`, `poor_fit`).
+- **`irt_user_ability`**: Per run/user: \(\theta\), \(\theta_\text{se}\).
+- **`irt_item_fit`** (optional): Per run/question: loglik, infit/outfit, `info_curve_summary`.
+
+### Estimation
+
+- **Staged**: (1) Joint MAP over \(\theta\) and item params with priors; (2) optional MML/EM scaffold (toggleable).
+- **Priors**: \(\theta \sim N(0,1)\); \(a\) centered near 1 (e.g. log-normal); \(b \sim N(0,1)\); \(c\) implied by \(1/K\).
+- **Cold start**: \(b\) from ELO difficulty when available; else from empirical p-value (logit); \(a\) from config prior; \(c\) near \(1/K\) for 3PL.
+- **Determinism**: Fixed seed per run; `dataset_spec` stored; same seed + same spec → same metrics/params within tolerance.
+
+### Evaluation Harness Integration
+
+- Each calibration run produces an **eval run** (suite `irt_2pl` or `irt_3pl`) with **logloss**, **Brier**, **ECE** (and optional IRT-specific metrics). Artifacts (e.g. calibration curve, summary JSON) stored under `backend/artifacts/irt/<run_id>/`.
+
+### Admin API
+
+- **POST** `/v1/admin/irt/runs`: Create and run calibration (admin only).
+- **GET** `/v1/admin/irt/runs`: List runs (filters: `model_type`, `status`).
+- **GET** `/v1/admin/irt/runs/{id}`: Run details + metrics.
+- **GET** `/v1/admin/irt/runs/{id}/items?flag=low_discrimination`: Item params, optionally filtered by flag.
+- **GET** `/v1/admin/irt/runs/{id}/items/{question_id}`: Single item params.
+- **GET** `/v1/admin/irt/runs/{id}/users/{user_id}`: User \(\theta\) and SE.
+
+All IRT admin routes require **ADMIN** role and **`FEATURE_IRT_SHADOW`** enabled.
+
+### IRT Activation Policy
+
+IRT activation is controlled by a **strict "No-Vibes" activation policy** that requires objective, measurable criteria before IRT can be used for student-facing decisions.
+
+#### Activation Gates (Policy v1)
+
+All gates must pass for activation eligibility:
+
+1. **Gate A: Minimum Data Sufficiency**
+   - Requires: n_users_train >= 500, n_items_train >= 1000, n_attempts_train >= 100,000
+   - Requires: median_attempts_per_item >= 50, median_attempts_per_user >= 100
+   - Cold-start blocker to ensure sufficient data for reliable calibration
+
+2. **Gate B: Holdout Predictive Superiority vs Baseline**
+   - IRT must improve vs baseline (ELO+BKT+FSRS) on same holdout split:
+     - logloss_irt <= logloss_baseline - 0.005
+     - brier_irt <= brier_baseline - 0.003
+     - ece_irt <= ece_baseline - 0.005
+   - Improvement must hold in >= 3 evaluation replays/folds
+
+3. **Gate C: Calibration Sanity**
+   - No extreme parameter pathologies:
+     - <= 15% items with low discrimination (a < 0.25)
+     - <= 5% items with difficulty out of range (|b| > 4.0)
+     - For 3PL: <= 10% items with c near cap (> 0.95*(1/K))
+
+4. **Gate D: Parameter Stability Over Time**
+   - Compare current run to previous eligible run:
+     - Spearman corr(b) >= 0.90
+     - Spearman corr(a) >= 0.80
+     - For 3PL: Spearman corr(c) >= 0.70
+     - median |delta_b| <= 0.15
+
+5. **Gate E: Measurement Precision**
+   - Ability SE distribution:
+     - median(theta_se) <= 0.35
+     - >= 60% users with theta_se <= 0.30
+
+6. **Gate F: Coverage + Fairness Sanity**
+   - No subgroup (year/block) has catastrophic degradation:
+     - logloss_subgroup <= logloss_overall + 0.02
+
+#### Activation Process
+
+1. **Evaluate**: Admin runs evaluation on a SUCCEEDED calibration run
+   - `POST /v1/admin/irt/activation/evaluate` with `run_id` and `policy_version`
+   - Returns gate results and eligibility status
+   - Decision stored in `irt_activation_decision` table
+
+2. **Activate** (if eligible):
+   - `POST /v1/admin/irt/activation/activate` with `run_id`, `scope`, `model_type`, `reason`
+   - Requires latest decision `eligible=true`
+   - Updates `platform_settings` with IRT flags
+   - Creates audit event in `irt_activation_event`
+
+3. **Deactivate** (kill-switch):
+   - `POST /v1/admin/irt/activation/deactivate` with `reason`
+   - Always allowed for ADMIN
+   - Instantly sets `FEATURE_IRT_ACTIVE=false` and `FEATURE_IRT_SCOPE="none"`
+   - Creates audit event
+
+#### Progressive Rollout
+
+- Initial activation recommended as `"selection_only"` for 2 weeks
+- `"selection_and_scoring"` only allowed if:
+  - Gate B improvements hold for 2 consecutive weekly runs
+  - Gate D stability holds in both runs
+
+#### Runtime Helpers
+
+- `is_irt_active(db)`: Check if IRT is active (reads from platform_settings, fallback to config)
+- `get_irt_scope(db)`: Get activation scope
+- `get_irt_model(db)`: Get IRT model type
+- `is_irt_shadow_enabled(db)`: Check if shadow mode enabled
+
+### IRT Runtime Integration
+
+IRT is integrated with the algorithm runtime framework as module `"irt"`:
+
+**Runtime Helpers** (in `app.learning_engine.runtime`):
+- `is_irt_shadow_enabled(db)`: Check if shadow mode is enabled (allows calibration runs)
+- `is_irt_active_allowed(db, runtime_cfg)`: Check if IRT can be used for student decisions
+  - Requires: Module override not "v0", `FEATURE_IRT_ACTIVE=true`, and not frozen
+- `get_effective_irt_state(db)`: Get complete IRT state (shadow, active, frozen, override)
+
+**Module Override Values:**
+- `"v0"`: Never use IRT (even if active flag is on)
+- `"v1"`: Eligible to be used (only if `FEATURE_IRT_ACTIVE=true`)
+- `"shadow"`: Runs allowed (if not frozen), but NO usage in decisions
+
+**Freeze Mode:**
+- When `freeze_updates=true`, IRT calibration runs are blocked
+- Runs set to FAILED status with error message
+- No state mutations when frozen
+
+**Session Snapshot:**
+- Future IRT usage must respect session snapshot (`algo_profile_at_start`, `algo_overrides_at_start`)
+- `maybe_get_irt_estimates_for_session()` function enforces this contract
+- Returns `None` unless IRT is active-allowed
+
+All helpers read from `platform_settings` first (for runtime changes), then fallback to `config.py`.
+
+#### Audit Trail
+
+All activation events are logged immutably in `irt_activation_event`:
+- `EVALUATED`: Gate evaluation performed
+- `ACTIVATED`: IRT activated for student-facing decisions
+- `DEACTIVATED`: IRT deactivated (kill-switch)
+- `ROLLED_BACK`: Previous activation rolled back
+
+Each event includes:
+- Previous and new state (flags and scope)
+- Run ID (if applicable)
+- Policy version
+- Reason
+- Created by user ID
+- Timestamp
+
+### Why Shadow?
+
+- IRT is used only for **offline calibration**, **admin dashboards**, and **evaluation**. Student-facing selection, scoring, and difficulty updates use **BKT/FSRS/ELO/Adaptive** exclusively unless `FEATURE_IRT_ACTIVE` is explicitly enabled and all activation gates pass.
+
+---
+
+## Rank Prediction v1 — Shadow/Offline (Task 126)
+
+### Purpose
+
+Rank prediction provides **quantile-based percentile estimates** for students within their cohort (e.g., year). This enables analytics dashboards showing "You are in the top X% of your cohort" without affecting learning decisions. **Rank is completely shadow/offline by default** and **never used for student-facing decisions** unless explicitly activated via runtime override and feature flags.
+
+### Feature Flags
+
+- **`FEATURE_RANK_SHADOW`** (default `true`): Allows offline computation and admin visibility (snapshots, runs, metrics).
+- **`FEATURE_RANK_ACTIVE`** (default `false`): When `false`, no student endpoints use rank; no selection or scoring uses rank.
+- **Student-facing flag** (default `false`): Even if `FEATURE_RANK_ACTIVE=true`, student endpoints require an additional `rank.student_enabled` flag in `platform_settings`.
+
+### Model: Empirical CDF over theta_proxy
+
+Rank v1 uses a **quantile-based approach**:
+
+1. **Compute theta_proxy** (ability proxy) for each user:
+   - Priority 1: Elo user rating (if available)
+   - Priority 2: Mastery-weighted score (weighted average of `mastery_score` across themes, weights = `attempts_total`)
+   - Priority 3: Zero (with `insufficient_data` status)
+
+2. **Build cohort CDF**:
+   - Gather all users in cohort (e.g., "year:1")
+   - Compute theta_proxy for each user
+   - Sort thetas and build empirical CDF: `percentile = fraction of cohort thetas <= user theta`
+
+3. **Uncertainty bands**:
+   - Analytic approximation: `band_half_width = sqrt(p*(1-p)/N) * Z`
+   - Where `Z` from config (default 1.28 for ~80% confidence)
+   - `band_low = clip(percentile - half_width, 0, 1)`
+   - `band_high = clip(percentile + half_width, 0, 1)`
+
+### What Is Stored
+
+- **`rank_prediction_snapshot`**: Daily snapshots per user/cohort:
+  - `theta_proxy`: Ability proxy used
+  - `predicted_percentile`: Percentile (0..1)
+  - `band_low`, `band_high`: Uncertainty band
+  - `status`: `ok`, `insufficient_data`, `unstable`, `blocked_frozen`, `disabled`
+  - `model_version`: `"rank_v1_empirical_cdf"`
+  - `features_hash`: Hash of features for reproducibility
+  - Unique constraint: `(user_id, cohort_key, model_version, DATE(computed_at))`
+
+- **`rank_model_run`**: Shadow evaluation run registry:
+  - `cohort_key`: Cohort identifier (e.g., "year:1")
+  - `dataset_spec`: Time window, filters
+  - `metrics`: Coverage, stability, rank correlation
+  - `status`: `QUEUED`, `RUNNING`, `DONE`, `FAILED`, `BLOCKED_FROZEN`, `DISABLED`
+
+- **`rank_activation_event`**: Immutable audit log of activation events
+
+- **`rank_config`**: Policy settings (MIN_COHORT_N, THETA_PROXY_PRIORITY, WINDOW_DAYS, etc.)
+
+### Cohort Key Generation
+
+- **Default**: `"year:{year_id}"` from user's academic profile
+- **Optional**: `"year:{year_id}:block:{block_code}"` for block-specific cohorts
+- **Fallback**: `"year:0"` if user has no academic profile
+
+### Execution Modes
+
+1. **Daily snapshots** (nightly job or on-demand):
+   - For each active user, compute snapshot for their cohort
+   - Must respect `freeze_updates`: if frozen, write status `"blocked_frozen"` and skip computation
+
+2. **Offline evaluation** (admin-triggered):
+   - Backtest using time-sliced cohorts
+   - Metrics: coverage, stability (median abs percentile change week-to-week), rank correlation
+   - Stored in `rank_model_run.metrics`
+
+### Admin API
+
+- **GET** `/v1/admin/rank/status?cohort_key=...`: Latest run summary + coverage + stability
+- **POST** `/v1/admin/rank/runs`: Create and execute rank model run (admin only, shadow mode)
+- **GET** `/v1/admin/rank/runs`: List runs (filters: `cohort_key`, `status`)
+- **GET** `/v1/admin/rank/runs/{id}`: Run details + metrics
+- **GET** `/v1/admin/rank/snapshots?user_id=...&cohort_key=...&days=30`: List snapshots
+- **POST** `/v1/admin/rank/activate`: Activate rank for student-facing operations (requires eligibility gates)
+- **POST** `/v1/admin/rank/deactivate`: Deactivate rank (kill-switch)
+
+All rank admin routes require **ADMIN** role and rank mode not `"v0"`.
+
+### Rank Activation Policy
+
+Rank activation is controlled by **objective eligibility gates**:
+
+#### Activation Gates
+
+All gates must pass for activation eligibility:
+
+1. **Gate A: Minimum Cohort Size**
+   - Requires: `MIN_COHORT_N` users with `ok` status (default: 50)
+   - Activation threshold: `ACTIVATION_MIN_COHORT_N` (default: 100)
+
+2. **Gate B: Coverage**
+   - Requires: `coverage >= COVERAGE_THRESHOLD` (default: 0.80)
+   - Coverage = fraction of users with `ok` status
+
+3. **Gate C: Stability**
+   - Requires: `median_abs_percentile_change <= STABILITY_THRESHOLD_ABS_CHANGE` (default: 0.05)
+   - Computed from week-to-week percentile changes
+
+#### Activation Process
+
+1. **Evaluate**: Admin checks eligibility for a cohort
+   - `is_rank_eligible_for_activation(db, cohort_key)` returns `(eligible, reasons)`
+
+2. **Activate** (if eligible):
+   - `POST /v1/admin/rank/activate` with `cohort_key`, `reason`, `confirmation_phrase="ACTIVATE RANK"`
+   - Requires eligibility gates passed (unless `force=true`)
+   - Updates runtime config override `"rank": "v1"`
+   - Creates audit event in `rank_activation_event`
+
+3. **Deactivate** (kill-switch):
+   - `POST /v1/admin/rank/deactivate` with `reason`, `confirmation_phrase="DEACTIVATE RANK"`
+   - Always allowed for ADMIN
+   - Instantly sets runtime override `"rank": "v0"`
+   - Creates audit event
+
+### Rank Runtime Integration
+
+Rank is integrated with the algorithm runtime framework as module `"rank"`:
+
+**Runtime Helpers** (in `app.learning_engine.runtime`):
+- `get_rank_mode(db, runtime_cfg, snapshot_cfg)`: Get rank mode (`"v0"`, `"shadow"`, `"v1"`)
+  - Respects session snapshot if provided
+- `is_rank_enabled_for_admin(db, runtime_cfg)`: Check if rank enabled for admin operations
+  - Returns `True` if mode is `"shadow"` or `"v1"`
+- `is_rank_enabled_for_student(db, runtime_cfg, snapshot_cfg)`: Check if rank enabled for student operations
+  - Returns `True` only if mode is `"v1"` AND `rank.student_enabled` flag is `true`
+
+**Module Override Values:**
+- `"v0"`: Disabled (no runs, no reads)
+- `"shadow"`: Can compute/store snapshots + evaluation, but not used in any student-facing logic
+- `"v1"`: Allowed to be used in analytics surfaces (still must not affect learning decisions unless separately approved)
+
+**Freeze Mode:**
+- When `freeze_updates=true`, rank snapshot computation is blocked
+- Snapshots set to `"blocked_frozen"` status
+- No state mutations when frozen
+
+**Session Snapshot:**
+- Future rank usage must respect session snapshot (`algo_profile_at_start`, `algo_overrides_at_start`)
+- All rank reads use snapshot config
+
+### Why Shadow?
+
+- Rank is used only for **offline analytics**, **admin dashboards**, and **evaluation**. Student-facing selection, scoring, and difficulty updates **never use rank** unless explicitly activated and all gates pass.
+- Even when activated, rank is intended for **analytics surfaces only**, not learning decisions.
+
+---
+
+## Graph-Aware Revision Planning v1 — Shadow/Offline (Task 127)
+
+### Purpose
+
+Graph-aware revision planning re-ranks and augments FSRS revision plans using prerequisite graph knowledge. It injects prerequisite themes that students should review before tackling due themes, improving learning efficiency. **Graph revision is completely shadow/offline by default** and **never affects student queues** unless explicitly activated via runtime override and feature flags.
+
+### Feature Flags
+
+- **`FEATURE_GRAPH_REVISION_SHADOW`** (default `true`): Allows offline computation and admin visibility (shadow plans, metrics).
+- **`FEATURE_GRAPH_REVISION_ACTIVE`** (default `false`): When `false`, no student endpoints use graph revision; revision queues remain baseline FSRS only.
+- **Student-facing flag** (default `false`): Even if `FEATURE_GRAPH_REVISION_ACTIVE=true`, student endpoints require an additional `graph_revision.active` flag in `platform_settings`.
+
+### Model: Prerequisite-Aware Re-ranking
+
+Graph revision v1 uses a **prerequisite injection approach**:
+
+1. **Start with baseline**: Take FSRS due themes (canonical `due_at` from `user_revision_state`).
+
+2. **Fetch prerequisites**: For each due theme, query Neo4j graph for prerequisite themes up to depth D (default 2).
+
+3. **Score prerequisites**: For each prerequisite candidate:
+   - `score = w1*(1 - mastery(p)) + w2*(is_overdue(p)) + w3*(recency_need(p))`
+   - Where weights are configurable (default: mastery_inverse=0.5, is_overdue=0.3, recency_need=0.2)
+
+4. **Select top prerequisites**: 
+   - Respect injection cap (default: ≤25% of baseline count)
+   - Max prereqs per theme (default: 2)
+   - Avoid duplicates
+
+5. **Produce ordered plan**:
+   - Keep baseline due themes order stable
+   - Insert prerequisites as "assist items" with explainability labels
+
+**Explainability**: Each injected prerequisite stores reason codes and contributing signals (mastery score, overdue status, source themes).
+
+### What Is Stored
+
+- **`shadow_revision_plan`**: Daily shadow plans per user:
+  - `baseline_count`: Number of baseline due themes
+  - `injected_count`: Number of prerequisite themes injected
+  - `plan_json`: Ordered list of plan items with `{theme_id, kind: "due"|"prereq", reason_codes, score, ...}`
+  - `mode`: `"baseline"` (Neo4j unavailable) or `"shadow"` (graph-augmented)
+  - Unique constraint: `(user_id, run_date)`
+
+- **`prereq_edges`**: Authoritative prerequisite edges in Postgres (synced to Neo4j):
+  - `from_theme_id`: Prerequisite theme
+  - `to_theme_id`: Theme that requires the prerequisite
+  - `weight`: Edge weight (default 1.0)
+  - `source`: `"manual"`, `"imported"`, or `"inferred"`
+  - `is_active`: Soft delete flag
+
+- **`prereq_sync_run`**: Neo4j sync job tracking (node/edge counts, errors)
+
+- **`graph_revision_run`**: Shadow evaluation run registry:
+  - `metrics`: Coverage, injection rate, Neo4j availability, cycle count
+  - `status`: `QUEUED`, `RUNNING`, `DONE`, `FAILED`, `BLOCKED_FROZEN`, `DISABLED`
+
+- **`graph_revision_activation_event`**: Immutable audit log of activation events
+
+- **`graph_revision_config`**: Policy settings (prereq_depth, injection_cap_ratio, scoring_weights, coverage_threshold, etc.)
+
+### Neo4j Integration
+
+- **Authoritative source**: Postgres `prereq_edges` table (single source of truth)
+- **Neo4j projection**: Synced via idempotent sync job (upserts nodes/edges, removes inactive)
+- **Schema**: 
+  - Nodes: `(:Theme {theme_id: string})`
+  - Edges: `(:Theme)-[:PREREQ_OF {weight: float}]->(:Theme)`
+- **Health checks**: Ping Neo4j, node/edge counts, cycle detection
+- **Graceful degradation**: If Neo4j unavailable, planner returns baseline-only plan (mode="baseline")
+
+### Execution Modes
+
+1. **Shadow computation** (nightly job or on-demand):
+   - When `graph_revision` mode is `"shadow"`:
+     - Compute `shadow_revision_plan` for active users
+     - Store metrics in `graph_revision_run`
+   - Must respect `freeze_updates`: if frozen, do not write plans; mark run `BLOCKED_FROZEN`
+
+2. **When activated** (`graph_revision=v1` + feature flag `true`):
+   - Revision queue builder may call planner to augment ordering
+   - **MUST obey session snapshot** for any plan used in a session
+   - **IMPORTANT**: Even when active, does not mutate FSRS state; only re-orders/selects items for today's plan
+
+### Admin API
+
+- **POST** `/v1/admin/graph-revision/sync`: Trigger Neo4j sync from Postgres
+- **GET** `/v1/admin/graph-revision/sync/runs`: List sync runs
+- **GET** `/v1/admin/graph-revision/sync/runs/{id}`: Get sync run details
+- **GET** `/v1/admin/graph-revision/health`: Neo4j health + graph stats + cycle check
+- **GET** `/v1/admin/graph-revision/edges`: List prerequisite edges
+- **POST** `/v1/admin/graph-revision/edges`: Create edge
+- **PUT** `/v1/admin/graph-revision/edges/{id}`: Update edge
+- **DELETE** `/v1/admin/graph-revision/edges/{id}`: Soft delete edge (is_active=false)
+- **GET** `/v1/admin/graph-revision/shadow-plans?user_id=...&days=7`: List shadow plans
+- **POST** `/v1/admin/graph-revision/activate`: Activate graph revision (requires eligibility gates)
+- **POST** `/v1/admin/graph-revision/deactivate`: Deactivate graph revision (kill-switch)
+
+All graph revision admin routes require **ADMIN** role and graph_revision mode not `"v0"`.
+
+### Graph Revision Activation Policy
+
+Graph revision activation is controlled by **objective eligibility gates**:
+
+#### Activation Gates
+
+All gates must pass for activation eligibility:
+
+1. **Gate A: Cycle Check**
+   - Requires: No cycles detected in prerequisite graph (or cycles handled with explicit policy)
+   - Default: `cycle_check_enabled=true` (prefer fail if cycles)
+
+2. **Gate B: Coverage**
+   - Requires: `coverage >= COVERAGE_THRESHOLD` (default: 0.50)
+   - Coverage = fraction of active themes with at least one prerequisite edge
+
+3. **Gate C: Neo4j Availability**
+   - Requires: Neo4j currently available (can be enhanced with historical success rate tracking)
+   - Default threshold: `neo4j_availability_threshold=0.95` (95% success rate)
+
+#### Activation Process
+
+1. **Evaluate**: Admin checks eligibility
+   - `is_graph_revision_eligible_for_activation(db)` returns `(eligible, reasons)`
+
+2. **Activate** (if eligible):
+   - `POST /v1/admin/graph-revision/activate` with `reason`, `confirmation_phrase="ACTIVATE GRAPH REVISION"`
+   - Requires eligibility gates passed (unless `force=true`)
+   - Updates runtime config override `"graph_revision": "v1"`
+   - Creates audit event in `graph_revision_activation_event`
+
+3. **Deactivate** (kill-switch):
+   - `POST /v1/admin/graph-revision/deactivate` with `reason`, `confirmation_phrase="DEACTIVATE GRAPH REVISION"`
+   - Always allowed for ADMIN
+   - Instantly sets runtime override `"graph_revision": "v0"`
+   - Creates audit event
+
+### Graph Revision Runtime Integration
+
+Graph revision is integrated with the algorithm runtime framework as module `"graph_revision"`:
+
+**Runtime Helpers** (in `app.learning_engine.runtime`):
+- `get_graph_revision_mode(db, runtime_cfg, snapshot_cfg)`: Get graph_revision mode (`"v0"`, `"shadow"`, `"v1"`)
+  - Respects session snapshot if provided
+- `is_graph_revision_active_allowed(db, runtime_cfg, snapshot_cfg)`: Check if graph_revision enabled for student operations
+  - Returns `True` only if mode is `"v1"` AND `graph_revision.active` flag is `true` AND not frozen
+
+**Module Override Values:**
+- `"v0"`: Disabled (baseline FSRS only)
+- `"shadow"`: Can compute/store shadow plans + evaluation, but not used in any student-facing logic
+- `"v1"`: Allowed to influence ordering/augmentation of revision plans (still session snapshot rule)
+
+**Freeze Mode:**
+- When `freeze_updates=true`, shadow plan computation is blocked
+- Plans return `None` (not stored)
+- No state mutations when frozen
+
+**Session Snapshot:**
+- Graph revision usage must respect session snapshot (`algo_profile_at_start`, `algo_overrides_at_start`)
+- All graph revision reads use snapshot config
+
+### Why Shadow?
+
+- Graph revision is used to **augment revision plans** with prerequisite knowledge, improving learning efficiency without disrupting FSRS core scheduling.
+- **Shadow-first approach** ensures we can evaluate injection rates, coverage, and learning outcomes before affecting student queues.
+- Even when activated, graph revision **does not mutate FSRS state**; it only re-orders/selects items for today's plan, maintaining FSRS as the authoritative scheduler.
+
+---
+
+## Algorithm Runtime Profiles & Kill Switch
+
+### Overview
+
+The system supports **instant, reversible switching** between algorithm versions via runtime profiles. This allows falling back to v0 (baseline) if v1 algorithms misbehave, without disrupting active students.
+
+### Runtime Profiles
+
+**V1_PRIMARY** (default):
+- Mastery: BKT v1
+- Revision: FSRS v1
+- Difficulty: ELO v1
+- Adaptive: Bandit v1
+- Mistakes: ML v1
+
+**V0_FALLBACK**:
+- Mastery: Weighted accuracy heuristic v0
+- Revision: Rules-based spaced repetition v0
+- Difficulty: ELO-lite v0 (or keep v1 if safe)
+- Adaptive: Deterministic rules v0
+- Mistakes: Rule classifier v0
+
+### Per-Module Overrides
+
+You can override specific modules while keeping others on v1:
+
+```json
+{
+  "profile": "V1_PRIMARY",
+  "overrides": {
+    "adaptive": "v0"  // Only adaptive falls back to v0
+  }
+}
+```
+
+### Session Snapshot Rule
+
+**Critical:** Sessions use the algorithm profile captured at creation time.
+
+- When a session is created, current `algo_runtime_config` is snapshotted
+- Stored in `test_sessions.algo_profile_at_start` and `algo_overrides_at_start`
+- All learning updates during session use snapshot config
+- New sessions after switch use new config
+- **No mid-session algorithm switching**
+
+### Canonical State Store
+
+Both v0 and v1 read/write the same canonical tables, enabling seamless transitions:
+
+- **`user_theme_stats`**: Theme-level aggregates (attempts, correct, last_attempt_at)
+- **`user_mastery_state`**: Canonical mastery score (0..1) + model-specific state
+- **`user_revision_state`**: Canonical due dates + v0/v1 state fields
+
+**Migration Strategy:**
+- Existing `user_theme_mastery` populates `user_mastery_state.mastery_score`
+- Existing `revision_queue` populates `user_revision_state.due_at`
+- Incremental updates maintain canonical state
+
+### State Bridging
+
+When switching profiles, state is automatically bridged:
+
+**v1 → v0:**
+- Mastery: Use canonical `mastery_score` directly (no recompute)
+- Revision: Derive v0 interval/stage from canonical `due_at`
+- No cold start - state preserved
+
+**v0 → v1:**
+- Mastery: Initialize BKT from canonical `mastery_score` (non-trivial priors)
+- Revision: Map v0 interval to FSRS stability/difficulty
+- Preserves `due_at` continuity
+
+**Bridging is:**
+- **Lazy**: Triggered on first request after switch (per-user)
+- **Idempotent**: Running twice produces same result
+- **Batch**: Optional backfill job processes all active users
+
+### Safe Mode
+
+**Emergency freeze:** `freeze_updates=true` enables read-only mode:
+- No state mutations
+- Read-only decisions using cached state
+- All decisions logged as "frozen"
+
+### Admin API
+
+- `GET /v1/admin/algorithms/runtime` - Get current config
+- `POST /v1/admin/algorithms/runtime/switch` - Switch profile
+- `POST /v1/admin/algorithms/runtime/freeze_updates` - Emergency freeze
+- `POST /v1/admin/algorithms/runtime/unfreeze_updates` - Unfreeze
+- `GET /v1/admin/algorithms/bridge/status` - Bridge job status
+
+See `docs/runbook.md` for operational procedures.
+
+### ALGO_BRIDGE_SPEC_v1
+
+The bridge specification defines exact mapping rules for converting state between v1 and v0 algorithms. All mappings are **config-driven** (stored in `algo_bridge_config`) and **idempotent**.
+
+**Key Principles:**
+1. **Canonical State First**: Both v0 and v1 read/write the same canonical tables
+2. **Preserve Continuity**: `due_at` and `mastery_score` are preserved across switches
+3. **Non-Trivial Initialization**: v1 algorithms initialize from canonical state, not default priors
+4. **Config-Driven**: All thresholds and mappings stored in DB, not hardcoded
+
+**Mastery Bridging:**
+- **v0 Computation**: Recency-weighted accuracy with configurable decay (`MASTERY_RECENCY_TAU_DAYS`)
+- **BKT Initialization**: Direct mapping or shrinkage toward prior (`BKT_INIT_PRIOR_FROM_MASTERY`)
+
+**Revision Bridging:**
+- **v1→v0**: Preserves `due_at`, derives `v0_interval_days` and `v0_stage` from time intervals
+- **v0→v1**: Preserves `due_at`, maps `v0_interval_days` to FSRS `stability` (monotonic_log/linear/sqrt)
+
+**Bandit Initialization:**
+- Beta prior from mastery: `alpha = 1 + mastery_score * S`, `beta = 1 + (1-mastery_score) * S`
+- Strength `S` clipped between `BANDIT_PRIOR_STRENGTH_MIN` and `BANDIT_PRIOR_STRENGTH_MAX`
+
+**Full Specification:** See `docs/ALGO_BRIDGE_SPEC_v1.md`
 
 ---
 

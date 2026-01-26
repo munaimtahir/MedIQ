@@ -1,0 +1,57 @@
+# Traefik Static Configuration
+# This file is loaded at startup and defines providers, entrypoints, and certificates resolvers
+
+# API and Dashboard (internal only, not exposed publicly)
+api:
+  dashboard: true
+  insecure: false  # Dashboard not exposed publicly
+
+# Entrypoints (ports Traefik listens on)
+entryPoints:
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: false
+    transport:
+      respondingTimeouts:
+        readTimeout: 15s
+        writeTimeout: 15s
+        idleTimeout: 60s
+  websecure:
+    address: ":443"
+    forwardedHeaders:
+      insecure: false
+    transport:
+      respondingTimeouts:
+        readTimeout: 15s
+        writeTimeout: 15s
+        idleTimeout: 60s
+  traefik:
+    address: "127.0.0.1:8080"
+    # Localhost-only entrypoint for dashboard (accessed via SSH tunnel)
+
+# Providers (where Traefik discovers services)
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # Only services with traefik.enable=true are exposed
+    network: app  # Use app network for service discovery
+
+# Certificates Resolvers (Let's Encrypt)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: ${TRAEFIK_ACME_EMAIL}
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# Logging
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  bufferingSize: 100

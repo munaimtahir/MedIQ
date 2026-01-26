@@ -20,15 +20,17 @@ from app.schemas.telemetry import EventType
 @pytest.fixture
 def test_user(db):
     """Create a test user."""
+    from app.core.security import hash_password
+    
     user = User(
         id=uuid.uuid4(),
         email="telemetry@example.com",
-        first_name="Telemetry",
-        last_name="User",
-        role=UserRole.STUDENT,
-        password_hash="fake_hash",
+        full_name="Telemetry User",
+        role=UserRole.STUDENT.value,
+        password_hash=hash_password("Test123!"),
         is_active=True,
         email_verified=True,
+        onboarding_completed=True,
     )
     db.add(user)
     db.flush()
@@ -36,11 +38,28 @@ def test_user(db):
 
 
 @pytest.fixture
-def test_session(db, test_user):
-    """Create a test session."""
+async def test_session_async(db_session):
+    """Create a test session (async)."""
+    from app.core.security import hash_password
+    from app.models.user import UserRole
+    
+    # Create test user first
+    user = User(
+        id=uuid.uuid4(),
+        email="telemetry@example.com",
+        full_name="Telemetry User",
+        role=UserRole.STUDENT.value,
+        password_hash=hash_password("Test123!"),
+        is_active=True,
+        email_verified=True,
+        onboarding_completed=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    
     session = TestSession(
         id=uuid.uuid4(),
-        user_id=test_user.id,
+        user_id=user.id,
         mode=SessionMode.TUTOR,
         status=SessionStatus.ACTIVE,
         year=1,
@@ -49,9 +68,9 @@ def test_session(db, test_user):
         total_questions=5,
         started_at=datetime.utcnow(),
     )
-    db.add(session)
-    db.flush()
-    return session
+    db_session.add(session)
+    await db_session.flush()
+    return session, user
 
 
 @pytest.fixture
@@ -211,21 +230,25 @@ def test_event_types_validation(db, test_user, test_session):
     assert events_count == len(event_types)
 
 
-def test_telemetry_service_best_effort(db, test_user, test_session):
+@pytest.mark.asyncio
+async def test_telemetry_service_best_effort(db_session, test_session_async):
     """Test that telemetry service handles failures gracefully."""
     from app.services.telemetry import log_event
 
+    session, user = test_session_async
+    
     # Valid event should succeed
     event = await log_event(
-        db,
-        session_id=test_session.id,
-        user_id=test_user.id,
+        db_session,
+        session_id=session.id,
+        user_id=user.id,
         event_type=EventType.QUESTION_VIEWED,
         payload={"position": 1},
     )
 
     assert event is not None
     assert event.event_type == EventType.QUESTION_VIEWED.value
+    await db_session.flush()
 
 
 def test_payload_size_limit_enforced():

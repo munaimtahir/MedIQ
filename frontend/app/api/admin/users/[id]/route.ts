@@ -4,8 +4,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const cookies = request.headers.get("cookie") || "";
     const body = await request.json();
 
@@ -17,7 +18,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       is_active: boolean;
       created_at: string;
       last_login_at: string | null;
-    }>(`/admin/users/${params.id}`, {
+    }>(`/admin/users/${id}`, {
       method: "PUT",
       cookies,
       body,

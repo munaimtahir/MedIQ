@@ -161,3 +161,64 @@ export interface SessionReview {
   session: SessionMeta;
   items: ReviewItem[];
 }
+
+// ============================================================================
+// Thin Endpoint Types (Optimized for Player UX)
+// ============================================================================
+
+export interface SessionStateThin {
+  session_id: string;
+  mode: SessionMode;
+  status: SessionStatus;
+  total_questions: number;
+  current_index: number; // 1-based
+  answered_count: number;
+  remaining_count: number;
+  time_limit_seconds: number | null;
+  started_at: string;
+  server_now: string;
+  algo_snapshot?: Record<string, unknown> | null;
+}
+
+export interface QuestionThin {
+  question_id: string;
+  stem: string;
+  options: string[]; // ["A", "B", "C", "D", "E"]
+  media: Array<{ type: string; url: string }>;
+}
+
+export interface AnswerState {
+  selected_index: number | null;
+  marked_for_review: boolean;
+}
+
+export interface QuestionWithAnswerState {
+  session_id: string;
+  index: number; // 1-based
+  question: QuestionThin;
+  answer_state: AnswerState;
+}
+
+export interface PrefetchQuestionsResponse {
+  items: QuestionWithAnswerState[];
+}
+
+export interface AnswerSubmitThinRequest {
+  index: number; // 1-based
+  question_id: string;
+  selected_index?: number | null;
+  marked_for_review?: boolean;
+  client_event_id?: string | null; // For idempotency
+}
+
+export interface AnswerSubmitThinResponse {
+  ok: boolean;
+  server_now: string;
+  answer_state: AnswerState;
+}
+
+export interface SessionSubmitThinResponse {
+  ok: boolean;
+  submitted_at: string;
+  review_url: string;
+}

@@ -5,7 +5,7 @@ from enum import Enum as PyEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 # ============================================================================
 # Event Types Enum
@@ -51,8 +51,9 @@ class TelemetryEventSubmit(BaseModel):
     question_id: UUID | None = Field(None, description="Question ID (optional)")
     payload: dict[str, Any] = Field(default_factory=dict, description="Event-specific payload")
 
-    @validator("payload")
-    def validate_payload_size(self, v):
+    @field_validator("payload")
+    @classmethod
+    def validate_payload_size(cls, v):
         """Ensure payload is not too large."""
         import json
 
@@ -68,8 +69,9 @@ class TelemetryBatchSubmit(BaseModel):
     source: str = Field("web", description="Event source (web, mobile, api)")
     events: list[TelemetryEventSubmit] = Field(..., description="List of events", max_length=50)
 
-    @validator("events")
-    def validate_batch_size(self, v):
+    @field_validator("events")
+    @classmethod
+    def validate_batch_size(cls, v):
         """Ensure batch is not too large."""
         if len(v) > 50:
             raise ValueError("Batch size exceeds 50 events")

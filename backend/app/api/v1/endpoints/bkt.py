@@ -7,11 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db
 from app.learning_engine.bkt.service import (
-    get_user_mastery_state,
-    update_bkt_from_attempt,
+    get_user_mastery,
+    update_from_attempt,
 )
+from app.security.exam_mode_gate import require_not_exam_mode
 from app.learning_engine.bkt.training import (
     build_training_dataset,
     fit_bkt_parameters,
@@ -22,12 +23,13 @@ from app.learning_engine.registry import resolve_active
 from app.learning_engine.runs import log_run_failure, log_run_start, log_run_success
 from app.models.user import User
 from app.schemas.bkt import (
-    BKTRecomputeRequest,
-    BKTRecomputeResponse,
-    BKTRecomputeSummary,
-    BKTUpdateInput,
-    BKTUpdateResult,
-    BKTUserSkillStateResponse,
+    GetMasteryRequest,
+    GetMasteryResponse,
+    MasteryStateResponse,
+    RecomputeMasteryRequest,
+    RecomputeMasteryResponse,
+    UpdateFromAttemptRequest,
+    UpdateFromAttemptResponse,
 )
 
 router = APIRouter()
@@ -41,9 +43,13 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-@router.post("/recompute", response_model=BKTRecomputeResponse)
+@router.post(
+    "/recompute",
+    response_model=RecomputeMasteryResponse,
+    dependencies=[Depends(require_not_exam_mode("bkt_recompute"))],
+)
 async def recompute_bkt_params(
-    request: BKTRecomputeRequest,
+    request: RecomputeMasteryRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
@@ -54,6 +60,7 @@ async def recompute_bkt_params(
     Optionally activates the newly fitted parameters.
 
     **Requires**: Admin role
+    **Blocked**: When exam mode is enabled (423 Locked)
     """
     # Resolve active BKT algorithm version
     algo_version, algo_params_obj = await resolve_active(db, AlgoKey.BKT)
@@ -75,33 +82,32 @@ async def recompute_bkt_params(
             "to_date": request.to_date.isoformat() if request.to_date else None,
             "min_attempts": request.min_attempts,
             "concept_count": len(request.concept_ids) if request.concept_ids else "all",
-            "activate": request.activate_new_params,
+            "activate": request.activate,
         },
     )
 
     try:
-        summary = BKTRecomputeSummary(
-            concepts_processed=0,
-            params_fitted=0,
-            new_algo_version_id=algo_version.id,
-            run_metrics={},
-            errors={},
-        )
+        # Track processing metrics
+        concepts_processed = 0
+        concepts_fitted = 0
+        concepts_skipped = 0
+        errors_dict = {}
+        metrics_summary = {}
 
         # Get concept IDs to process
         concept_ids = request.concept_ids or []
 
         if not concept_ids:
-            # TODO: Query all concept IDs from concepts table
-            # For now, return error
+            # NOTE: Querying all concept IDs requires a concepts table which is not yet implemented.
+            # For now, concept_ids must be explicitly provided.
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="concept_ids must be provided (all-concepts not yet implemented)",
+                detail="concept_ids must be provided. Querying all concepts is not yet implemented (requires concepts table).",
             )
 
         # Process each concept
         for concept_id in concept_ids:
-            summary.concepts_processed += 1
+            concepts_processed += 1
 
             try:
                 # Build training dataset
@@ -115,9 +121,10 @@ async def recompute_bkt_params(
 
                 # Check if sufficient data
                 if not dataset.is_sufficient(min_attempts=request.min_attempts):
-                    summary.errors[concept_id] = (
+                    errors_dict[str(concept_id)] = (
                         f"Insufficient data: {dataset.total_attempts} attempts"
                     )
+                    concepts_skipped += 1
                     continue
 
                 # Fit parameters
@@ -128,7 +135,8 @@ async def recompute_bkt_params(
                 )
 
                 if not is_valid:
-                    summary.errors[concept_id] = f"Fitting failed: {message}"
+                    errors_dict[str(concept_id)] = f"Fitting failed: {message}"
+                    concepts_skipped += 1
                     continue
 
                 # Persist parameters
@@ -141,14 +149,16 @@ async def recompute_bkt_params(
                     from_date=request.from_date,
                     to_date=request.to_date,
                     constraints_applied={},
-                    activate=request.activate_new_params,
+                    activate=request.activate,
                 )
 
-                summary.params_fitted += 1
+                concepts_fitted += 1
+                metrics_summary[str(concept_id)] = metrics
 
             except Exception as e:
                 logger.error(f"Error fitting concept {concept_id}: {e}", exc_info=True)
-                summary.errors[concept_id] = str(e)
+                errors_dict[str(concept_id)] = str(e)
+                concepts_skipped += 1
 
         # Commit all changes
         await db.commit()
@@ -158,22 +168,22 @@ async def recompute_bkt_params(
             db,
             run_id=run.id,
             output_summary={
-                "concepts_processed": summary.concepts_processed,
-                "params_fitted": summary.params_fitted,
-                "errors_count": len(summary.errors),
+                "concepts_processed": concepts_processed,
+                "params_fitted": concepts_fitted,
+                "errors_count": len(errors_dict),
             },
         )
         await db.commit()
 
-        return BKTRecomputeResponse(
-            ok=True,
-            run_id=run.id,
-            algo={
-                "key": algo_version.algo_key.value,
-                "version": algo_version.version,
-            },
-            params_id=algo_params_obj.id,
-            summary=summary,
+        return RecomputeMasteryResponse(
+            run_id=str(run.id),
+            algo_version=f"{algo_version.algo_key}:{algo_version.version}",
+            concepts_processed=concepts_processed,
+            concepts_fitted=concepts_fitted,
+            concepts_skipped=concepts_skipped,
+            metrics_summary=metrics_summary,
+            dry_run=request.dry_run,
+            activated=request.activate,
         )
 
     except Exception as e:
@@ -189,9 +199,9 @@ async def recompute_bkt_params(
         ) from e
 
 
-@router.post("/update", response_model=BKTUpdateResult)
+@router.post("/update", response_model=UpdateFromAttemptResponse)
 async def update_bkt_mastery(
-    request: BKTUpdateInput,
+    request: UpdateFromAttemptRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -238,7 +248,7 @@ async def update_bkt_mastery(
         ) from e
 
 
-@router.get("/mastery", response_model=list[BKTUserSkillStateResponse])
+@router.get("/mastery", response_model=list[MasteryStateResponse])
 async def get_bkt_mastery(
     user_id: UUID | None = None,
     concept_id: UUID | None = None,
@@ -265,7 +275,8 @@ async def get_bkt_mastery(
         )
 
     try:
-        states = await get_user_mastery_state(db, target_user_id, concept_id)
+        concept_ids = [concept_id] if concept_id else None
+        states = await get_user_mastery(db, target_user_id, concept_ids)
         return states
 
     except Exception as e:

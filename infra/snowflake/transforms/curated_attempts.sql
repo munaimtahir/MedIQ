@@ -1,0 +1,84 @@
+-- Transform: CURATED_ATTEMPT materialized view refresh
+-- This script refreshes the CURATED_ATTEMPT view with latest RAW data
+-- Run after loading new RAW_FACT_ATTEMPT data
+
+-- Option 1: Refresh view (if using view)
+-- REFRESH MATERIALIZED VIEW CURATED_ATTEMPT;
+
+-- Option 2: Recreate as table (if using table)
+-- DROP TABLE IF EXISTS CURATED_ATTEMPT;
+-- CREATE TABLE CURATED_ATTEMPT AS
+-- SELECT DISTINCT
+--     a.attempt_id,
+--     a.user_id,
+--     a.session_id,
+--     a.question_id,
+--     a.attempted_at,
+--     a.is_correct,
+--     COALESCE(a.concept_id, a.theme_id) AS concept_id,
+--     a.theme_id,
+--     a.block_id,
+--     a.year,
+--     a.selected_index,
+--     a.correct_index,
+--     a.time_spent_ms,
+--     a.changed_answer_count,
+--     a.marked_for_review,
+--     a.difficulty_snapshot,
+--     a.difficulty_value,
+--     a.elo_user_before,
+--     a.elo_user_after,
+--     a.elo_question_before,
+--     a.elo_question_after,
+--     a.algo_profile,
+--     a.algo_versions,
+--     q.question_text,
+--     q.question_type,
+--     q.difficulty_label AS question_difficulty_label,
+--     a._export_version,
+--     a._generated_at,
+--     a._loaded_at
+-- FROM RAW_FACT_ATTEMPT a
+-- LEFT JOIN RAW_DIM_QUESTION q ON a.question_id = q.question_id
+-- WHERE a._loaded_at IS NOT NULL
+-- QUALIFY ROW_NUMBER() OVER (PARTITION BY a.attempt_id ORDER BY a._loaded_at DESC) = 1;
+
+-- Incremental update (if using table with incremental loads)
+-- INSERT INTO CURATED_ATTEMPT
+-- SELECT DISTINCT
+--     a.attempt_id,
+--     a.user_id,
+--     a.session_id,
+--     a.question_id,
+--     a.attempted_at,
+--     a.is_correct,
+--     COALESCE(a.concept_id, a.theme_id) AS concept_id,
+--     a.theme_id,
+--     a.block_id,
+--     a.year,
+--     a.selected_index,
+--     a.correct_index,
+--     a.time_spent_ms,
+--     a.changed_answer_count,
+--     a.marked_for_review,
+--     a.difficulty_snapshot,
+--     a.difficulty_value,
+--     a.elo_user_before,
+--     a.elo_user_after,
+--     a.elo_question_before,
+--     a.elo_question_after,
+--     a.algo_profile,
+--     a.algo_versions,
+--     q.question_text,
+--     q.question_type,
+--     q.difficulty_label AS question_difficulty_label,
+--     a._export_version,
+--     a._generated_at,
+--     a._loaded_at
+-- FROM RAW_FACT_ATTEMPT a
+-- LEFT JOIN RAW_DIM_QUESTION q ON a.question_id = q.question_id
+-- WHERE a._loaded_at > (SELECT MAX(_loaded_at) FROM CURATED_ATTEMPT)
+-- QUALIFY ROW_NUMBER() OVER (PARTITION BY a.attempt_id ORDER BY a._loaded_at DESC) = 1;
+
+-- Note: Actual implementation depends on whether CURATED_ATTEMPT is a view or table
+-- For now, this is a template showing the logic

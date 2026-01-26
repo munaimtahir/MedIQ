@@ -353,6 +353,163 @@ If telemetry impacts performance:
 
 ---
 
+## IRT Calibration Metrics (Shadow)
+
+IRT calibration runs emit metrics for **offline evaluation and admin visibility** only. They are not used for student-facing decisions unless `FEATURE_IRT_ACTIVE` is enabled.
+
+**⚠️ Runtime Framework:** IRT is fully integrated with the algorithm runtime system. Freeze mode blocks all IRT calibration execution. See [Algorithm Runtime Management](../docs/runbook.md#algorithm-runtime-management) for details.
+
+### Emitted metrics
+
+| Metric | Description | Where stored |
+|--------|-------------|--------------|
+| **logloss** | Binary cross-entropy on validation set | `irt_calibration_run.metrics`, `eval_metric` |
+| **brier** | Brier score on validation set | `irt_calibration_run.metrics`, `eval_metric` |
+| **ece** | Expected calibration error (bins) | `irt_calibration_run.metrics`, `eval_metric` |
+| **stability** | Parameter drift vs previous run (optional) | `irt_calibration_run.metrics` |
+| **info_curve_summary** | Test information at theta grid | `irt_calibration_run.metrics` |
+| **n_train**, **n_val** | Train/validation sample sizes | `irt_calibration_run.metrics` |
+
+### Storage
+
+- **`irt_calibration_run.metrics`** (JSONB): Full set of IRT-specific metrics.
+- **Evaluation harness**: Each run creates an **eval run** (suite `irt_2pl` or `irt_3pl`) with **logloss**, **Brier**, **ECE** stored as `eval_metric` rows. Calibration curve data stored as `eval_curve`.
+
+### Artifacts
+
+- **`backend/artifacts/irt/<run_id>/summary.json`**: Run summary, metrics, n_items, n_users.
+- Eval artifacts (e.g. reliability curve) follow the evaluation harness layout.
+
+### Block Reasons
+
+**Freeze Mode:**
+- When `freeze_updates=true`, IRT calibration runs are blocked
+- Run status set to `FAILED` with error: "Calibration blocked: freeze_updates mode is enabled. All learning state writes are paused."
+- Query blocked runs: `SELECT * FROM irt_calibration_run WHERE status = 'FAILED' AND error LIKE '%freeze_updates%';`
+
+**Activation Events:**
+- All activation/deactivation events logged in `irt_activation_event`
+- Includes confirmation phrase status in event `new_state.details`
+- Query recent events: `SELECT * FROM irt_activation_event ORDER BY created_at DESC LIMIT 20;`
+
+---
+
+## Rank Prediction Metrics (Shadow)
+
+Rank prediction runs emit metrics for **offline evaluation and admin visibility** only. They are not used for student-facing decisions unless explicitly activated via runtime override and feature flags.
+
+**⚠️ Runtime Framework:** Rank is fully integrated with the algorithm runtime system. Freeze mode blocks all rank snapshot computation. See [Algorithm Runtime Management](../docs/runbook.md#algorithm-runtime-management) for details.
+
+### Emitted metrics
+
+| Metric | Description | Where stored |
+|--------|-------------|--------------|
+| **coverage** | Fraction of users with `ok` status (vs `insufficient_data`, `unstable`) | `rank_model_run.metrics` |
+| **stability** | Median absolute percentile change week-to-week | `rank_model_run.metrics` |
+| **rank_correlation** | Spearman correlation of user ranks across time windows | `rank_model_run.metrics` |
+| **n_users** | Number of users in cohort | `rank_model_run.metrics` |
+| **n_ok** | Number of users with `ok` status | `rank_model_run.metrics` |
+| **theta_proxy_stats** | Summary stats (mean, median, std) of theta_proxy distribution | `rank_model_run.metrics` |
+
+### Storage
+
+- **`rank_model_run.metrics`** (JSONB): Full set of rank-specific metrics (coverage, stability, rank_correlation, n_users, n_ok, theta_proxy_stats).
+- **`rank_prediction_snapshot`**: Per-user snapshots with:
+  - `theta_proxy`: Ability proxy (Elo or mastery-weighted)
+  - `predicted_percentile`: Percentile (0..1)
+  - `band_low`, `band_high`: Uncertainty bands
+  - `status`: `ok`, `insufficient_data`, `unstable`, `blocked_frozen`, `disabled`
+
+### Artifacts
+
+- **Rank snapshots**: Stored directly in `rank_prediction_snapshot` table (no file artifacts)
+- **Rank runs**: Metadata and metrics stored in `rank_model_run` table
+- **Activation events**: Audit trail in `rank_activation_event` table
+
+### Block Reasons
+
+**Freeze Mode:**
+- When `freeze_updates=true`, rank snapshot computation is blocked
+- Snapshot status set to `BLOCKED_FROZEN`
+- Run status set to `BLOCKED_FROZEN`
+- Query blocked snapshots: `SELECT * FROM rank_prediction_snapshot WHERE status = 'blocked_frozen';`
+- Query blocked runs: `SELECT * FROM rank_model_run WHERE status = 'BLOCKED_FROZEN';`
+
+**Activation Events:**
+- All activation/deactivation events logged in `rank_activation_event`
+- Includes confirmation phrase status in event details
+- Query recent events: `SELECT * FROM rank_activation_event ORDER BY created_at DESC LIMIT 20;`
+
+**Status Values:**
+- **`ok`**: Snapshot computed successfully
+- **`insufficient_data`**: User lacks sufficient data for theta_proxy (falls back to zero)
+- **`unstable`**: Percentile changed significantly week-to-week (exceeds stability threshold)
+- **`blocked_frozen`**: Computation blocked due to `freeze_updates=true`
+- **`disabled`**: Rank module disabled (runtime override `"rank": "v0"`)
+
+---
+
+## Graph Revision Metrics (Shadow)
+
+Graph revision runs emit metrics for **offline evaluation and admin visibility** only. They are not used for student-facing decisions unless explicitly activated via runtime override and feature flags.
+
+**⚠️ Runtime Framework:** Graph revision is fully integrated with the algorithm runtime system. Freeze mode blocks all graph revision plan computation. See [Algorithm Runtime Management](../docs/runbook.md#algorithm-runtime-management) for details.
+
+### Emitted metrics
+
+| Metric | Description | Where stored |
+|--------|-------------|--------------|
+| **coverage** | Fraction of active themes with at least one prerequisite edge | `graph_revision_run.metrics` |
+| **injection_rate** | Average fraction of baseline themes that received prerequisite injections | `graph_revision_run.metrics` |
+| **neo4j_availability** | Neo4j availability status (boolean or success rate) | `graph_revision_run.metrics` |
+| **cycle_count** | Number of cycles detected in prerequisite graph | `graph_revision_run.metrics` |
+| **n_users_processed** | Number of users for whom shadow plans were computed | `graph_revision_run.metrics` |
+| **n_plans_baseline** | Number of plans that fell back to baseline (Neo4j unavailable) | `graph_revision_run.metrics` |
+| **n_plans_shadow** | Number of plans that used graph augmentation | `graph_revision_run.metrics` |
+
+### Storage
+
+- **`graph_revision_run.metrics`** (JSONB): Full set of graph revision-specific metrics (coverage, injection_rate, neo4j_availability, cycle_count, n_users_processed, n_plans_baseline, n_plans_shadow).
+- **`shadow_revision_plan`**: Per-user shadow plans with:
+  - `baseline_count`: Number of baseline due themes
+  - `injected_count`: Number of prerequisite themes injected
+  - `plan_json`: Ordered list of plan items with explainability
+  - `mode`: `"baseline"` (Neo4j unavailable) or `"shadow"` (graph-augmented)
+
+### Artifacts
+
+- **Shadow plans**: Stored directly in `shadow_revision_plan` table (no file artifacts)
+- **Graph revision runs**: Metadata and metrics stored in `graph_revision_run` table
+- **Prerequisite edges**: Authoritative source in `prereq_edges` table (synced to Neo4j)
+- **Sync runs**: Tracking in `prereq_sync_run` table
+- **Activation events**: Audit trail in `graph_revision_activation_event` table
+
+### Block Reasons
+
+**Freeze Mode:**
+- When `freeze_updates=true`, graph revision plan computation is blocked
+- Plans return `None` (not stored)
+- Run status set to `BLOCKED_FROZEN`
+- Query blocked runs: `SELECT * FROM graph_revision_run WHERE status = 'BLOCKED_FROZEN';`
+
+**Neo4j Unavailability:**
+- When Neo4j is unavailable, plans fall back to baseline mode
+- Plans stored with `mode="baseline"` and `injected_count=0`
+- Query baseline-only plans: `SELECT * FROM shadow_revision_plan WHERE mode = 'baseline';`
+
+**Activation Events:**
+- All activation/deactivation events logged in `graph_revision_activation_event`
+- Includes confirmation phrase status in event details
+- Query recent events: `SELECT * FROM graph_revision_activation_event ORDER BY created_at DESC LIMIT 20;`
+
+**Status Values:**
+- **`baseline`**: Plan computed without graph augmentation (Neo4j unavailable or no prerequisites)
+- **`shadow`**: Plan computed with graph augmentation (prerequisites injected)
+- **`BLOCKED_FROZEN`**: Computation blocked due to `freeze_updates=true`
+- **`DISABLED`**: Graph revision module disabled (runtime override `"graph_revision": "v0"`)
+
+---
+
 ## Best Practices
 
 ### DO

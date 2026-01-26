@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import type { SystemInfo } from "@/lib/admin/settings/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, XCircle } from "lucide-react";
+import { ExamModeCard } from "./ExamModeCard";
+import { FreezeUpdatesCard } from "./FreezeUpdatesCard";
+import { useSystemInfo } from "@/lib/admin/settings/hooks";
 
 interface SystemInfoProps {
   info: SystemInfo | null;
@@ -97,5 +100,15 @@ export function SystemInfo({ info, loading }: SystemInfoProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function SystemControls() {
+  return (
+    <div className="space-y-6">
+      <ExamModeCard />
+      <FreezeUpdatesCard />
+      <SystemInfo info={null} loading={false} />
+    </div>
   );
 }

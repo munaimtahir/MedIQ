@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://backend:8000";
 
-export async function POST(request: NextRequest, { params }: { params: { type: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ type: string }> }) {
   try {
+    const { type } = await params;
     const cookies = request.headers.get("cookie") || "";
     const { searchParams } = new URL(request.url);
     const dryRun = searchParams.get("dry_run") === "true";
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: { type: s
       queryParams.set("auto_create", "true");
     }
 
-    const url = `${BACKEND_URL}/v1/admin/syllabus/import/${params.type}?${queryParams.toString()}`;
+    const url = `${BACKEND_URL}/v1/admin/syllabus/import/${type}?${queryParams.toString()}`;
 
     // Extract access token from cookies for Authorization header
     const accessTokenMatch = cookies.match(/access_token=([^;]+)/);

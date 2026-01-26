@@ -4,14 +4,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { backendFetch } from "@/lib/server/backendClient";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const cookies = request.headers.get("cookie") || "";
 
     const { data } = await backendFetch<{
       message: string;
       email_sent: boolean;
-    }>(`/admin/users/${params.id}/password-reset`, {
+    }>(`/admin/users/${id}/password-reset`, {
       method: "POST",
       cookies,
     });
