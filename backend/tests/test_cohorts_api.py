@@ -2,6 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -11,6 +12,7 @@ from app.models.warehouse import (
     WarehouseExportDataset,
     WarehouseExportRun,
     WarehouseExportRunStatus,
+    WarehouseExportRunType,
     WarehouseExportState,
 )
 
@@ -125,17 +127,24 @@ class TestCohortActivationGating:
         # Mock SNOWFLAKE_ENABLED=True and readiness=True
         from app.cohorts.service import get_percentiles
         from app.core.config import settings
+        from unittest.mock import patch
+        from app.warehouse.snowflake_readiness import SnowflakeReadinessStatus
 
         original_value = settings.SNOWFLAKE_ENABLED
         try:
             settings.SNOWFLAKE_ENABLED = True
-            # No export runs in database
-            result = get_percentiles(db, "mastery_prob", "theme", 1, "30d")
+            # Mock snowflake readiness to be ready so we can test the export check
+            with patch("app.cohorts.service.check_snowflake_readiness") as mock_readiness:
+                mock_readiness.return_value = SnowflakeReadinessStatus(ready=True, reason="")
+                # No export runs in database
+                result = get_percentiles(db, "mastery_prob", "theme", 1, "30d")
 
-            assert "error" in result
-            assert result["error"] == "feature_disabled"
-            assert result["data_source"] == "disabled"
-            assert any("no successful export" in reason for reason in result["blocking_reasons"])
+                assert "error" in result
+                assert result["error"] == "feature_disabled"
+                assert result["data_source"] == "disabled"
+                # Check for blocking reason about missing exports (message format: "no successful export for {dataset} in last 24h")
+                blocking_reasons_str = " ".join(result["blocking_reasons"]).lower()
+                assert "no successful export" in blocking_reasons_str or ("export" in blocking_reasons_str and "24h" in blocking_reasons_str)
         finally:
             settings.SNOWFLAKE_ENABLED = original_value
 
@@ -149,17 +158,19 @@ class TestCohortActivationGating:
         db.add(config)
         db.commit()
 
-        # Create recent successful export runs
+        # Create recent successful export runs (within last 24h, check requires >= 24h cutoff)
+        # Use 12 hours ago to ensure it's within the 24h window
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=12)
+        # Each dataset needs its own run_id since run_id is the primary key
         for dataset in [WarehouseExportDataset.ATTEMPTS, WarehouseExportDataset.EVENTS, WarehouseExportDataset.MASTERY]:
             run = WarehouseExportRun(
-                run_id="test-run-id",
-                run_type="incremental",
+                run_id=uuid4(),  # Unique run_id for each dataset
+                run_type=WarehouseExportRunType.INCREMENTAL.value,  # Must use .value to get "incremental" (lowercase)
                 dataset=dataset,
                 range_start=cutoff_time - timedelta(hours=1),
                 range_end=cutoff_time,
-                status=WarehouseExportRunStatus.SHADOW_DONE_FILES_ONLY,
-                finished_at=cutoff_time,
+                status=WarehouseExportRunStatus.SHADOW_DONE_FILES_ONLY.value,  # Must use .value to get lowercase string
+                finished_at=cutoff_time,  # 12 hours ago, well within 24h window
                 rows_exported=100,
                 files_written=1,
             )

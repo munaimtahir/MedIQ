@@ -117,10 +117,21 @@ jobs:
       - name: Run pip-audit
         run: pip-audit -f json -o backend-audit.json || true
 
+      - name: Set FAIL_ON_HIGH
+        id: set_fail_on_high
+        env:
+          VAR_VALUE: ${{ vars.FAIL_ON_HIGH || '0' }}
+        run: |
+          if [ "$VAR_VALUE" == "1" ]; then
+            echo "value=1" >> $GITHUB_OUTPUT
+          else
+            echo "value=0" >> $GITHUB_OUTPUT
+          fi
+
       - name: Audit check backend
         run: python scripts/audit_check_backend.py
         env:
-          FAIL_ON_HIGH: ${{ vars.FAIL_ON_HIGH == '1' && '1' || '0' }}
+          FAIL_ON_HIGH: ${{ steps.set_fail_on_high.outputs.value }}
 
       - name: Install frontend dependencies
         working-directory: frontend

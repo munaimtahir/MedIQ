@@ -63,8 +63,23 @@ class TestAuditCompleteness:
         """Test that write_audit_critical includes all required fields."""
         from fastapi import Request
         from starlette.datastructures import Headers
+        from app.models.user import User, UserRole
+        from app.core.security import hash_password
         
+        # Create a user first to satisfy foreign key constraint
         user_id = uuid4()
+        user = User(
+            id=user_id,
+            email="test@example.com",
+            password_hash=hash_password("Test123!"),
+            full_name="Test User",
+            role=UserRole.ADMIN.value,
+            is_active=True,
+            email_verified=True,
+        )
+        db.add(user)
+        db.commit()
+        
         entity_id = uuid4()
         
         # Create a mock request

@@ -1,11 +1,16 @@
 """Tests for CSP report endpoint."""
 
 import json
+import os
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+# Disable Redis before importing app to prevent connection attempts
+os.environ["REDIS_ENABLED"] = "false"
 
 from app.main import app
 from app.models.csp_report import CSPReport
@@ -16,16 +21,30 @@ from app.models.user import User, UserRole
 def client(db: Session):
     """Create test client with database dependency override."""
     from app.db.session import get_db
+    import os
+    from unittest.mock import patch
 
     def override_get_db():
         yield db
 
+    # Disable Redis via environment variable to prevent connection attempts
+    original_redis_enabled = os.environ.get("REDIS_ENABLED", "true")
+    os.environ["REDIS_ENABLED"] = "false"
+    
     app.dependency_overrides[get_db] = override_get_db
     try:
-        with TestClient(app) as c:
-            yield c
+        # Patch Redis client where it's imported and used
+        # The rate_limit module imports from app.core.redis_client
+        with patch("app.security.rate_limit.get_redis_client", return_value=None):
+            with TestClient(app) as c:
+                yield c
     finally:
         app.dependency_overrides.clear()
+        # Restore original Redis setting
+        if original_redis_enabled:
+            os.environ["REDIS_ENABLED"] = original_redis_enabled
+        elif "REDIS_ENABLED" in os.environ:
+            del os.environ["REDIS_ENABLED"]
 
 
 def test_csp_report_endpoint_accepts_valid_report(client: TestClient, db: Session):

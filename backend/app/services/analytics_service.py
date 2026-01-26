@@ -79,6 +79,7 @@ async def get_overview(db: AsyncSession, user_id: UUID) -> dict[str, Any]:
 
     questions_answered = sum(1 for a in answers if a.selected_index is not None)
     correct = sum(1 for a in answers if a.is_correct is True)
+    # Accuracy is correct / questions_seen (all questions in session)
     accuracy_pct = round((correct / questions_seen * 100), 2) if questions_seen > 0 else 0.0
 
     # By block breakdown

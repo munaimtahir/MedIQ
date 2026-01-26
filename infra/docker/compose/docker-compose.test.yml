@@ -9,7 +9,7 @@ services:
     ports:
       - "${TEST_POSTGRES_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TEST_DATABASE_USER:-exam_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_DATABASE_USER:-exam_user} -d ${TEST_DATABASE_NAME:-exam_platform_test}"]
       interval: 5s
       timeout: 3s
       retries: 10

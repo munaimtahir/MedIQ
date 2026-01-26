@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/queue", response_model=SRSQueueResponse)
 async def get_srs_queue(
-    scope: str = Query("today", regex="^(today|week)$"),
+    scope: str = Query("today", pattern="^(today|week)$"),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

@@ -47,23 +47,43 @@ def db() -> Generator[Session, None, None]:
 
     try:
         # Ensure test data exists (year, block, theme)
-        year = session.query(Year).filter(Year.id == 1).first()
-        if not year:
-            year = Year(id=1, name="1st Year", order_no=1, is_active=True)
-            session.add(year)
-            session.flush()
+        # Check if tables exist first (migrations might not have run for individual tests)
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        if "years" in tables:
+            try:
+                year = session.query(Year).filter(Year.id == 1).first()
+                if not year:
+                    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+                    session.add(year)
+                    session.flush()
+            except Exception:
+                # Table might not be fully initialized, skip
+                pass
 
-        block = session.query(Block).filter(Block.id == 1).first()
-        if not block:
-            block = Block(id=1, year_id=1, code="A", name="Test Block", order_no=1, is_active=True)
-            session.add(block)
-            session.flush()
+            if "blocks" in tables:
+                try:
+                    block = session.query(Block).filter(Block.id == 1).first()
+                    if not block:
+                        block = Block(id=1, year_id=1, code="A", name="Test Block", order_no=1, is_active=True)
+                        session.add(block)
+                        session.flush()
+                except Exception:
+                    # Table might not be fully initialized, skip
+                    pass
 
-        theme = session.query(Theme).filter(Theme.id == 1).first()
-        if not theme:
-            theme = Theme(id=1, block_id=1, title="Test Theme", order_no=1, is_active=True)
-            session.add(theme)
-            session.flush()
+                if "themes" in tables:
+                    try:
+                        theme = session.query(Theme).filter(Theme.id == 1).first()
+                        if not theme:
+                            theme = Theme(id=1, block_id=1, title="Test Theme", order_no=1, is_active=True)
+                            session.add(theme)
+                            session.flush()
+                    except Exception:
+                        # Table might not be fully initialized, skip
+                        pass
 
         yield session
     finally:

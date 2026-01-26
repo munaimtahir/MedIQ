@@ -50,16 +50,16 @@ class WarehouseExportRun(Base):
 
     run_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_type = Column(
-        ENUM(WarehouseExportRunType, name="warehouse_export_run_type", create_type=False),
+        ENUM(WarehouseExportRunType, name="warehouse_export_run_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     status = Column(
-        ENUM(WarehouseExportRunStatus, name="warehouse_export_run_status", create_type=False),
+        ENUM(WarehouseExportRunStatus, name="warehouse_export_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=WarehouseExportRunStatus.QUEUED.value,
     )
     dataset = Column(
-        ENUM(WarehouseExportDataset, name="warehouse_export_dataset", create_type=False),
+        ENUM(WarehouseExportDataset, name="warehouse_export_dataset", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     range_start = Column(DateTime(timezone=True), nullable=True)
