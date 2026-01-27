@@ -257,7 +257,7 @@ function LoginForm() {
       )}
 
       {/* Email Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" data-testid="login-form">
         {/* OAuth-only message */}
         {oauthOnlyProvider && (
           <div data-animate className="rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -301,6 +301,7 @@ function LoginForm() {
             }}
             autoComplete="email"
             disabled={loading || !!oauthOnlyProvider}
+            data-testid="login-email-input"
             className={`h-11 rounded-lg border-slate-200 bg-white focus:border-primary focus:ring-primary ${
               errors.email ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""
             } ${oauthOnlyProvider ? "cursor-not-allowed opacity-50" : ""}`}
@@ -380,6 +381,7 @@ function LoginForm() {
             type="submit"
             disabled={loading || !!oauthOnlyProvider}
             className="h-11 w-full rounded-lg bg-primary font-semibold text-white transition-all duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="login-submit-button"
           >
             {loading ? (
               <>

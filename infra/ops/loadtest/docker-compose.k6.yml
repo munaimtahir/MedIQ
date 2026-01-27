@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  k6:
+    image: grafana/k6:latest
+    container_name: exam_platform_k6
+    volumes:
+      - ./k6:/scripts
+      - ./k6-results:/results
+    environment:
+      - BASE_URL=${BASE_URL:-http://backend:8000}
+      - STUDENT_USER=${STUDENT_USER:-student-1@example.com}
+      - STUDENT_PASS=${STUDENT_PASS:-StudentPass123!}
+      - ADMIN_USER=${ADMIN_USER:-}
+      - ADMIN_PASS=${ADMIN_PASS:-}
+      - VUS=${VUS:-10}
+      - DURATION=${DURATION:-2m}
+      - BASE_VUS=${BASE_VUS:-5}
+      - SPIKE_VUS=${SPIKE_VUS:-50}
+      - X_TEST_RUN_ID=${X_TEST_RUN_ID:-}
+      - K6_SCRIPT=${K6_SCRIPT:-concurrent_sessions.js}
+    networks:
+      - exam_platform_network
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      SCRIPT=$${K6_SCRIPT:-concurrent_sessions.js} &&
+      k6 run /scripts/$$SCRIPT
+      --out json=/results/k6-results.json
+      --summary-export=/results/k6-summary.json
+    depends_on:
+      - backend
+    restart: "no"
+
+networks:
+  exam_platform_network:
+    external: true
+    name: exam_platform_network

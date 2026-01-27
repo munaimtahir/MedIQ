@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exam-platform-config
+  namespace: exam-platform
+data:
+  # Application settings
+  ENV: "prod"
+  PROJECT_NAME: "Medical Exam Platform API"
+  LOG_LEVEL: "INFO"
+  
+  # CORS settings
+  CORS_ALLOW_METHODS: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+  CORS_ALLOW_HEADERS: "Authorization,Content-Type,X-Request-ID"
+  CORS_EXPOSE_HEADERS: "X-Request-ID,X-Response-Time-ms,X-DB-Queries,X-DB-Time-ms"
+  CORS_ALLOW_CREDENTIALS: "false"
+  
+  # Uvicorn settings
+  UVICORN_WORKERS: "5"
+  UVICORN_TIMEOUT_KEEP_ALIVE: "5"
+  UVICORN_LIMIT_CONCURRENCY: "200"
+  UVICORN_LIMIT_MAX_REQUESTS: "10000"
+  
+  # Redis settings
+  REDIS_ENABLED: "true"
+  REDIS_REQUIRED: "false"
+  
+  # Frontend settings
+  NEXT_PUBLIC_ENV: "production"
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"

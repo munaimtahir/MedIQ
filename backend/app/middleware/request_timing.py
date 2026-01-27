@@ -17,8 +17,10 @@ import time
 import uuid
 from typing import Any
 
+import structlog
+
 from app.core.config import settings
-from app.core.logging import get_logger
+from app.observability.logging import get_logger
 from app.db.session import SessionLocal
 from app.middleware.request_context import (
     db_query_count_var,
@@ -64,6 +66,18 @@ class RequestTimingMiddleware:
         token_db_q = db_query_count_var.set(0)
         token_db_ms = db_total_ms_var.set(0.0)
 
+        # Bind request_id to structlog context for all logs in this request
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+
+        # Log request lifecycle: request.start
+        logger.info(
+            "request.start",
+            request_id=request_id,
+            method=scope.get("method"),
+            path=scope.get("path"),
+            route=scope.get("route", {}).get("path") if scope.get("route") else None,
+        )
+
         status_code: int | None = None
 
         async def send_wrapper(message: dict[str, Any]) -> None:
@@ -94,6 +108,11 @@ class RequestTimingMiddleware:
             db_queries = int(db_query_count_var.get() or 0)
             db_ms = int(float(db_total_ms_var.get() or 0.0))
 
+            # Log sampling for high-volume endpoints (health, metrics, etc.)
+            path = str(scope.get("path") or "")
+            is_high_volume = path in ["/health", "/metrics", "/v1/health", "/"]
+            sample_rate = 0.1 if is_high_volume else 1.0  # Sample 10% of high-volume endpoints
+
             user = None
             try:
                 user = (scope.get("state") or {}).get("user")
@@ -109,24 +128,31 @@ class RequestTimingMiddleware:
                     user_id = None
                     user_role = None
 
-            extra = {
-                "event": "request",
-                "request_id": request_id,
-                "method": scope.get("method"),
-                "path": scope.get("path"),
-                "status_code": status_code,
-                "total_ms": total_ms,
-                "db_query_count": db_queries,
-                "db_total_ms": db_ms,
-            }
-            if user_id:
-                extra["user_id"] = user_id
-            if user_role:
-                extra["user_role"] = user_role
-            sev = _severity_for_ms(total_ms)
-            if sev:
-                extra["severity"] = sev
-            logger.info("perf", extra=extra)
+            # Log request lifecycle: request.end (with sampling for high-volume endpoints)
+            if random.random() < sample_rate:
+                log_data: dict[str, Any] = {
+                    "event": "request.end",
+                    "request_id": request_id,
+                    "method": scope.get("method"),
+                    "path": scope.get("path"),
+                    "route": scope.get("route", {}).get("path") if scope.get("route") else None,
+                    "status_code": status_code,
+                    "duration_ms": total_ms,
+                    "db_query_count": db_queries,
+                    "db_total_ms": db_ms,
+                }
+                if user_id:
+                    log_data["user_id"] = user_id
+                if user_role:
+                    log_data["user_role"] = user_role
+                sev = _severity_for_ms(total_ms)
+                if sev:
+                    log_data["severity"] = sev
+                if is_high_volume:
+                    log_data["sampled"] = True
+                    log_data["sample_rate"] = sample_rate
+                
+                logger.info("request.end", **log_data)
 
             try:
                 sample_rate = float(getattr(settings, "PERF_SAMPLE_RATE", 0.01))
@@ -150,6 +176,9 @@ class RequestTimingMiddleware:
                     )
                 )
 
+            # Clear structlog context
+            structlog.contextvars.clear_contextvars()
+            
             request_id_var.reset(token_request_id)
             db_query_count_var.reset(token_db_q)
             db_total_ms_var.reset(token_db_ms)

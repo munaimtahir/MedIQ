@@ -186,7 +186,7 @@ export default function RevisionPage() {
               description="Great job! You're all caught up. Check back tomorrow for new revision items."
             />
           ) : (
-            <Table>
+            <Table data-testid="revision-themes-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Theme</TableHead>

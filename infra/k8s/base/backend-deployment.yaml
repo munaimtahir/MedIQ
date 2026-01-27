@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: exam-platform
+  labels:
+    app: backend
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: api
+    spec:
+      containers:
+      - name: backend
+        image: ghcr.io/OWNER/REPO-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: REDIS_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: JWT_SECRET
+        - name: JWT_ACCESS_TTL_MIN
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: JWT_ACCESS_TTL_MIN
+        - name: JWT_REFRESH_TTL_DAYS
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: JWT_REFRESH_TTL_DAYS
+        - name: AUTH_TOKEN_PEPPER
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: AUTH_TOKEN_PEPPER
+        - name: MFA_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: MFA_ENCRYPTION_KEY
+        - name: CORS_ALLOW_ORIGINS_PUBLIC
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: CORS_ALLOW_ORIGINS_PUBLIC
+              optional: true
+        - name: CORS_ALLOW_ORIGINS_APP
+          valueFrom:
+            secretKeyRef:
+              name: exam-platform-secrets
+              key: CORS_ALLOW_ORIGINS_APP
+        envFrom:
+        - configMapRef:
+            name: exam-platform-config
+        livenessProbe:
+          httpGet:
+            path: /v1/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1500m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL

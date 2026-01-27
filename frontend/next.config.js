@@ -30,6 +30,9 @@ const nextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
+  
+  // Enable standalone output for Docker (minimal runtime dependencies)
+  output: 'standalone',
 };
 
 module.exports = nextConfig;

@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.observability.tracing import get_safe_user_id, set_span_error, tracer
 from app.models.question_cms import Question, QuestionStatus
 from app.models.session import (
     SessionAnswer,
@@ -45,7 +46,24 @@ async def select_questions(
     Raises:
         HTTPException: If not enough questions available
     """
-    # Build query for eligible PUBLISHED questions
+    # Create span for question selection
+    with tracer.start_as_current_span("question.select") as span:
+        try:
+            # Set span attributes
+            if span.is_recording():
+                span.set_attribute("user.id", str(user_id))
+                span.set_attribute("question_selection.year", str(filters.year))
+                span.set_attribute("question_selection.count", filters.count)
+                if filters.blocks:
+                    span.set_attribute("question_selection.blocks_count", len(filters.blocks))
+                if filters.themes:
+                    span.set_attribute("question_selection.themes_count", len(filters.themes))
+                if filters.difficulty:
+                    span.set_attribute("question_selection.difficulty_count", len(filters.difficulty))
+                if filters.cognitive:
+                    span.set_attribute("question_selection.cognitive_count", len(filters.cognitive))
+
+            # Build query for eligible PUBLISHED questions
     query = select(Question.id).where(
         Question.status == QuestionStatus.PUBLISHED,
         Question.year_id == filters.year,
@@ -93,10 +111,19 @@ async def select_questions(
     shuffled_ids = eligible_ids.copy()
     rng.shuffle(shuffled_ids)
 
-    # Take first N questions
-    selected_ids = shuffled_ids[: filters.count]
+            # Take first N questions
+            selected_ids = shuffled_ids[: filters.count]
 
-    return selected_ids
+            # Set final attributes on span
+            if span.is_recording():
+                span.set_attribute("question_selection.selected_count", len(selected_ids))
+                span.set_attribute("question_selection.eligible_count", len(eligible_ids))
+
+            return selected_ids
+        except Exception as e:
+            # Record exception on span
+            set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)
+            raise
 
 
 async def create_session(
@@ -118,107 +145,141 @@ async def create_session(
     Raises:
         HTTPException: If invalid filters or not enough questions
     """
-    # Create session ID and seed
-    session_id = uuid.uuid4()
-    started_at = datetime.utcnow()
+    # Create span for session creation
+    with tracer.start_as_current_span("session.start") as span:
+        try:
+            # Create session ID and seed
+            session_id = uuid.uuid4()
+            started_at = datetime.utcnow()
 
-    # Generate deterministic seed
-    seed_parts = [
-        str(user_id),
-        str(filters.year),
-        ",".join(sorted(filters.blocks)),
-        ",".join(map(str, sorted(filters.themes or []))),
-        filters.mode.value,
-        started_at.date().isoformat(),
-    ]
-    seed_string = ":".join(seed_parts)
-    session_seed = hashlib.sha256(seed_string.encode()).hexdigest()
+            # Set span attributes
+            if span.is_recording():
+                span.set_attribute("session.id", str(session_id))
+                span.set_attribute("user.id", str(user_id))
+                span.set_attribute("session.mode", filters.mode.value if hasattr(filters.mode, "value") else str(filters.mode))
+                span.set_attribute("session.year", str(filters.year))
+                if filters.blocks:
+                    span.set_attribute("session.blocks_count", len(filters.blocks))
+                if filters.themes:
+                    span.set_attribute("session.themes_count", len(filters.themes))
+                if filters.count:
+                    span.set_attribute("session.question_count", filters.count)
+                if filters.duration_seconds:
+                    span.set_attribute("session.duration_seconds", filters.duration_seconds)
 
-    # Select questions
-    question_ids = await select_questions(db, filters, user_id, session_seed)
+            # Generate deterministic seed
+            seed_parts = [
+                str(user_id),
+                str(filters.year),
+                ",".join(sorted(filters.blocks)),
+                ",".join(map(str, sorted(filters.themes or []))),
+                filters.mode.value,
+                started_at.date().isoformat(),
+            ]
+            seed_string = ":".join(seed_parts)
+            session_seed = hashlib.sha256(seed_string.encode()).hexdigest()
 
-    # Calculate expiry if duration set
-    expires_at = None
-    if filters.duration_seconds:
-        expires_at = started_at + timedelta(seconds=filters.duration_seconds)
+            # Select questions
+            question_ids = await select_questions(db, filters, user_id, session_seed)
 
-    # Snapshot algorithm runtime config for session continuity (sync DB)
-    from app.models.algo_runtime import AlgoBridgeConfig, AlgoRuntimeConfig, AlgoRuntimeProfile
+            # Calculate expiry if duration set
+            expires_at = None
+            if filters.duration_seconds:
+                expires_at = started_at + timedelta(seconds=filters.duration_seconds)
 
-    runtime_row = db.query(AlgoRuntimeConfig).first()
-    if not runtime_row:
-        runtime_row = AlgoRuntimeConfig(
-            active_profile=AlgoRuntimeProfile.V1_PRIMARY,
-            config_json={
-                "profile": "V1_PRIMARY",
-                "overrides": {},
-                "safe_mode": {"freeze_updates": False, "prefer_cache": True},
-                "search_engine_mode": "postgres",
-            },
-        )
-        db.add(runtime_row)
-        db.commit()
-        db.refresh(runtime_row)
+            # Snapshot algorithm runtime config for session continuity (sync DB)
+            from app.models.algo_runtime import AlgoBridgeConfig, AlgoRuntimeConfig, AlgoRuntimeProfile
 
-    config_json = runtime_row.config_json or {}
-    algo_profile_at_start = runtime_row.active_profile.value
-    algo_overrides_at_start = (config_json.get("overrides") or {}).copy()
+            runtime_row = db.query(AlgoRuntimeConfig).first()
+            if not runtime_row:
+                runtime_row = AlgoRuntimeConfig(
+                    active_profile=AlgoRuntimeProfile.V1_PRIMARY,
+                    config_json={
+                        "profile": "V1_PRIMARY",
+                        "overrides": {},
+                        "safe_mode": {"freeze_updates": False, "prefer_cache": True},
+                        "search_engine_mode": "postgres",
+                    },
+                )
+                db.add(runtime_row)
+                db.commit()
+                db.refresh(runtime_row)
 
-    bridge_row = (
-        db.query(AlgoBridgeConfig).filter(AlgoBridgeConfig.policy_version == "ALGO_BRIDGE_SPEC_v1").first()
-    )
-    algo_policy_version_at_start = bridge_row.policy_version if bridge_row else "ALGO_BRIDGE_SPEC_v1"
+            config_json = runtime_row.config_json or {}
+            algo_profile_at_start = runtime_row.active_profile.value
+            algo_overrides_at_start = (config_json.get("overrides") or {}).copy()
 
-    # Snapshot exam mode and freeze-updates at session creation (no mid-session effect)
-    from app.system.flags import is_exam_mode, is_freeze_updates
+            bridge_row = (
+                db.query(AlgoBridgeConfig).filter(AlgoBridgeConfig.policy_version == "ALGO_BRIDGE_SPEC_v1").first()
+            )
+            algo_policy_version_at_start = bridge_row.policy_version if bridge_row else "ALGO_BRIDGE_SPEC_v1"
 
-    exam_mode_at_start = is_exam_mode(db)
-    freeze_updates_at_start = is_freeze_updates(db)
+            # Snapshot exam mode and freeze-updates at session creation (no mid-session effect)
+            from app.system.flags import is_exam_mode, is_freeze_updates
 
-    # Create session
-    session = TestSession(
-        id=session_id,
-        user_id=user_id,
-        mode=filters.mode,
-        status=SessionStatus.ACTIVE,
-        year=filters.year,
-        blocks_json=filters.blocks,
-        themes_json=filters.themes,
-        total_questions=len(question_ids),
-        started_at=started_at,
-        duration_seconds=filters.duration_seconds,
-        expires_at=expires_at,
-        algo_profile_at_start=algo_profile_at_start,
-        algo_overrides_at_start=algo_overrides_at_start,
-        algo_policy_version_at_start=algo_policy_version_at_start,
-        exam_mode_at_start=exam_mode_at_start,
-        freeze_updates_at_start=freeze_updates_at_start,
-    )
-    db.add(session)
+            exam_mode_at_start = is_exam_mode(db)
+            freeze_updates_at_start = is_freeze_updates(db)
 
-    # Create session_questions with frozen content
-    for position, question_id in enumerate(question_ids, start=1):
-        # Freeze question content
-        version_id, snapshot = await freeze_question(db, question_id)
+            # Set exam mode on span
+            if span.is_recording():
+                span.set_attribute("session.exam_mode", exam_mode_at_start)
 
-        session_question = SessionQuestion(
-            session_id=session_id,
-            position=position,
-            question_id=question_id,
-            question_version_id=version_id,
-            snapshot_json=snapshot,
-        )
-        db.add(session_question)
+            # Create session
+            session = TestSession(
+                id=session_id,
+                user_id=user_id,
+                mode=filters.mode,
+                status=SessionStatus.ACTIVE,
+                year=filters.year,
+                blocks_json=filters.blocks,
+                themes_json=filters.themes,
+                total_questions=len(question_ids),
+                started_at=started_at,
+                duration_seconds=filters.duration_seconds,
+                expires_at=expires_at,
+                algo_profile_at_start=algo_profile_at_start,
+                algo_overrides_at_start=algo_overrides_at_start,
+                algo_policy_version_at_start=algo_policy_version_at_start,
+                exam_mode_at_start=exam_mode_at_start,
+                freeze_updates_at_start=freeze_updates_at_start,
+            )
+            db.add(session)
 
-    # Store runtime snapshot (profile + resolved modules + flags) for no-mid-session change
-    from app.runtime_control.snapshot import build_and_store_snapshot
+            # Create session_questions with frozen content
+            for position, question_id in enumerate(question_ids, start=1):
+                # Freeze question content
+                version_id, snapshot = await freeze_question(db, question_id)
 
-    build_and_store_snapshot(db, session_id)
+                session_question = SessionQuestion(
+                    session_id=session_id,
+                    position=position,
+                    question_id=question_id,
+                    question_version_id=version_id,
+                    snapshot_json=snapshot,
+                )
+                db.add(session_question)
 
-    db.commit()
-    db.refresh(session)
+            # Store runtime snapshot (profile + resolved modules + flags) for no-mid-session change
+            from app.runtime_control.snapshot import build_and_store_snapshot
 
-    return session
+            build_and_store_snapshot(db, session_id)
+
+            db.commit()
+            db.refresh(session)
+
+            # Set final attributes on span
+            if span.is_recording():
+                span.set_attribute("session.total_questions", session.total_questions)
+                if algo_profile_at_start:
+                    span.set_attribute("session.algo_profile", algo_profile_at_start)
+                if algo_policy_version_at_start:
+                    span.set_attribute("session.algo_policy_version", algo_policy_version_at_start)
+
+            return session
+        except Exception as e:
+            # Record exception on span
+            set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)
+            raise
 
 
 async def check_and_expire_session(db: Session, session: TestSession) -> TestSession:
@@ -261,32 +322,62 @@ async def submit_session(
     Returns:
         Updated session with scores
     """
-    # Idempotency: If already submitted, return as-is (safe for double-submit)
-    if session.status != SessionStatus.ACTIVE:
-        # Refresh to get latest state (including scores if already computed)
-        db.refresh(session)
-        return session
+    # Create span for attempt submission
+    with tracer.start_as_current_span("attempt.submit") as span:
+        try:
+            # Set span attributes
+            if span.is_recording():
+                span.set_attribute("session.id", str(session.id))
+                span.set_attribute("user.id", str(session.user_id))
+                span.set_attribute("attempt.auto_expired", auto_expired)
+                if session.exam_mode_at_start is not None:
+                    span.set_attribute("attempt.exam_mode", session.exam_mode_at_start)
+                if session.algo_profile_at_start:
+                    span.set_attribute("attempt.algo_profile", session.algo_profile_at_start)
+                if session.algo_policy_version_at_start:
+                    span.set_attribute("attempt.algo_policy_version", session.algo_policy_version_at_start)
 
-    # Calculate score
-    answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session.id)
-    answers_result = db.execute(answers_stmt)
-    answers = answers_result.scalars().all()
+            # Idempotency: If already submitted, return as-is (safe for double-submit)
+            if session.status != SessionStatus.ACTIVE:
+                # Refresh to get latest state (including scores if already computed)
+                db.refresh(session)
+                if span.is_recording():
+                    span.set_attribute("attempt.already_submitted", True)
+                    span.set_attribute("attempt.score_correct", session.score_correct or 0)
+                    span.set_attribute("attempt.score_total", session.score_total or 0)
+                return session
 
-    score_correct = sum(1 for a in answers if a.is_correct is True)
-    score_total = session.total_questions
-    score_pct = round((score_correct / score_total) * 100, 2) if score_total > 0 else 0.0
+            # Calculate score
+            answers_stmt = select(SessionAnswer).where(SessionAnswer.session_id == session.id)
+            answers_result = db.execute(answers_stmt)
+            answers = answers_result.scalars().all()
 
-    # Update session
-    session.status = SessionStatus.EXPIRED if auto_expired else SessionStatus.SUBMITTED
-    session.submitted_at = datetime.utcnow()
-    session.score_correct = score_correct
-    session.score_total = score_total
-    session.score_pct = score_pct
+            score_correct = sum(1 for a in answers if a.is_correct is True)
+            score_total = session.total_questions
+            score_pct = round((score_correct / score_total) * 100, 2) if score_total > 0 else 0.0
 
-    db.commit()
-    db.refresh(session)
+            # Set score attributes on span
+            if span.is_recording():
+                span.set_attribute("attempt.score_correct", score_correct)
+                span.set_attribute("attempt.score_total", score_total)
+                span.set_attribute("attempt.score_pct", score_pct)
+                span.set_attribute("attempt.answers_count", len(answers))
 
-    return session
+            # Update session
+            session.status = SessionStatus.EXPIRED if auto_expired else SessionStatus.SUBMITTED
+            session.submitted_at = datetime.utcnow()
+            session.score_correct = score_correct
+            session.score_total = score_total
+            session.score_pct = score_pct
+
+            db.commit()
+            db.refresh(session)
+
+            return session
+        except Exception as e:
+            # Record exception on span
+            set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)
+            raise
 
 
 async def get_session_progress(db: Session, session_id: UUID) -> dict[str, Any]:
@@ -359,79 +450,102 @@ async def process_answer(
     Raises:
         HTTPException: If session not active or question not in session
     """
-    # Check session is active (and not expired)
-    session = await check_and_expire_session(db, session)
-    if session.status != SessionStatus.ACTIVE:
-        raise HTTPException(status_code=400, detail="Session is not active")
-    session_id = session.id  # capture before any rollback (session may be expired after)
+    # Create span for answer processing
+    with tracer.start_as_current_span("answer.submit") as span:
+        try:
+            # Set span attributes
+            if span.is_recording():
+                span.set_attribute("session.id", str(session.id))
+                span.set_attribute("user.id", str(session.user_id))
+                span.set_attribute("answer.question_id", str(question_id))
+                if selected_index is not None:
+                    span.set_attribute("answer.selected_index", selected_index)
+                if marked_for_review is not None:
+                    span.set_attribute("answer.marked_for_review", marked_for_review)
 
-    # Verify question belongs to session
-    session_question_stmt = select(SessionQuestion).where(
-        SessionQuestion.session_id == session_id,
-        SessionQuestion.question_id == question_id,
-    )
-    session_question_result = await db.execute(session_question_stmt)
-    session_question = session_question_result.scalar_one_or_none()
+            # Check session is active (and not expired)
+            session = await check_and_expire_session(db, session)
+            if session.status != SessionStatus.ACTIVE:
+                raise HTTPException(status_code=400, detail="Session is not active")
+                    session_id = session.id  # capture before any rollback (session may be expired after)
 
-    if not session_question:
-        raise HTTPException(status_code=404, detail="Question not in session")
+            # Verify question belongs to session
+            session_question_stmt = select(SessionQuestion).where(
+                SessionQuestion.session_id == session_id,
+                SessionQuestion.question_id == question_id,
+            )
+            session_question_result = await db.execute(session_question_stmt)
+            session_question = session_question_result.scalar_one_or_none()
 
-    # Get or create answer
-    answer_stmt = select(SessionAnswer).where(
-        SessionAnswer.session_id == session_id,
-        SessionAnswer.question_id == question_id,
-    )
-    answer_result = await db.execute(answer_stmt)
-    answer = answer_result.scalar_one_or_none()
+            if not session_question:
+                raise HTTPException(status_code=404, detail="Question not in session")
 
-    if not answer:
-        answer = SessionAnswer(
-            session_id=session_id,
-            question_id=question_id,
-        )
-        db.add(answer)
-
-    # Check if answer changed
-    if answer.selected_index is not None and selected_index is not None:
-        if answer.selected_index != selected_index:
-            answer.changed_count += 1
-
-    # Update answer
-    answer.selected_index = selected_index
-    if selected_index is not None:
-        answer.answered_at = datetime.utcnow()
-
-    if marked_for_review is not None:
-        answer.marked_for_review = marked_for_review
-
-    # Compute is_correct using frozen content
-    if selected_index is not None:
-        frozen_content = await get_frozen_content(
-            db,
-            question_id,
-            session_question.question_version_id,
-            session_question.snapshot_json,
-        )
-        correct_index = frozen_content.get("correct_index")
-        answer.is_correct = selected_index == correct_index
-    else:
-        answer.is_correct = None
-
-    try:
-        await db.commit()
-        await db.refresh(answer)
-        return answer
-    except IntegrityError:
-        await db.rollback()
-        # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing (idempotent).
-        db.expire(answer)  # force refetch from DB, not identity map
-        refetch = await db.execute(
-            select(SessionAnswer).where(
+            # Get or create answer
+            answer_stmt = select(SessionAnswer).where(
                 SessionAnswer.session_id == session_id,
                 SessionAnswer.question_id == question_id,
             )
-        )
-        existing = refetch.scalar_one_or_none()
-        if existing is None:
+            answer_result = await db.execute(answer_stmt)
+            answer = answer_result.scalar_one_or_none()
+
+            if not answer:
+                answer = SessionAnswer(
+                    session_id=session_id,
+                    question_id=question_id,
+                )
+                db.add(answer)
+
+            # Check if answer changed
+            if answer.selected_index is not None and selected_index is not None:
+                if answer.selected_index != selected_index:
+                    answer.changed_count += 1
+
+            # Update answer
+            answer.selected_index = selected_index
+            if selected_index is not None:
+                answer.answered_at = datetime.utcnow()
+
+            if marked_for_review is not None:
+                answer.marked_for_review = marked_for_review
+
+            # Compute is_correct using frozen content
+            if selected_index is not None:
+                frozen_content = await get_frozen_content(
+                    db,
+                    question_id,
+                    session_question.question_version_id,
+                    session_question.snapshot_json,
+                )
+            correct_index = frozen_content.get("correct_index")
+            answer.is_correct = selected_index == correct_index
+        else:
+            answer.is_correct = None
+
+        try:
+            await db.commit()
+            await db.refresh(answer)
+            
+            # Set final attributes on span
+            if span.is_recording():
+                span.set_attribute("answer.is_correct", answer.is_correct if answer.is_correct is not None else False)
+                span.set_attribute("answer.changed_count", answer.changed_count)
+            
+            return answer
+        except IntegrityError:
+            await db.rollback()
+            # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing (idempotent).
+            db.expire(answer)  # force refetch from DB, not identity map
+            refetch = await db.execute(
+                select(SessionAnswer).where(
+                    SessionAnswer.session_id == session_id,
+                    SessionAnswer.question_id == question_id,
+                )
+            )
+            existing = refetch.scalar_one_or_none()
+            if existing is None:
+                raise
+            return existing
+        except Exception as e:
+            # Record exception on span
+            set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)
             raise
-        return existing

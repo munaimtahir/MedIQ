@@ -29,6 +29,9 @@ entryPoints:
   traefik:
     address: "127.0.0.1:8080"
     # Localhost-only entrypoint for dashboard (accessed via SSH tunnel)
+  metrics:
+    address: ":8082"
+    # Internal-only entrypoint for Prometheus metrics (not exposed publicly)
 
 # Providers (where Traefik discovers services)
 providers:
@@ -55,3 +58,12 @@ accessLog:
   filePath: /var/log/traefik/access.log
   format: json
   bufferingSize: 100
+
+# Prometheus metrics
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    buckets: [0.1, 0.3, 1.2, 5.0]

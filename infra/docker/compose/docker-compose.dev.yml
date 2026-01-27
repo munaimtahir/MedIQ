@@ -18,6 +18,20 @@ services:
     networks:
       - exam_platform_network
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: exam_platform_postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-exam_user}:${POSTGRES_PASSWORD:-change_me}@postgres:5432/${POSTGRES_DB:-exam_platform}?sslmode=disable"
+    ports:
+      - "${POSTGRES_EXPORTER_PORT:-9187}:9187"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     container_name: exam_platform_redis
@@ -34,6 +48,19 @@ services:
       start_period: 10s
     networks:
       - exam_platform_network
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: exam_platform_redis_exporter
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    ports:
+      - "${REDIS_EXPORTER_PORT:-9121}:9121"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+    depends_on:
+      - redis
 
   neo4j:
     image: neo4j:5-community
@@ -127,6 +154,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENV=${ENV:-dev}
       - PROJECT_NAME=${PROJECT_NAME:-Medical Exam Platform API}
+      - SERVICE_NAME=${SERVICE_NAME:-Medical Exam Platform API}
       # OAuth Configuration
       - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID:-}
       - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET:-}
@@ -151,9 +179,18 @@ services:
       - EXAM_MODE=${EXAM_MODE:-false}
       - ENABLE_HSTS=${ENABLE_HSTS:-false}
       - ENABLE_CSP=${ENABLE_CSP:-false}
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-Medical Exam Platform API}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      - OTEL_TRACES_SAMPLER=${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}
+      - OTEL_TRACES_SAMPLER_ARG=${OTEL_TRACES_SAMPLER_ARG:-0.1}
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=dev}
+      - OTEL_SERVICE_VERSION=${OTEL_SERVICE_VERSION:-1.0.0}
     depends_on:
       postgres:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     volumes:
       - ../../../backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -169,6 +206,74 @@ services:
       - ranking-go
     networks:
       - exam_platform_network
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: exam_platform_otel_collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../../../infra/ops/otel/otel-collector.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: exam_platform_tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ../../../infra/ops/tempo/tempo.yaml:/etc/tempo.yaml
+      - tempo_data:/var/tempo
+    ports:
+      - "${TEMPO_HTTP_PORT:-3200}:3200"
+      - "${TEMPO_OTLP_GRPC_PORT:-4317}:4317"
+      - "${TEMPO_OTLP_HTTP_PORT:-4318}:4318"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: exam_platform_prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ../../../infra/ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: exam_platform_grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../../infra/ops/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../../infra/ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - exam_platform_network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
   frontend:
     build:
@@ -229,6 +334,9 @@ volumes:
   elasticsearch_data:
   frontend_node_modules:
   frontend_next_cache:
+  tempo_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   exam_platform_network:

@@ -12,6 +12,7 @@ from fastapi import (
     Form,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.dependencies import require_roles
+from app.core.etag import check_if_none_match, compute_etag, create_not_modified_response
 from app.db.session import get_db
 from app.security.exam_mode_gate import require_not_exam_mode
 from app.models.import_schema import (
@@ -193,10 +195,11 @@ async def get_schema(
 @router.get("/schemas/{schema_id}/template")
 async def download_template(
     schema_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> Response:
-    """Download CSV template for a schema."""
+    """Download CSV template for a schema. Supports ETag/If-None-Match for caching."""
     schema = db.query(ImportSchema).filter(ImportSchema.id == schema_id).first()
     if not schema:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schema not found")
@@ -217,11 +220,21 @@ async def download_template(
     # Create CSV content
     csv_content = schema.delimiter.join(headers) + "\n"
 
+    # Compute ETag
+    etag = compute_etag(csv_content)
+    
+    # Check If-None-Match
+    if check_if_none_match(request, etag):
+        return create_not_modified_response(etag)
+
     filename = f"{schema.name}_v{schema.version}_template.csv"
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "ETag": etag,
+        },
     )
 
 
@@ -417,10 +430,11 @@ async def get_job(
 @router.get("/jobs/{job_id}/rejected.csv")
 async def download_rejected_csv(
     job_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMIN)),
 ) -> Response:
-    """Download rejected rows as CSV."""
+    """Download rejected rows as CSV. Supports ETag/If-None-Match for caching."""
     job = db.query(ImportJob).filter(ImportJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -471,8 +485,19 @@ async def download_rejected_csv(
 
     csv_content = output.getvalue()
 
+    # Compute ETag based on content
+    csv_content_str = output.getvalue()
+    etag = compute_etag(csv_content_str)
+    
+    # Check If-None-Match
+    if check_if_none_match(request, etag):
+        return create_not_modified_response(etag)
+    
     return Response(
-        content=csv_content,
+        content=csv_content_str,
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="job_{job_id}_rejected.csv"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="job_{job_id}_rejected.csv"',
+            "ETag": etag,
+        },
     )

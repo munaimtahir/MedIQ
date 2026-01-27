@@ -1,18 +1,23 @@
 """Bookmark endpoints for student users."""
 
+import base64
+import json
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.pagination import CursorPaginationParams, cursor_pagination_params
 from app.core.dependencies import get_current_user, get_db
 from app.models.bookmark import Bookmark
 from app.models.question_cms import Question
 from app.models.user import User
 from app.schemas.bookmark import (
     BookmarkCreate,
+    BookmarkCursorResponse,
     BookmarkOut,
     BookmarkUpdate,
     BookmarkWithQuestion,
@@ -73,6 +78,112 @@ async def list_bookmarks(
         )
 
     return bookmarks
+
+
+# ============================================================================
+# GET /v1/bookmarks:cursor (cursor-based pagination for mobile)
+# ============================================================================
+
+
+def _encode_bookmark_cursor(bookmark_id: UUID, created_at: datetime) -> str:
+    """Encode cursor from bookmark ID and timestamp."""
+    cursor_data = {
+        "id": str(bookmark_id),
+        "created_at": created_at.isoformat(),
+    }
+    cursor_json = json.dumps(cursor_data, sort_keys=True)
+    return base64.b64encode(cursor_json.encode()).decode()
+
+
+def _decode_bookmark_cursor(cursor: str) -> tuple[UUID, datetime]:
+    """Decode cursor to bookmark ID and timestamp."""
+    try:
+        cursor_json = base64.b64decode(cursor.encode()).decode()
+        cursor_data = json.loads(cursor_json)
+        return UUID(cursor_data["id"]), datetime.fromisoformat(cursor_data["created_at"])
+    except (ValueError, KeyError, json.JSONDecodeError):
+        raise ValueError("Invalid cursor format")
+
+
+@router.get("/bookmarks:cursor", response_model=BookmarkCursorResponse)
+async def list_bookmarks_cursor(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    pagination: Annotated[CursorPaginationParams, Depends(cursor_pagination_params)],
+):
+    """
+    List bookmarks with cursor pagination (mobile-safe).
+
+    Returns bookmarks ordered by most recent first.
+    """
+    # Build base query
+    filters = [Bookmark.user_id == current_user.id]
+
+    # Apply cursor if provided
+    if pagination.cursor:
+        try:
+            cursor_id, cursor_created_at = _decode_bookmark_cursor(pagination.cursor)
+            # Get items after cursor (created_at < cursor OR (created_at = cursor AND id < cursor_id))
+            filters.append(
+                (Bookmark.created_at < cursor_created_at)
+                | (
+                    (Bookmark.created_at == cursor_created_at)
+                    & (Bookmark.id < cursor_id)
+                )
+            )
+        except ValueError:
+            # Invalid cursor - return empty result
+            return BookmarkCursorResponse(items=[], next_cursor=None, has_more=False)
+
+    # Get bookmarks with question details (limit + 1 to check if there are more)
+    stmt = (
+        select(Bookmark, Question)
+        .join(Question, Bookmark.question_id == Question.id)
+        .where(*filters)
+        .order_by(Bookmark.created_at.desc(), Bookmark.id.desc())
+        .limit(pagination.limit + 1)
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    # Check if there are more items
+    has_more = len(rows) > pagination.limit
+    if has_more:
+        rows = rows[:-1]  # Remove the extra item
+
+    # Transform to BookmarkWithQuestion
+    bookmarks = []
+    for bookmark, question in rows:
+        bookmarks.append(
+            BookmarkWithQuestion(
+                id=bookmark.id,
+                user_id=bookmark.user_id,
+                question_id=bookmark.question_id,
+                notes=bookmark.notes,
+                created_at=bookmark.created_at,
+                updated_at=bookmark.updated_at,
+                question_stem=question.stem,
+                question_status=question.status.value if question.status else "UNKNOWN",
+                year_id=question.year_id,
+                block_id=question.block_id,
+                theme_id=question.theme_id,
+                difficulty=question.difficulty,
+                cognitive_level=question.cognitive_level,
+            )
+        )
+
+    # Generate next cursor from last item
+    next_cursor = None
+    if has_more and rows:
+        last_bookmark, _ = rows[-1]
+        next_cursor = _encode_bookmark_cursor(last_bookmark.id, last_bookmark.created_at)
+
+    return BookmarkCursorResponse(
+        items=bookmarks,
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
 
 
 @router.post("/bookmarks", response_model=BookmarkOut, status_code=201)

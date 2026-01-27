@@ -1,0 +1,254 @@
+name: Staging Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip Playwright smoke tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ${{ github.repository }}-backend
+  IMAGE_FRONTEND: ${{ github.repository }}-frontend
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    outputs:
+      sha-short: ${{ steps.sha.outputs.short }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=staging,enable={{is_default_branch}}
+            type=raw,value=staging-prev,enable={{is_default_branch}}
+
+      - name: Extract short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GITHUB_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  deploy:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://${{ secrets.STAGING_DOMAIN }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to staging server
+        env:
+          IMAGE_TAG: sha-${{ needs.build-and-push.outputs.sha-short }}
+        run: |
+          # Create deployment script
+          cat > deploy.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -e
+          
+          IMAGE_TAG="$1"
+          REGISTRY="$2"
+          IMAGE_BACKEND="$3"
+          IMAGE_FRONTEND="$4"
+          GITHUB_TOKEN="$5"
+          GITHUB_ACTOR="$6"
+          
+          # Navigate to deployment directory
+          cd ~/exam-platform-staging || { echo "Deployment directory not found"; exit 1; }
+          
+          # Login to GHCR
+          echo "$GITHUB_TOKEN" | docker login "$REGISTRY" -u "$GITHUB_ACTOR" --password-stdin
+          
+          # Pull latest images
+          docker pull "$REGISTRY/$IMAGE_BACKEND:$IMAGE_TAG"
+          docker pull "$REGISTRY/$IMAGE_FRONTEND:$IMAGE_TAG"
+          
+          # Tag as staging-prev (for rollback)
+          docker tag "$REGISTRY/$IMAGE_BACKEND:$IMAGE_TAG" "$REGISTRY/$IMAGE_BACKEND:staging-prev" || true
+          docker tag "$REGISTRY/$IMAGE_FRONTEND:$IMAGE_TAG" "$REGISTRY/$IMAGE_FRONTEND:staging-prev" || true
+          
+          # Update docker-compose.staging.yml with new image tags
+          sed -i "s|image:.*backend.*|image: $REGISTRY/$IMAGE_BACKEND:$IMAGE_TAG|g" docker-compose.staging.yml
+          sed -i "s|image:.*frontend.*|image: $REGISTRY/$IMAGE_FRONTEND:$IMAGE_TAG|g" docker-compose.staging.yml
+          
+          # Run database migrations (if needed)
+          docker compose -f docker-compose.staging.yml run --rm backend_staging alembic upgrade head || echo "Migration failed or not needed"
+          
+          # Deploy services
+          docker compose -f docker-compose.staging.yml up -d
+          
+          # Wait for services to be healthy
+          echo "Waiting for services to be healthy..."
+          sleep 30
+          
+          # Verify deployment
+          if ! docker compose -f docker-compose.staging.yml ps | grep -q "healthy\|Up"; then
+            echo "Services not healthy after deployment"
+            docker compose -f docker-compose.staging.yml ps
+            docker compose -f docker-compose.staging.yml logs --tail=50
+            exit 1
+          fi
+          DEPLOY_SCRIPT
+          
+          # Copy and execute deployment script
+          scp deploy.sh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:~/deploy.sh
+          ssh ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} \
+            "chmod +x ~/deploy.sh && ~/deploy.sh \
+            '${IMAGE_TAG}' \
+            '${{ env.REGISTRY }}' \
+            '${{ env.IMAGE_BACKEND }}' \
+            '${{ env.IMAGE_FRONTEND }}' \
+            '${{ secrets.GITHUB_TOKEN }}' \
+            '${{ github.actor }}'"
+
+  verify:
+    name: Verify Deployment
+    needs: deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Wait for services to be ready
+        run: sleep 10
+
+      - name: Verify frontend
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.STAGING_DOMAIN }}/)
+          if [ "$response" != "200" ]; then
+            echo "Frontend health check failed: HTTP $response"
+            exit 1
+          fi
+          echo "Frontend is healthy: HTTP $response"
+
+      - name: Verify backend health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.STAGING_DOMAIN }}/api/health || curl -s -o /dev/null -w "%{http_code}" https://api-${{ secrets.STAGING_DOMAIN }}/health)
+          if [ "$response" != "200" ]; then
+            echo "Backend health check failed: HTTP $response"
+            exit 1
+          fi
+          echo "Backend is healthy: HTTP $response"
+
+      - name: Verify backend readiness
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.STAGING_DOMAIN }}/api/v1/ready || curl -s -o /dev/null -w "%{http_code}" https://api-${{ secrets.STAGING_DOMAIN }}/v1/ready)
+          if [ "$response" != "200" ]; then
+            echo "Backend readiness check failed: HTTP $response (may be degraded)"
+            # Don't fail on readiness, only log
+          else
+            echo "Backend is ready: HTTP $response"
+          fi
+
+  smoke-tests:
+    name: Run Playwright Smoke Tests
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.event.inputs.skip_tests != 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps
+
+      - name: Run Playwright smoke tests
+        working-directory: frontend
+        env:
+          FRONTEND_BASE_URL: https://${{ secrets.STAGING_DOMAIN }}
+        run: |
+          if [ -d "tests/smoke" ] && [ "$(ls -A tests/smoke/*.spec.ts 2>/dev/null)" ]; then
+            pnpm exec playwright test tests/smoke --reporter=list
+          else
+            echo "No smoke tests found, skipping..."
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

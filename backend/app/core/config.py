@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = Field(default="Medical Exam Platform API")
 
     # API
-    API_PREFIX: str = Field(default="/v1")
-    API_V1_STR: str = Field(default="/v1")
+    API_PREFIX: str = Field(default="/api/v1")
+    API_V1_STR: str = Field(default="/api/v1")
 
     # Database
     DATABASE_URL: str = Field(
@@ -48,7 +48,7 @@ class Settings(BaseSettings):
         description="Comma-separated allowed HTTP methods",
     )
     CORS_ALLOW_HEADERS: str = Field(
-        default="Authorization,Content-Type,X-Request-ID",
+        default="Authorization,Content-Type,X-Request-ID,Idempotency-Key",
         description="Comma-separated allowed request headers",
     )
     CORS_EXPOSE_HEADERS: str = Field(

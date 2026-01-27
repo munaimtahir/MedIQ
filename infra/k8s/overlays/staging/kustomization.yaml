@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: exam-platform
+
+resources:
+  - ../../base
+
+# Override image tags for staging
+images:
+  - name: ghcr.io/OWNER/REPO-backend
+    newTag: staging
+  - name: ghcr.io/OWNER/REPO-frontend
+    newTag: staging
+
+# Override namespace labels
+commonLabels:
+  app.kubernetes.io/name: exam-platform
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/environment: staging
+
+# Patches for staging-specific configurations
+patches:
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment
+  - path: ingress-patch.yaml
+    target:
+      kind: Ingress
+
+# Replicas override for staging (can be lower)
+replicas:
+  - name: backend
+    count: 2
+  - name: frontend
+    count: 2
+  - name: redis
+    count: 1

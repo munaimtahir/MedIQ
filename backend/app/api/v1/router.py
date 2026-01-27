@@ -56,6 +56,8 @@ from app.api.v1.endpoints import (
     student_graph,
     syllabus,
     telemetry,
+    sync,
+    test_packages,
     user_prefs,
 )
 from app.graph import api as graph_api
@@ -104,6 +106,8 @@ api_router.include_router(admin_search.router, prefix="", tags=["Admin - Search"
 api_router.include_router(observability.router, prefix="", tags=["Observability"])
 api_router.include_router(user_prefs.router, prefix="", tags=["User Preferences"])
 api_router.include_router(sessions.router, prefix="/sessions", tags=["Sessions"])
+api_router.include_router(test_packages.router, prefix="", tags=["Test Packages"])
+api_router.include_router(sync.router, prefix="", tags=["Offline Sync"])
 api_router.include_router(bookmarks.router, prefix="/bookmarks", tags=["Bookmarks"])
 api_router.include_router(telemetry.router, prefix="/telemetry", tags=["Telemetry"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])

@@ -1,0 +1,21 @@
+# AWS Terraform Variables Example
+# Copy to terraform.tfvars and fill in values
+
+aws_region  = "us-east-1"
+environment = "staging"
+domain      = "example.com"
+
+image_backend  = "ghcr.io/owner/repo-backend:staging"
+image_frontend = "ghcr.io/owner/repo-frontend:staging"
+
+database_instance_class = "db.t3.micro"
+cache_node_type         = "cache.t3.micro"
+
+vpc_cidr        = "10.0.0.0/16"
+enable_multi_az = true
+
+tags = {
+  Project   = "exam-platform"
+  ManagedBy = "terraform"
+  Environment = "staging"
+}

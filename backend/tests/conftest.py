@@ -3,24 +3,26 @@
 import os
 import uuid
 from collections.abc import AsyncGenerator, Generator
+from typing import Any
 
 import pytest
-
-# Configure pytest-asyncio
-pytest_plugins = ("pytest_asyncio",)
+from httpx import AsyncClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 
 from fastapi.testclient import TestClient
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.core.security import hash_password
-from app.main import app
+from app.main import app, create_app
 from app.models.question_cms import Question, QuestionStatus
 from app.models.session import SessionStatus, TestSession
 from app.models.syllabus import Block, Theme, Year
 from app.models.user import User, UserRole
+
+# Configure pytest-asyncio
+pytest_plugins = ("pytest_asyncio",)
 
 # Use test database URL if available, otherwise use PostgreSQL from env
 TEST_DATABASE_URL = os.environ.get(
@@ -372,3 +374,84 @@ def authenticated_client_student(client, test_user, auth_headers_student):
     # The client already has DB override, we just need to ensure auth works
     # For tests that need actual token auth, use auth_headers_student in requests
     return client
+
+
+# ============================================================================
+# Async Test Fixtures (for async endpoints)
+# ============================================================================
+
+
+@pytest.fixture
+async def async_client(db: Session) -> AsyncGenerator[AsyncClient, None]:
+    """Create an async FastAPI test client with database dependency override."""
+    from app.db.session import get_db, get_async_db
+    
+    # Create a test app instance to avoid conflicts
+    test_app = create_app()
+    
+    # Override sync get_db (most endpoints use this)
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass  # Don't close the session, it's managed by the db fixture
+    
+    test_app.dependency_overrides[get_db] = override_get_db
+    
+    # Also override async get_async_db for async endpoints
+    # Create async session from same connection
+    async def override_get_async_db():
+        # Convert sync session to async (simplified - in practice use db_session fixture)
+        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+        from urllib.parse import urlparse
+        
+        # Convert DATABASE_URL to async format
+        db_url = TEST_DATABASE_URL
+        if "postgresql+psycopg2://" in db_url:
+            async_url = db_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        elif "postgresql://" in db_url:
+            async_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        else:
+            async_url = db_url
+        
+        async_engine = create_async_engine(async_url, pool_pre_ping=True, echo=False)
+        async_session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+        
+        async with async_session() as async_db:
+            try:
+                yield async_db
+            finally:
+                await async_db.close()
+        
+        await async_engine.dispose()
+    
+    test_app.dependency_overrides[get_async_db] = override_get_async_db
+    
+    async with AsyncClient(app=test_app, base_url="http://test") as ac:
+        try:
+            yield ac
+        finally:
+            test_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_settings() -> Settings:
+    """Create test settings override."""
+    return Settings(
+        ENV="test",
+        DATABASE_URL=TEST_DATABASE_URL,
+        REDIS_ENABLED=False,
+        REDIS_REQUIRED=False,
+        JWT_SECRET="test_jwt_secret_key_change_in_production_min_32_chars",
+        AUTH_TOKEN_PEPPER="test_pepper_change_in_production",
+        TOKEN_PEPPER="test_pepper_change_in_production",
+        EMAIL_ENABLED=False,
+        NEO4J_ENABLED=False,
+        ELASTICSEARCH_ENABLED=False,
+    )
+
+
+@pytest.fixture
+def redis_client():
+    """Mock Redis client for tests (returns None if Redis is disabled)."""
+    return None

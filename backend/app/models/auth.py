@@ -46,7 +46,12 @@ class AuthSession(Base):
 
 
 class RefreshToken(Base):
-    """Refresh token model for token rotation and revocation."""
+    """Refresh token model for token rotation and revocation.
+    
+    Supports token family tracking for mobile-safe refresh:
+    - family_id: Groups tokens from same login session
+    - On reuse, entire family is revoked
+    """
 
     __tablename__ = "refresh_tokens"
 
@@ -57,6 +62,9 @@ class RefreshToken(Base):
     session_id = Column(
         UUID(as_uuid=True), ForeignKey("auth_sessions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    family_id = Column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )  # Token family ID for mobile-safe refresh (groups tokens from same login)
     token_hash = Column(String, unique=True, nullable=False, index=True)
     issued_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)

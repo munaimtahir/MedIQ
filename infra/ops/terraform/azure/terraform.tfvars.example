@@ -1,0 +1,21 @@
+# Azure Terraform Variables Example
+# Copy to terraform.tfvars and fill in values
+
+azure_location = "eastus"
+environment    = "staging"
+domain         = "example.com"
+
+image_backend  = "ghcr.io/owner/repo-backend:staging"
+image_frontend = "ghcr.io/owner/repo-frontend:staging"
+
+database_sku_name = "B_Standard_B1ms"
+cache_sku_name    = "Basic"
+
+vnet_address_space      = "10.0.0.0/16"
+enable_zone_redundancy  = true
+
+tags = {
+  Project     = "exam-platform"
+  ManagedBy   = "terraform"
+  Environment = "staging"
+}

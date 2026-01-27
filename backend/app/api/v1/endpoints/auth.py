@@ -1,10 +1,14 @@
 """Authentication endpoints."""
 
 from datetime import UTC, datetime, timedelta
+import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
+from opentelemetry import trace
 from sqlalchemy.orm import Session
+
+from app.observability.tracing import get_safe_user_id, set_span_error, tracer
 
 from app.core.abuse_protection import (
     check_email_locked,
@@ -40,6 +44,7 @@ from app.core.security import (
     verify_password,
     verify_token_hash,
 )
+from app.core.redis_lock import redis_lock
 from app.core.security_logging import log_security_event
 from app.db.session import get_db
 from app.models.auth import AuthSession, EmailVerificationToken, PasswordResetToken, RefreshToken
@@ -105,10 +110,14 @@ def _create_tokens_for_user(
     # Calculate expiry
     expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
+    # Generate family_id for new token family (new login = new family)
+    family_id = uuid.uuid4()
+    
     # Create new refresh token record linked to session
     db_refresh_token = RefreshToken(
         user_id=user.id,
         session_id=session.id,
+        family_id=family_id,
         token_hash=token_hash,
         expires_at=expires_at,
         ip_address=ip_address,
@@ -454,161 +463,191 @@ async def login(
     db: Session = Depends(get_db),
 ) -> LoginResponse:
     """Log in a user."""
-    ip = get_client_ip(request)
-    email_normalized = request_data.email.lower().strip()
+    # Create span for login flow
+    with tracer.start_as_current_span("auth.login") as span:
+        try:
+            ip = get_client_ip(request)
+            email_normalized = request_data.email.lower().strip()
 
-    # Rate limit by email
-    check_email_limit = rate_limit_email("auth.login", fail_open=True)
-    check_email_limit(request_data.email, request)
+            # Set span attributes
+            if span.is_recording():
+                span.set_attribute("auth.email_normalized", email_normalized)
+                span.set_attribute("auth.ip_address", ip)
+                # Get request_id from request state (set by middleware)
+                request_id = getattr(request.state, "request_id", None)
+                if request_id:
+                    span.set_attribute("http.request_id", request_id)
 
-    # Check IP and email lockouts before processing
-    check_ip_locked(ip, request)
-    check_email_locked(email_normalized, request)
+            # Rate limit by email
+            check_email_limit = rate_limit_email("auth.login", fail_open=True)
+            check_email_limit(request_data.email, request)
 
-    # Find user by email
-    user = db.query(User).filter(User.email == email_normalized).first()
+            # Check IP and email lockouts before processing
+            check_ip_locked(ip, request)
+            check_email_locked(email_normalized, request)
 
-    # Timing protection: always verify password to prevent timing leaks
-    # Use a dummy hash if user doesn't exist or has no password (OAuth-only)
-    dummy_hash = "$argon2id$v=19$m=65536,t=3,p=4$dummy$dummy"
-    password_hash = user.password_hash if (user and user.password_hash) else dummy_hash
+            # Find user by email
+            user = db.query(User).filter(User.email == email_normalized).first()
 
-    # Verify password (this takes similar time whether user exists or not)
-    password_valid = (
-        verify_password(request_data.password, password_hash)
-        if password_hash != dummy_hash
-        else False
-    )
+            # Timing protection: always verify password to prevent timing leaks
+            # Use a dummy hash if user doesn't exist or has no password (OAuth-only)
+            dummy_hash = "$argon2id$v=19$m=65536,t=3,p=4$dummy$dummy"
+            password_hash = user.password_hash if (user and user.password_hash) else dummy_hash
 
-    # Check for OAuth-only accounts before generic error
-    # This check happens after password verification to maintain timing protection
-    if user and not password_valid and not user.password_hash:
-        # Check if user has OAuth identities
-        oauth_identities = db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id).all()
-        if oauth_identities:
-            # User is OAuth-only - get the provider
-            provider = oauth_identities[0].provider
-            provider_display = (
-                provider.replace("_", " ").title() if "_" in provider else provider.title()
+            # Verify password (this takes similar time whether user exists or not)
+            password_valid = (
+                verify_password(request_data.password, password_hash)
+                if password_hash != dummy_hash
+                else False
             )
 
-            # Record failure
-            record_login_failure(email_normalized, ip)
+            # Check for OAuth-only accounts before generic error
+            # This check happens after password verification to maintain timing protection
+            if user and not password_valid and not user.password_hash:
+                # Check if user has OAuth identities
+                oauth_identities = db.query(OAuthIdentity).filter(OAuthIdentity.user_id == user.id).all()
+                if oauth_identities:
+                    # User is OAuth-only - get the provider
+                    provider = oauth_identities[0].provider
+                    provider_display = (
+                        provider.replace("_", " ").title() if "_" in provider else provider.title()
+                    )
 
-            # Log security event
+                    # Record failure
+                    record_login_failure(email_normalized, ip)
+
+                    # Log security event
+                    log_security_event(
+                        request,
+                        event_type="auth_login_failed",
+                        outcome="deny",
+                        reason_code="OAUTH_ONLY_ACCOUNT",
+                        user_id=str(user.id),
+                    )
+
+                    raise_app_error(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        code="OAUTH_ONLY_ACCOUNT",
+                        message=(
+                            f"This account was created with {provider_display}. "
+                            f"Please sign in with {provider_display} instead."
+                        ),
+                        details={"provider": provider},
+                    )
+
+            # Generic error for invalid credentials (don't reveal if email exists)
+            if not user or not password_valid:
+                # Record failure
+                record_login_failure(email_normalized, ip)
+
+                # Log security event
+                log_security_event(
+                    request,
+                    event_type="auth_login_failed",
+                    outcome="deny",
+                    reason_code="UNAUTHORIZED",
+                )
+
+                raise_app_error(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    code="UNAUTHORIZED",
+                    message="Invalid email or password",
+                )
+
+            # Check if user is active
+            if not user.is_active:
+                log_security_event(
+                    request,
+                    event_type="auth_login_failed",
+                    outcome="deny",
+                    reason_code="FORBIDDEN",
+                    user_id=str(user.id),
+                )
+                raise_app_error(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    code="FORBIDDEN",
+                    message="User account is inactive",
+                )
+
+            # Check if email is verified
+            if not user.email_verified:
+                log_security_event(
+                    request,
+                    event_type="auth_login_failed",
+                    outcome="deny",
+                    reason_code="EMAIL_NOT_VERIFIED",
+                    user_id=str(user.id),
+                )
+                raise_app_error(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    code="EMAIL_NOT_VERIFIED",
+                    message="Please verify your email before logging in.",
+                )
+
+            # Clear failure counters on successful login
+            clear_login_failures(email_normalized, ip)
+
+            # Set user attributes on span (safe IDs only)
+            if span.is_recording():
+                user_id = get_safe_user_id(user)
+                if user_id:
+                    span.set_attribute("user.id", user_id)
+                span.set_attribute("user.role", user.role.value if hasattr(user.role, "value") else str(user.role))
+
+            # Check if MFA is enabled
+            from app.core.mfa import create_mfa_token
+            from app.models.mfa import MFATOTP
+
+            mfa_totp = db.query(MFATOTP).filter(MFATOTP.user_id == user.id, MFATOTP.enabled).first()
+
+            if mfa_totp:
+                # MFA required - return step-up token
+                if span.is_recording():
+                    span.set_attribute("auth.mfa_required", True)
+                
+                mfa_token = create_mfa_token(str(user.id))
+
+                log_security_event(
+                    request,
+                    event_type="mfa_challenge_issued",
+                    outcome="allow",
+                    user_id=str(user.id),
+                )
+
+                return LoginResponse(
+                    mfa_required=True,
+                    mfa_token=mfa_token,
+                    method="totp",
+                )
+
+            # No MFA - proceed with normal login
+            # Update last login
+            user.last_login_at = datetime.now(UTC)
+            db.commit()
+
+            # Log successful login
             log_security_event(
                 request,
-                event_type="auth_login_failed",
-                outcome="deny",
-                reason_code="OAUTH_ONLY_ACCOUNT",
+                event_type="auth_login_success",
+                outcome="allow",
                 user_id=str(user.id),
             )
 
-            raise_app_error(
-                status_code=status.HTTP_403_FORBIDDEN,
-                code="OAUTH_ONLY_ACCOUNT",
-                message=(
-                    f"This account was created with {provider_display}. "
-                    f"Please sign in with {provider_display} instead."
-                ),
-                details={"provider": provider},
+            # Create tokens
+            tokens, auth_session = _create_tokens_for_user(user, db, request)
+
+            # Set session ID on span
+            if span.is_recording() and auth_session:
+                span.set_attribute("auth.session_id", str(auth_session.id))
+
+            return LoginResponse(
+                user=UserResponse.model_validate(user),
+                tokens=tokens,
             )
-
-    # Generic error for invalid credentials (don't reveal if email exists)
-    if not user or not password_valid:
-        # Record failure
-        record_login_failure(email_normalized, ip)
-
-        # Log security event
-        log_security_event(
-            request,
-            event_type="auth_login_failed",
-            outcome="deny",
-            reason_code="UNAUTHORIZED",
-        )
-
-        raise_app_error(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            code="UNAUTHORIZED",
-            message="Invalid email or password",
-        )
-
-    # Check if user is active
-    if not user.is_active:
-        log_security_event(
-            request,
-            event_type="auth_login_failed",
-            outcome="deny",
-            reason_code="FORBIDDEN",
-            user_id=str(user.id),
-        )
-        raise_app_error(
-            status_code=status.HTTP_403_FORBIDDEN,
-            code="FORBIDDEN",
-            message="User account is inactive",
-        )
-
-    # Check if email is verified
-    if not user.email_verified:
-        log_security_event(
-            request,
-            event_type="auth_login_failed",
-            outcome="deny",
-            reason_code="EMAIL_NOT_VERIFIED",
-            user_id=str(user.id),
-        )
-        raise_app_error(
-            status_code=status.HTTP_403_FORBIDDEN,
-            code="EMAIL_NOT_VERIFIED",
-            message="Please verify your email before logging in.",
-        )
-
-    # Clear failure counters on successful login
-    clear_login_failures(email_normalized, ip)
-
-    # Check if MFA is enabled
-    from app.core.mfa import create_mfa_token
-    from app.models.mfa import MFATOTP
-
-    mfa_totp = db.query(MFATOTP).filter(MFATOTP.user_id == user.id, MFATOTP.enabled).first()
-
-    if mfa_totp:
-        # MFA required - return step-up token
-        mfa_token = create_mfa_token(str(user.id))
-
-        log_security_event(
-            request,
-            event_type="mfa_challenge_issued",
-            outcome="allow",
-            user_id=str(user.id),
-        )
-
-        return LoginResponse(
-            mfa_required=True,
-            mfa_token=mfa_token,
-            method="totp",
-        )
-
-    # No MFA - proceed with normal login
-    # Update last login
-    user.last_login_at = datetime.now(UTC)
-    db.commit()
-
-    # Log successful login
-    log_security_event(
-        request,
-        event_type="auth_login_success",
-        outcome="allow",
-        user_id=str(user.id),
-    )
-
-    # Create tokens
-    tokens, session = _create_tokens_for_user(user, db, request)
-
-    return LoginResponse(
-        user=UserResponse.model_validate(user),
-        tokens=tokens,
-    )
+        except Exception as e:
+            # Record exception on span
+            set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)
+            raise
 
 
 @router.post(
@@ -616,184 +655,240 @@ async def login(
     response_model=RefreshResponse,
     status_code=status.HTTP_200_OK,
     summary="Refresh tokens",
-    description="Refresh access and refresh tokens. Implements token rotation.",
+    description="Refresh access and refresh tokens. Implements token rotation with concurrency safety.",
+    dependencies=[
+        Depends(rate_limit_ip("auth.refresh", fail_open=True)),
+    ],
 )
 async def refresh(
     request_data: RefreshRequest,
     request: Request,
     db: Session = Depends(get_db),
 ) -> RefreshResponse:
-    """Refresh access and refresh tokens with rotation and reuse detection."""
+    """
+    Refresh access and refresh tokens with rotation and reuse detection.
+    
+    Mobile-safe features:
+    - Redis locking prevents concurrent refresh (no duplicate tokens)
+    - Token family revocation on reuse
+    - Strict error codes for mobile retry logic
+    """
     # Hash the provided refresh token
     token_hash = hash_token(request_data.refresh_token)
-
-    # Find refresh token (check if already rotated for reuse detection)
-    # Query by hash (indexed lookup), then verify with constant-time comparison
-    refresh_token_record = (
-        db.query(RefreshToken)
-        .filter(RefreshToken.token_hash == token_hash)
-        .first()
-    )
     
-    # Constant-time verification (defense in depth against timing attacks)
-    if refresh_token_record and not verify_token_hash(request_data.refresh_token, refresh_token_record.token_hash):
-        refresh_token_record = None
-
-    if not refresh_token_record:
-        log_security_event(
-            request,
-            event_type="auth_refresh_failed",
-            outcome="deny",
-            reason_code="UNAUTHORIZED",
+    # Use Redis lock to prevent concurrent refresh of same token
+    lock_key = f"refresh:lock:{token_hash}"
+    
+    with redis_lock(lock_key, ttl_seconds=5) as lock_acquired:
+        if not lock_acquired:
+            # Lock not acquired - another refresh in progress
+            # Wait briefly and retry (or return error)
+            log_security_event(
+                request,
+                event_type="auth_refresh_locked",
+                outcome="deny",
+                reason_code="CONCURRENT_REFRESH",
+            )
+            raise_app_error(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                code="CONCURRENT_REFRESH",
+                message="Refresh already in progress. Please retry.",
+            )
+        
+        # Find refresh token (check if already rotated for reuse detection)
+        refresh_token_record = (
+            db.query(RefreshToken)
+            .filter(RefreshToken.token_hash == token_hash)
+            .first()
         )
-        raise_app_error(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            code="UNAUTHORIZED",
-            message="Invalid refresh token",
-        )
+        
+        # Constant-time verification (defense in depth against timing attacks)
+        if refresh_token_record and not verify_token_hash(request_data.refresh_token, refresh_token_record.token_hash):
+            refresh_token_record = None
 
-    # Check if token was already rotated (reuse detection)
-    if refresh_token_record.rotated_at is not None:
-        # Token reuse detected - revoke entire session
-        session = refresh_token_record.session
-        if session:
-            session.revoked_at = datetime.now(UTC)
-            session.revoke_reason = "refresh_reuse_detected"
+        if not refresh_token_record:
+            log_security_event(
+                request,
+                event_type="auth_refresh_failed",
+                outcome="deny",
+                reason_code="UNAUTHORIZED",
+            )
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="UNAUTHORIZED",
+                message="Invalid refresh token",
+            )
+
+        # Check if token was already rotated (reuse detection)
+        if refresh_token_record.rotated_at is not None:
+            # Token reuse detected - revoke entire token family
+            family_id = refresh_token_record.family_id
             
-            # Blacklist session immediately
-            ttl = calculate_blacklist_ttl(refresh_token_record.expires_at)
-            blacklist_session(str(session.id), ttl)
+            # Revoke all tokens in the family
+            if family_id:
+                db.query(RefreshToken).filter(
+                    RefreshToken.family_id == family_id,
+                    RefreshToken.revoked_at.is_(None),
+                ).update({"revoked_at": datetime.now(UTC)})
+            
+            # Revoke session
+            session = refresh_token_record.session
+            if session:
+                session.revoked_at = datetime.now(UTC)
+                session.revoke_reason = "refresh_reuse_detected"
+                
+                # Blacklist session immediately
+                ttl = calculate_blacklist_ttl(refresh_token_record.expires_at)
+                blacklist_session(str(session.id), ttl)
+            
+            db.commit()
+            
+            log_security_event(
+                request,
+                event_type="auth_refresh_reuse_detected",
+                outcome="deny",
+                reason_code="REFRESH_TOKEN_REUSE",
+                user_id=str(refresh_token_record.user_id),
+            )
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="REFRESH_TOKEN_REUSE",
+                message="Refresh token has been used. All tokens in family revoked for security.",
+            )
+
+        # Check if token is revoked
+        if refresh_token_record.revoked_at is not None:
+            log_security_event(
+                request,
+                event_type="auth_refresh_failed",
+                outcome="deny",
+                reason_code="REFRESH_REVOKED",
+            )
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="REFRESH_REVOKED",
+                message="Refresh token has been revoked",
+            )
         
+        # Check if token is expired
+        now = datetime.now(UTC)
+        if now >= refresh_token_record.expires_at:
+            log_security_event(
+                request,
+                event_type="auth_refresh_failed",
+                outcome="deny",
+                reason_code="REFRESH_EXPIRED",
+            )
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="REFRESH_EXPIRED",
+                message="Refresh token has expired",
+            )
+
+        # Get user and session
+        user = refresh_token_record.user
+        session = refresh_token_record.session
+        
+        if not user or not user.is_active:
+            log_security_event(
+                request,
+                event_type="auth_refresh_failed",
+                outcome="deny",
+                reason_code="UNAUTHORIZED",
+            )
+            raise_app_error(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                code="UNAUTHORIZED",
+                message="User not found or inactive",
+            )
+
+        # Check if session is revoked
+        if session:
+            if is_session_blacklisted(str(session.id)):
+                log_security_event(
+                    request,
+                    event_type="auth_refresh_failed",
+                    outcome="deny",
+                    reason_code="SESSION_REVOKED",
+                    user_id=str(user.id),
+                )
+                raise_app_error(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    code="REFRESH_REVOKED",
+                    message="Session has been revoked",
+                )
+            
+            if session.revoked_at is not None:
+                log_security_event(
+                    request,
+                    event_type="auth_refresh_failed",
+                    outcome="deny",
+                    reason_code="SESSION_REVOKED",
+                    user_id=str(user.id),
+                )
+                raise_app_error(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    code="REFRESH_REVOKED",
+                    message="Session has been revoked",
+                )
+            
+            # Update last_seen_at
+            session.last_seen_at = datetime.now(UTC)
+
+        # Rate limit by user (strict)
+        require_rate_limit_refresh(str(user.id), request)
+
+        # Rotate: mark old token as rotated
+        refresh_token_record.rotated_at = datetime.now(UTC)
+
+        # Create new tokens
+        new_access_token = create_access_token(
+            str(user.id), user.role, session_id=str(session.id) if session else None
+        )
+        new_refresh_token = create_refresh_token()
+        new_token_hash = hash_token(new_refresh_token)
+        expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        # Extract IP and user agent for new token
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("user-agent")
+
+        # Use same family_id (token family continues)
+        family_id = refresh_token_record.family_id or uuid.uuid4()
+
+        # Create new refresh token record (linked to same session and family)
+        new_refresh_token_record = RefreshToken(
+            user_id=user.id,
+            session_id=session.id if session else None,
+            family_id=family_id,
+            token_hash=new_token_hash,
+            expires_at=expires_at,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        new_refresh_token_record.replaced_by_token_id = refresh_token_record.id
+        db.add(new_refresh_token_record)
+
+        # Link old token to new one
+        refresh_token_record.replaced_by_token_id = new_refresh_token_record.id
+
         db.commit()
-        
+
+        # Log successful refresh
         log_security_event(
             request,
-            event_type="auth_refresh_reuse_detected",
-            outcome="deny",
-            reason_code="REFRESH_TOKEN_REUSE",
-            user_id=str(refresh_token_record.user_id),
-        )
-        raise_app_error(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            code="UNAUTHORIZED",
-            message="Refresh token has been used. Session revoked for security.",
+            event_type="auth_refresh_success",
+            outcome="allow",
+            user_id=str(user.id),
         )
 
-    # Check if token is active (not revoked, not expired)
-    if not refresh_token_record.is_active():
-        log_security_event(
-            request,
-            event_type="auth_refresh_failed",
-            outcome="deny",
-            reason_code="UNAUTHORIZED",
-        )
-        raise_app_error(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            code="UNAUTHORIZED",
-            message="Invalid or expired refresh token",
-        )
-
-    # Get user and session
-    user = refresh_token_record.user
-    session = refresh_token_record.session
-    
-    if not user or not user.is_active:
-        log_security_event(
-            request,
-            event_type="auth_refresh_failed",
-            outcome="deny",
-            reason_code="UNAUTHORIZED",
-        )
-        raise_app_error(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            code="UNAUTHORIZED",
-            message="User not found or inactive",
-        )
-
-    # Check if session is revoked (fast check via Redis blacklist, fallback to DB)
-    if session:
-        if is_session_blacklisted(str(session.id)):
-            log_security_event(
-                request,
-                event_type="auth_refresh_failed",
-                outcome="deny",
-                reason_code="SESSION_REVOKED",
-                user_id=str(user.id),
+        return RefreshResponse(
+            tokens=TokensResponse(
+                access_token=new_access_token,
+                refresh_token=new_refresh_token,
+                token_type="bearer",
             )
-            raise_app_error(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="UNAUTHORIZED",
-                message="Session has been revoked",
-            )
-        
-        if session.revoked_at is not None:
-            # Session revoked in DB
-            log_security_event(
-                request,
-                event_type="auth_refresh_failed",
-                outcome="deny",
-                reason_code="SESSION_REVOKED",
-                user_id=str(user.id),
-            )
-            raise_app_error(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="UNAUTHORIZED",
-                message="Session has been revoked",
-            )
-        
-        # Update last_seen_at
-        session.last_seen_at = datetime.now(UTC)
-
-    # Rate limit by user
-    require_rate_limit_refresh(str(user.id), request)
-
-    # Rotate: mark old token as rotated
-    refresh_token_record.rotated_at = datetime.now(UTC)
-
-    # Create new tokens
-    new_access_token = create_access_token(
-        str(user.id), user.role, session_id=str(session.id) if session else None
-    )
-    new_refresh_token = create_refresh_token()
-    new_token_hash = hash_token(new_refresh_token)
-    expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    # Extract IP and user agent for new token
-    ip_address = get_client_ip(request)
-    user_agent = request.headers.get("user-agent")
-
-    # Create new refresh token record (linked to same session)
-    new_refresh_token_record = RefreshToken(
-        user_id=user.id,
-        session_id=session.id if session else None,
-        token_hash=new_token_hash,
-        expires_at=expires_at,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-    new_refresh_token_record.replaced_by_token_id = refresh_token_record.id
-    db.add(new_refresh_token_record)
-
-    # Link old token to new one
-    refresh_token_record.replaced_by_token_id = new_refresh_token_record.id
-
-    db.commit()
-
-    # Log successful refresh
-    log_security_event(
-        request,
-        event_type="auth_refresh_success",
-        outcome="allow",
-        user_id=str(user.id),
-    )
-
-    return RefreshResponse(
-        tokens=TokensResponse(
-            access_token=new_access_token,
-            refresh_token=new_refresh_token,
-            token_type="bearer",
         )
-    )
 
 
 @router.post(
@@ -801,14 +896,18 @@ async def refresh(
     response_model=StatusResponse,
     status_code=status.HTTP_200_OK,
     summary="Log out",
-    description="Revoke a refresh token. Access tokens remain valid until expiry.",
+    description="Revoke refresh token family. Access tokens remain valid until expiry.",
 )
 async def logout(
     request_data: LogoutRequest,
     request: Request,
     db: Session = Depends(get_db),
 ) -> StatusResponse:
-    """Log out by revoking refresh token and session."""
+    """
+    Log out by revoking refresh token family and session.
+    
+    Mobile-safe: Revokes entire token family (all tokens from same login session).
+    """
     # Hash the provided refresh token
     token_hash = hash_token(request_data.refresh_token)
 
@@ -824,8 +923,18 @@ async def logout(
         refresh_token_record = None
 
     if refresh_token_record:
-        # Revoke the refresh token
-        refresh_token_record.revoked_at = datetime.now(UTC)
+        # Revoke entire token family (mobile-safe: logout everywhere for this login)
+        family_id = refresh_token_record.family_id
+        
+        if family_id:
+            # Revoke all tokens in the family
+            db.query(RefreshToken).filter(
+                RefreshToken.family_id == family_id,
+                RefreshToken.revoked_at.is_(None),
+            ).update({"revoked_at": datetime.now(UTC)})
+        else:
+            # Fallback: revoke just this token (backward compatibility)
+            refresh_token_record.revoked_at = datetime.now(UTC)
         
         # Revoke the session if it exists
         session = refresh_token_record.session

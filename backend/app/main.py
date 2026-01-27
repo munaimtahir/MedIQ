@@ -8,16 +8,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.observability.otel import instrument_app, setup_otel
 from app.core.errors import (
     general_exception_handler,
     http_exception_handler,
     validation_exception_handler,
 )
-from app.core.logging import setup_logging
+from app.observability.logging import setup_structured_logging
 from app.core.redis_client import init_redis
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.middleware.body_size_limit import BodySizeLimitMiddleware
 from app.middleware.cache_headers import CacheHeadersMiddleware
+from app.middleware.prometheus_metrics import PrometheusMetricsMiddleware
 from app.middleware.request_timing import RequestTimingMiddleware
 from app.core.seed_academic import seed_academic_structure
 from app.core.seed_auth import seed_demo_accounts
@@ -31,7 +33,8 @@ from app.db.session import SessionLocal
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
-    setup_logging()
+    # Setup structured logging (replaces legacy logging)
+    setup_structured_logging()
     # Initialize Redis (skip in test mode to avoid connection attempts)
     if settings.ENV != "test":
         init_redis()
@@ -90,6 +93,7 @@ def create_app() -> FastAPI:
     # Add middleware (order matters - first added is outermost)
     # RequestTimingMiddleware must be outermost to guarantee headers even on exceptions.
     app.add_middleware(RequestTimingMiddleware)
+    app.add_middleware(PrometheusMetricsMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     # CORS: Deny-by-default with env allowlists (no wildcards)
@@ -128,8 +132,26 @@ def create_app() -> FastAPI:
         """Health check endpoint - returns 200 if the API is running."""
         return {"status": "ok"}
 
+    # Prometheus metrics endpoint (internal only - not exposed via Traefik in production)
+    @app.get("/metrics", tags=["Observability"], include_in_schema=False)
+    async def metrics():
+        """Prometheus metrics endpoint - returns metrics in Prometheus text format."""
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        from fastapi.responses import Response
+
+        return Response(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST,
+        )
+
     return app
 
 
+# Initialize OpenTelemetry before creating app
+setup_otel()
+
 # Create app instance
 app = create_app()
+
+# Instrument app with OpenTelemetry (must be after app creation)
+instrument_app(app)

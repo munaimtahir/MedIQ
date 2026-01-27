@@ -1,0 +1,236 @@
+# Staging Docker Compose Configuration
+# This file is deployed to the staging server and updated by the CI/CD pipeline
+# The pipeline updates image tags before running docker compose up
+
+version: '3.8'
+
+services:
+  # Traefik Reverse Proxy (ONLY public entrypoint on ports 80/443)
+  traefik:
+    image: traefik:v3.0
+    container_name: exam_platform_traefik_staging
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik_letsencrypt_staging:/letsencrypt
+      - traefik_logs_staging:/var/log/traefik
+    environment:
+      - TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL}
+      - STAGING_BASIC_AUTH_USERS=${STAGING_BASIC_AUTH_USERS:-}
+      - STAGING_ALLOW_IPS=${STAGING_ALLOW_IPS:-}
+    networks:
+      - edge
+      - app
+    restart: unless-stopped
+    labels:
+      # Reusable middlewares defined on Traefik service
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+      - "traefik.http.middlewares.sec-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.sec-headers.headers.frameDeny=true"
+      - "traefik.http.middlewares.sec-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.sec-headers.headers.permissionsPolicy=geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()"
+      - "traefik.http.middlewares.sec-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.sec-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.sec-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.compress.compress=true"
+      - "traefik.http.middlewares.conn-limit.inflightreq.amount=100"
+      - "traefik.http.middlewares.req-size-limit.buffering.maxRequestBodyBytes=2000000"
+      - "traefik.http.middlewares.staging-auth.basicauth.users=${STAGING_BASIC_AUTH_USERS}"
+      - "traefik.http.middlewares.staging-auth.basicauth.removeheader=true"
+      - "traefik.http.middlewares.staging-ip.ipallowlist.sourcerange=${STAGING_ALLOW_IPS}"
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`localhost`) || Host(`127.0.0.1`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=traefik"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  # PostgreSQL Database for Staging
+  postgres_staging:
+    image: postgres:15-alpine
+    container_name: exam_platform_postgres_staging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_STAGING:-exam_platform_staging}
+      POSTGRES_USER: ${POSTGRES_USER_STAGING:-exam_user_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_STAGING}
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS_STAGING:-512MB}
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 1g
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_STAGING:-exam_user_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app
+    restart: unless-stopped
+
+  # Redis Cache for Staging
+  redis_staging:
+    image: redis:7-alpine
+    container_name: exam_platform_redis_staging
+    volumes:
+      - redis_staging_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app
+    restart: unless-stopped
+
+  # FastAPI Backend Staging
+  backend_staging:
+    # Image tag is updated by CI/CD pipeline
+    image: ghcr.io/OWNER/REPO-backend:sha-PLACEHOLDER
+    container_name: exam_platform_backend_staging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+        reservations:
+          cpus: "0.5"
+          memory: 512m
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER_STAGING:-exam_user_staging}:${POSTGRES_PASSWORD_STAGING}@postgres_staging:5432/${POSTGRES_DB_STAGING:-exam_platform_staging}
+      - CORS_ALLOW_ORIGINS_PUBLIC=${CORS_ALLOW_ORIGINS_PUBLIC_STAGING:-https://staging.${DOMAIN}}
+      - CORS_ALLOW_ORIGINS_APP=${CORS_ALLOW_ORIGINS_APP_STAGING:-https://staging.${DOMAIN}}
+      - CORS_ALLOW_METHODS=${CORS_ALLOW_METHODS:-GET,POST,PUT,PATCH,DELETE,OPTIONS}
+      - CORS_ALLOW_HEADERS=${CORS_ALLOW_HEADERS:-Authorization,Content-Type,X-Request-ID}
+      - CORS_EXPOSE_HEADERS=${CORS_EXPOSE_HEADERS:-X-Request-ID,X-Response-Time-ms,X-DB-Queries,X-DB-Time-ms}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-false}
+      - JWT_SECRET=${JWT_SECRET_STAGING}
+      - JWT_ACCESS_TTL_MIN=${JWT_ACCESS_TTL_MIN:-15}
+      - JWT_REFRESH_TTL_DAYS=${JWT_REFRESH_TTL_DAYS:-14}
+      - AUTH_TOKEN_PEPPER=${AUTH_TOKEN_PEPPER_STAGING}
+      - REDIS_URL=redis://redis_staging:6379/0
+      - NEO4J_ENABLED=${NEO4J_ENABLED:-false}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - NEO4J_DATABASE=${NEO4J_DATABASE:-neo4j}
+      - ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-false}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX_PREFIX=${ELASTICSEARCH_INDEX_PREFIX_STAGING:-platform_staging}
+      - ELASTICSEARCH_REQUEST_TIMEOUT_MS=${ELASTICSEARCH_REQUEST_TIMEOUT_MS:-2000}
+      - ELASTICSEARCH_BULK_BATCH_SIZE=${ELASTICSEARCH_BULK_BATCH_SIZE:-500}
+      - ELASTICSEARCH_RETRY_MAX=${ELASTICSEARCH_RETRY_MAX:-5}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENV=staging
+      - PROJECT_NAME=${PROJECT_NAME:-Medical Exam Platform API (Staging)}
+      - ENABLE_HSTS=${ENABLE_HSTS:-false}
+      - ENABLE_CSP=${ENABLE_CSP:-false}
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID_STAGING:-}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET_STAGING:-}
+      - OAUTH_GOOGLE_REDIRECT_URI=https://api-staging.${DOMAIN}/v1/auth/oauth/google/callback
+      - OAUTH_MICROSOFT_CLIENT_ID=${OAUTH_MICROSOFT_CLIENT_ID_STAGING:-}
+      - OAUTH_MICROSOFT_CLIENT_SECRET=${OAUTH_MICROSOFT_CLIENT_SECRET_STAGING:-}
+      - OAUTH_MICROSOFT_REDIRECT_URI=https://api-staging.${DOMAIN}/v1/auth/oauth/microsoft/callback
+      - OAUTH_MICROSOFT_TENANT=${OAUTH_MICROSOFT_TENANT:-common}
+      - OAUTH_ALLOWED_REDIRECT_URIS=https://staging.${DOMAIN},https://api-staging.${DOMAIN}
+      - FRONTEND_URL=https://staging.${DOMAIN}
+      - FRONTEND_BASE_URL=https://staging.${DOMAIN}
+      - EMAIL_BACKEND=${EMAIL_BACKEND_STAGING:-shadow}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM_STAGING:-noreply-staging@${DOMAIN}}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-true}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-false}
+      - MFA_ENCRYPTION_KEY=${MFA_ENCRYPTION_KEY_STAGING}
+      - GO_RANKING_ENABLED=${GO_RANKING_ENABLED:-false}
+      - RANKING_GO_URL=http://ranking-go:8080
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-5}
+      - UVICORN_TIMEOUT_KEEP_ALIVE=${UVICORN_TIMEOUT_KEEP_ALIVE:-5}
+      - UVICORN_LIMIT_CONCURRENCY=${UVICORN_LIMIT_CONCURRENCY:-200}
+      - UVICORN_LIMIT_MAX_REQUESTS=${UVICORN_LIMIT_MAX_REQUESTS:-10000}
+      - EXAM_MODE=${EXAM_MODE:-false}
+      - SKIP_SEED=${SKIP_SEED:-false}
+    depends_on:
+      postgres_staging:
+        condition: service_healthy
+    networks:
+      - app
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-staging.rule=Host(`api-staging.${DOMAIN}`)"
+      - "traefik.http.routers.api-staging.entrypoints=websecure"
+      - "traefik.http.routers.api-staging.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api-staging.middlewares=conn-limit@docker,req-size-limit@docker,staging-auth@docker,sec-headers@docker,compress@docker"
+      - "traefik.http.routers.api-staging.priority=1"
+      - "traefik.http.services.api-staging.loadbalancer.server.port=8000"
+      - "traefik.http.routers.api-staging-import.rule=Host(`api-staging.${DOMAIN}`) && PathPrefix(`/v1/admin/import/questions`) && Method(`POST`)"
+      - "traefik.http.routers.api-staging-import.entrypoints=websecure"
+      - "traefik.http.routers.api-staging-import.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.api-staging-import.priority=100"
+      - "traefik.http.routers.api-staging-import.middlewares=req-size-limit-import@docker,conn-limit@docker,staging-auth@docker,sec-headers@docker,compress@docker"
+      - "traefik.http.routers.api-staging-import.service=api-staging"
+      - "traefik.http.routers.api-staging-http.rule=Host(`api-staging.${DOMAIN}`)"
+      - "traefik.http.routers.api-staging-http.entrypoints=web"
+      - "traefik.http.routers.api-staging-http.middlewares=redirect-to-https@docker"
+
+  # Next.js Frontend Staging
+  frontend_staging:
+    # Image tag is updated by CI/CD pipeline
+    image: ghcr.io/OWNER/REPO-frontend:sha-PLACEHOLDER
+    container_name: exam_platform_frontend_staging
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=https://api-staging.${DOMAIN}/v1
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME_STAGING:-Exam Prep Platform (Staging)}
+      - NEXT_PUBLIC_ENV=staging
+      - NEXT_PUBLIC_FEATURE_STUDENT_CONCEPT_EXPLORER=${NEXT_PUBLIC_FEATURE_STUDENT_CONCEPT_EXPLORER:-false}
+      - BACKEND_URL=http://backend_staging:8000
+      - COOKIE_SECURE=true
+      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
+      - COOKIE_DOMAIN=${DOMAIN}
+      - ACCESS_COOKIE_MAXAGE_SECONDS=${ACCESS_COOKIE_MAXAGE_SECONDS:-900}
+      - REFRESH_COOKIE_MAXAGE_SECONDS=${REFRESH_COOKIE_MAXAGE_SECONDS:-1209600}
+      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_ENV=production
+    depends_on:
+      - backend_staging
+    networks:
+      - app
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-staging.rule=Host(`staging.${DOMAIN}`)"
+      - "traefik.http.routers.frontend-staging.entrypoints=websecure"
+      - "traefik.http.routers.frontend-staging.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-staging.middlewares=staging-auth@docker,sec-headers@docker,compress@docker"
+      - "traefik.http.services.frontend-staging.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend-staging-http.rule=Host(`staging.${DOMAIN}`)"
+      - "traefik.http.routers.frontend-staging-http.entrypoints=web"
+      - "traefik.http.routers.frontend-staging-http.middlewares=redirect-to-https@docker"
+
+volumes:
+  postgres_staging_data:
+  redis_staging_data:
+  traefik_letsencrypt_staging:
+  traefik_logs_staging:
+
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge

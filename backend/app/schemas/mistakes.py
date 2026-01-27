@@ -79,9 +79,17 @@ class MistakeItem(BaseModel):
 
 
 class MistakesListResponse(BaseModel):
-    """Paginated list of mistakes."""
+    """Paginated list of mistakes (page-based, legacy)."""
 
     page: int
     page_size: int
     total: int
     items: list[MistakeItem]
+
+
+class MistakesListCursorResponse(BaseModel):
+    """Cursor-paginated list of mistakes (mobile-safe)."""
+
+    items: list[MistakeItem]
+    next_cursor: str | None = None
+    has_more: bool

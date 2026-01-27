@@ -9,19 +9,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
-class ErrorDetail(BaseModel):
-    """Error detail structure."""
+class ErrorResponse(BaseModel):
+    """Mobile-safe error response envelope.
+    
+    Format: {error_code, message, details}
+    Compatible with mobile clients requiring stable error codes.
+    """
 
-    code: str
+    error_code: str
     message: str
     details: Any | None = None
     request_id: str | None = None
-
-
-class ErrorResponse(BaseModel):
-    """Consistent error response envelope."""
-
-    error: ErrorDetail
 
 
 def get_request_id(request: Request) -> str:
@@ -61,12 +59,10 @@ async def validation_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=ErrorResponse(
-            error=ErrorDetail(
-                code=code,
-                message=message,
-                details=details,
-                request_id=request_id,
-            )
+            error_code=code,
+            message=message,
+            details=details,
+            request_id=request_id,
         ).model_dump(),
     )
 
@@ -82,12 +78,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         response = JSONResponse(
             status_code=exc.status_code,
             content=ErrorResponse(
-                error=ErrorDetail(
-                    code=exc.code,
-                    message=exc.message,
-                    details=exc.details,
-                    request_id=request_id,
-                )
+                error_code=exc.code,
+                message=exc.message,
+                details=exc.details,
+                request_id=request_id,
             ).model_dump(),
         )
         # Add Retry-After header for rate limiting
@@ -122,12 +116,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
-            error=ErrorDetail(
-                code=code,
-                message=message,
-                details=details,
-                request_id=request_id,
-            )
+            error_code=code,
+            message=message,
+            details=details,
+            request_id=request_id,
         ).model_dump(),
     )
 
@@ -149,11 +141,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=ErrorResponse(
-            error=ErrorDetail(
-                code="INTERNAL_ERROR",
-                message=message,
-                details=details,
-                request_id=request_id,
-            )
+            error_code="INTERNAL_ERROR",
+            message=message,
+            details=details,
+            request_id=request_id,
         ).model_dump(),
     )

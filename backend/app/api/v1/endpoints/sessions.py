@@ -12,6 +12,12 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, get_db
 from app.runtime_control import require_mutations_allowed
 from app.security.rate_limit import create_user_rate_limit_dep
+from app.middleware.idempotency import (
+    check_idempotency_dependency,
+    store_idempotency_response,
+    IdempotencyContext,
+)
+from fastapi.responses import JSONResponse
 from app.models.session import (
     AttemptEvent,
     SessionAnswer,
@@ -287,6 +293,7 @@ async def submit_test_session(
     session_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    idempotency: IdempotencyContext = Depends(check_idempotency_dependency),
 ):
     """
     Submit the session and finalize scoring.
@@ -295,7 +302,11 @@ async def submit_test_session(
     Locks the session from further answers.
     
     Idempotent: Safe to call multiple times (returns existing result if already submitted).
+    Supports Idempotency-Key header for mobile clients with flaky networks.
     """
+    # Check for cached idempotency response
+    if idempotency.has_cached_response():
+        return JSONResponse(**idempotency.cached_response)
     session = get_user_session(db, session_id, current_user)
 
     # Store status before submission to detect if it was already submitted
@@ -776,7 +787,7 @@ async def submit_test_session(
 
         logging.getLogger(__name__).warning(f"SRS update failed for session {session_id}: {e}")
 
-    return SessionSubmitResponse(
+    response_data = SessionSubmitResponse(
         session_id=session.id,
         status=session.status,
         score_correct=session.score_correct,
@@ -784,6 +795,15 @@ async def submit_test_session(
         score_pct=float(session.score_pct),
         submitted_at=session.submitted_at,
     )
+    
+    # Store idempotency response for future requests
+    await store_idempotency_response(
+        idempotency_context=idempotency,
+        response_body=response_data.model_dump(),
+        status_code=200,
+    )
+    
+    return response_data
 
 
 # ============================================================================

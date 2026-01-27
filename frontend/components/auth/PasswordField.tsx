@@ -47,6 +47,7 @@ export function PasswordField({
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
           disabled={disabled}
+          data-testid={id === "password" ? "login-password-input" : undefined}
           className={cn(
             "h-11 rounded-lg border-slate-200 bg-white pr-10 focus:border-primary focus:ring-primary",
             error && "border-red-500 focus:border-red-500 focus:ring-red-500",

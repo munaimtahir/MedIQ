@@ -100,6 +100,7 @@ export function AdminSidebar() {
         "fixed left-0 top-0 z-40 flex h-screen flex-col border-r bg-card transition-all duration-300",
         sidebarWidth,
       )}
+      data-testid="admin-sidebar"
     >
       <div className="flex h-full flex-col p-4">
         {/* Header with toggle */}
@@ -237,6 +238,7 @@ export function AdminSidebar() {
               isCollapsed && "justify-center px-0",
             )}
             title={isCollapsed ? "Logout" : undefined}
+            data-testid="logout-button"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             {!isCollapsed && <span>Logout</span>}

@@ -55,3 +55,11 @@ class BookmarkWithQuestion(BaseModel):
     theme_id: int | None
     difficulty: str | None
     cognitive_level: str | None
+
+
+class BookmarkCursorResponse(BaseModel):
+    """Cursor-paginated bookmarks response (mobile-safe)."""
+
+    items: list[BookmarkWithQuestion]
+    next_cursor: str | None = None
+    has_more: bool

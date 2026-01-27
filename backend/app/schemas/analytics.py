@@ -124,6 +124,14 @@ class RecentSessionSummary(BaseModel):
 
 
 class RecentSessionsResponse(BaseModel):
-    """Recent sessions response."""
+    """Recent sessions response (legacy, page-based)."""
 
     sessions: list[RecentSessionSummary]
+
+
+class RecentSessionsCursorResponse(BaseModel):
+    """Cursor-paginated recent sessions response (mobile-safe)."""
+
+    items: list[RecentSessionSummary]
+    next_cursor: str | None = None
+    has_more: bool

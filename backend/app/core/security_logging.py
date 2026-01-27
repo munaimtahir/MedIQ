@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import Request
 
 from app.common.request_id import get_request_id
-from app.core.logging import get_logger
+from app.observability.logging import audit_log, get_logger
 
 logger = get_logger(__name__)
 
@@ -71,10 +71,18 @@ def log_security_event(
 
     log_data.update(extra_fields)
 
-    # Use appropriate log level based on outcome
-    if outcome == "deny":
-        logger.warning("Security event: denied", extra=log_data)
-    elif outcome == "degraded":
-        logger.warning("Security event: degraded", extra=log_data)
-    else:
-        logger.info("Security event: allowed", extra=log_data)
+    # Use audit logger for security events
+    audit_log(
+        event=event_type,
+        actor_id=user_id,
+        actor_role=None,  # Will be added if available in extra_fields
+        action=event_type,
+        target_id=None,  # Will be added if available in extra_fields
+        outcome=outcome,
+        reason_code=reason_code,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        request_id=request_id,
+        provider=provider,
+        **extra_fields,
+    )
