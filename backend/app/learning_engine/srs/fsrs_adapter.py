@@ -59,7 +59,7 @@ def compute_next_state_and_due(
         current_difficulty: Current difficulty [0, 10], None for first review
         rating: FSRS rating 1-4 (Again, Hard, Good, Easy)
         delta_days: Days since last review (0 for first review)
-        weights: FSRS weights (19 params), None for defaults
+        weights: FSRS weights (21 params), None for defaults
         desired_retention: Target retention probability
         reviewed_at: Timestamp of this review
 
@@ -75,8 +75,8 @@ def compute_next_state_and_due(
         weights = FSRS_DEFAULT_WEIGHTS.value
 
     # Validate weights length
-    if len(weights) != 19:
-        raise ValueError(f"FSRS-6 requires 19 weights, got {len(weights)}")
+    if len(weights) != 21:
+        raise ValueError(f"FSRS-6 requires 21 weights, got {len(weights)}")
 
     # Create FSRS scheduler with parameters
     scheduler = Scheduler(parameters=weights, desired_retention=desired_retention)
@@ -178,13 +178,13 @@ def validate_weights(weights: list[float]) -> tuple[bool, str]:
     Validate FSRS weights.
 
     Args:
-        weights: List of 19 FSRS-6 weights
+        weights: List of 21 FSRS-6 weights
 
     Returns:
         Tuple of (is_valid, error_message)
     """
-    if len(weights) != 19:
-        return False, f"Expected 19 weights, got {len(weights)}"
+    if len(weights) != 21:
+        return False, f"Expected 21 weights, got {len(weights)}"
 
     for i, w in enumerate(weights):
         if not math.isfinite(w):

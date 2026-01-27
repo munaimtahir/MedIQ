@@ -99,9 +99,10 @@ def db() -> Generator[Session, None, None]:
 @pytest.fixture
 def test_user(db) -> User:
     """Create a test student user."""
+    user_id = uuid.uuid4()
     user = User(
-        id=uuid.uuid4(),
-        email="test@example.com",
+        id=user_id,
+        email=f"test_{user_id}@example.com",
         full_name="Test User",
         password_hash=hash_password("Test123!"),
         role=UserRole.STUDENT.value,
@@ -117,9 +118,10 @@ def test_user(db) -> User:
 @pytest.fixture
 def test_admin_user(db) -> User:
     """Create a test admin user."""
+    user_id = uuid.uuid4()
     user = User(
-        id=uuid.uuid4(),
-        email="admin@test.com",
+        id=user_id,
+        email=f"admin_{user_id}@test.com",
         full_name="Test Admin",
         password_hash=hash_password("Admin123!"),
         role=UserRole.ADMIN.value,
@@ -196,6 +198,7 @@ def published_questions(db, test_admin_user) -> list[Question]:
             cognitive_level="UNDERSTAND",
             difficulty="MEDIUM",
             created_by=test_admin_user.id,
+            updated_by=test_admin_user.id,
         )
         db.add(question)
         questions.append(question)
@@ -314,6 +317,58 @@ def test_client(client) -> TestClient:
 
 
 @pytest.fixture
-def admin_user(db) -> User:
+def admin_user(db, test_admin_user) -> User:
     """Create an admin user for testing (alias for test_admin_user)."""
-    return test_admin_user(db)
+    return test_admin_user
+
+
+@pytest.fixture
+async def active_difficulty_algo(db_session):
+    """Ensure active difficulty algorithm is set up and return version and params."""
+    from app.learning_engine import AlgoKey
+    from app.learning_engine.registry import resolve_active
+    
+    version, params = await resolve_active(db_session, AlgoKey.DIFFICULTY)
+    if not version or not params:
+        raise ValueError("Difficulty algorithm not configured (no active version/params)")
+    return version, params
+
+
+@pytest.fixture
+def auth_headers_admin(test_admin_user):
+    """Create Authorization header for admin user."""
+    from app.core.security import create_access_token
+    
+    token = create_access_token(
+        user_id=str(test_admin_user.id),
+        role=test_admin_user.role,
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def auth_headers_student(test_user):
+    """Create Authorization header for student user."""
+    from app.core.security import create_access_token
+    
+    token = create_access_token(
+        user_id=str(test_user.id),
+        role=test_user.role,
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def authenticated_client_admin(client, test_admin_user, auth_headers_admin):
+    """Create authenticated test client with admin user."""
+    # The client already has DB override, we just need to ensure auth works
+    # For tests that need actual token auth, use auth_headers_admin in requests
+    return client
+
+
+@pytest.fixture
+def authenticated_client_student(client, test_user, auth_headers_student):
+    """Create authenticated test client with student user."""
+    # The client already has DB override, we just need to ensure auth works
+    # For tests that need actual token auth, use auth_headers_student in requests
+    return client

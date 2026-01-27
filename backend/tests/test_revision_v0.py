@@ -23,58 +23,83 @@ from app.models.user import User, UserRole
 
 
 @pytest.fixture
-async def student_user(db):
+async def student_user(db_session):
     """Create a test student user."""
+    from app.core.security import hash_password
+    user_id = uuid4()
     user = User(
-        id=uuid4(),
-        email="student@test.com",
-        password_hash="hashed",
+        id=user_id,
+        email=f"student_{user_id}@test.com",
+        password_hash=hash_password("Test123!"),
         full_name="Test Student",
         role=UserRole.STUDENT.value,
         is_active=True,
         email_verified=True,
+        onboarding_completed=True,
     )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.refresh(user)
     return user
 
 
 @pytest.fixture
-async def block_and_themes(db):
+async def block_and_themes(db_session):
     """Create test block and themes."""
-    block = Block(
-        id=1,
-        name="Test Block",
-        order_index=1,
-        year=1,
-    )
-    db.add(block)
-    await db.commit()
+    from sqlalchemy import select
+    from app.models.syllabus import Year
+    
+    # Ensure year exists
+    year_result = await db_session.execute(select(Year).where(Year.id == 1))
+    year = year_result.scalar_one_or_none()
+    if not year:
+        year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+        db_session.add(year)
+        await db_session.flush()
+    
+    block_result = await db_session.execute(select(Block).where(Block.id == 1))
+    block = block_result.scalar_one_or_none()
+    if not block:
+        block = Block(
+            id=1,
+            year_id=1,
+            code="A",
+            name="Test Block",
+            order_no=1,
+            is_active=True,
+        )
+        db_session.add(block)
+        await db_session.flush()
 
     themes = []
     for i in range(3):
-        theme = Theme(
-            id=i + 1,
-            block_id=1,
-            title=f"Theme {i + 1}",
-            order_index=i + 1,
-        )
-        themes.append(theme)
+        theme_result = await db_session.execute(select(Theme).where(Theme.id == i + 1))
+        theme = theme_result.scalar_one_or_none()
+        if not theme:
+            theme = Theme(
+                id=i + 1,
+                block_id=1,
+                title=f"Theme {i + 1}",
+                order_no=i + 1,
+                is_active=True,
+            )
+            db_session.add(theme)
+            themes.append(theme)
+        else:
+            themes.append(theme)
 
-    db.add_all(themes)
-    await db.commit()
+    await db_session.flush()
 
     return block, themes
 
 
 @pytest.fixture
-async def revision_algo_version(db):
+async def revision_algo_version(db_session):
     """Get revision algo version."""
     stmt = select(AlgoVersion).where(
         AlgoVersion.algo_key == "revision", AlgoVersion.version == "v0"
     )
-    result = await db.execute(stmt)
+    result = await db_session.execute(stmt)
     return result.scalar_one()
 
 
@@ -475,7 +500,7 @@ class TestRevisionQueueGeneration:
         assert result2["generated"] == result1["generated"]
 
     async def test_status_protection(
-        self, db, student_user, block_and_themes, revision_algo_version
+        self, db_session, student_user, block_and_themes, revision_algo_version
     ):
         """Test that DONE status is not overwritten."""
         block, themes = block_and_themes
@@ -497,27 +522,27 @@ class TestRevisionQueueGeneration:
             run_id=uuid4(),
             breakdown_json={},
         )
-        db.add(mastery)
-        await db.commit()
+        db_session.add(mastery)
+        await db_session.commit()
 
         # Generate queue
-        await generate_revision_queue_v0(db, user_id=student_user.id, trigger="test")
+        await generate_revision_queue_v0(db_session, user_id=student_user.id, trigger="test")
 
         # Mark as DONE
         stmt = select(RevisionQueue).where(
             RevisionQueue.user_id == student_user.id,
             RevisionQueue.theme_id == themes[0].id,
         )
-        queue_result = await db.execute(stmt)
+        queue_result = await db_session.execute(stmt)
         item = queue_result.scalar_one()
         item.status = "DONE"
-        await db.commit()
+        await db_session.commit()
 
         # Regenerate
-        await generate_revision_queue_v0(db, user_id=student_user.id, trigger="test")
+        await generate_revision_queue_v0(db_session, user_id=student_user.id, trigger="test")
 
         # Verify status still DONE
-        queue_result = await db.execute(stmt)
+        queue_result = await db_session.execute(stmt)
         item = queue_result.scalar_one()
         assert item.status == "DONE"
 
@@ -526,12 +551,37 @@ class TestAlgoRunLogging:
     """Test algo run logging for revision."""
 
     async def test_run_logging_on_success(
-        self, db, student_user, block_and_themes, revision_algo_version
+        self, db_session, student_user, block_and_themes, revision_algo_version
     ):
         """Test that successful generation logs a run."""
-        from app.models.learning import AlgoRun
+        from app.models.learning import AlgoRun, AlgoParams
 
         block, themes = block_and_themes
+
+        # Ensure user is committed
+        await db_session.flush()
+        await db_session.refresh(student_user)
+
+        # Create params and run records that are referenced by mastery
+        params = AlgoParams(
+            id=uuid4(),
+            algo_key="revision",
+            params_json={},
+        )
+        db_session.add(params)
+        await db_session.flush()
+
+        # Create a dummy run for the mastery record
+        dummy_run = AlgoRun(
+            id=uuid4(),
+            algo_version_id=revision_algo_version.id,
+            params_id=params.id,
+            user_id=student_user.id,
+            trigger="test",
+            status="SUCCESS",
+        )
+        db_session.add(dummy_run)
+        await db_session.flush()
 
         mastery = UserThemeMastery(
             id=uuid4(),
@@ -546,19 +596,19 @@ class TestAlgoRunLogging:
             last_attempt_at=datetime.utcnow() - timedelta(days=1),
             computed_at=datetime.utcnow(),
             algo_version_id=revision_algo_version.id,
-            params_id=uuid4(),
-            run_id=uuid4(),
+            params_id=params.id,
+            run_id=dummy_run.id,
             breakdown_json={},
         )
-        db.add(mastery)
-        await db.commit()
+        db_session.add(mastery)
+        await db_session.commit()
 
         # Generate
-        result = await generate_revision_queue_v0(db, user_id=student_user.id, trigger="test")
+        result = await generate_revision_queue_v0(db_session, user_id=student_user.id, trigger="test")
         run_id = result["run_id"]
 
         # Verify run exists
-        run = await db.get(AlgoRun, run_id)
+        run = await db_session.get(AlgoRun, run_id)
         assert run is not None
         assert run.user_id == student_user.id
         assert run.status == "SUCCESS"

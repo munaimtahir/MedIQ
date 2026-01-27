@@ -41,11 +41,14 @@ async def test_revision_queue_returns_only_user_items(db_session: AsyncSession):
     db_session.add(algo_params)
     await db_session.flush()
     
+    from datetime import UTC, datetime
     algo_run = AlgoRun(
         id=uuid4(),
         algo_version_id=algo_version.id,
         params_id=algo_params.id,
+        trigger="manual",
         status="SUCCESS",
+        started_at=datetime.now(UTC),
     )
     db_session.add(algo_run)
     await db_session.flush()
@@ -150,12 +153,15 @@ async def test_revision_patch_action_done_updates_status(db_session: AsyncSessio
         email_verified=True,
     )
     db_session.add(user)
+    await db_session.flush()
 
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
+    await db_session.flush()
 
     block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
+    await db_session.flush()
 
     theme = Theme(
         id=1,
@@ -165,6 +171,37 @@ async def test_revision_patch_action_done_updates_status(db_session: AsyncSessio
         is_active=True,
     )
     db_session.add(theme)
+    await db_session.flush()
+
+    # Create algo objects
+    algo_version = AlgoVersion(
+        id=uuid4(),
+        algo_key="REVISION",
+        version="v0",
+        status="ACTIVE",
+    )
+    db_session.add(algo_version)
+    await db_session.flush()
+    
+    algo_params = AlgoParams(
+        id=uuid4(),
+        algo_version_id=algo_version.id,
+        params_json={},
+    )
+    db_session.add(algo_params)
+    await db_session.flush()
+    
+    from datetime import UTC, datetime
+    algo_run = AlgoRun(
+        id=uuid4(),
+        algo_version_id=algo_version.id,
+        params_id=algo_params.id,
+        trigger="manual",
+        status="SUCCESS",
+        started_at=datetime.now(UTC),
+    )
+    db_session.add(algo_run)
+    await db_session.flush()
 
     item = RevisionQueue(
         id=uuid4(),
@@ -279,11 +316,14 @@ async def test_mistakes_list_filtered_by_type(db_session: AsyncSession):
     db_session.add(algo_params)
     await db_session.flush()
     
+    from datetime import UTC, datetime
     algo_run = AlgoRun(
         id=uuid4(),
         algo_version_id=algo_version.id,
         params_id=algo_params.id,
+        trigger="manual",
         status="SUCCESS",
+        started_at=datetime.now(UTC),
     )
     db_session.add_all([algo_version, algo_params, algo_run])
     await db_session.flush()
@@ -352,29 +392,29 @@ async def test_mistakes_list_filtered_by_block(db_session: AsyncSession):
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block1 = Block(id=uuid4(), year=1, name="Block 1", order=1)
-    block2 = Block(id=uuid4(), year=1, name="Block 2", order=2)
+    block1 = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    block2 = Block(id=2, year_id=1, code="B", name="Block 2", order_no=2, is_active=True)
     db_session.add_all([block1, block2])
 
     theme1 = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block1.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     theme2 = Theme(
-        id=uuid4(),
-        year=1,
+        id=2,
         block_id=block2.id,
-        name="Theme 2",
-        order=1,
+        title="Theme 2",
+        order_no=1,
+        is_active=True,
     )
     db_session.add_all([theme1, theme2])
 
     question1 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block1.id,
         theme_id=theme1.id,
         stem="Q1",
@@ -382,7 +422,7 @@ async def test_mistakes_list_filtered_by_block(db_session: AsyncSession):
     )
     question2 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block2.id,
         theme_id=theme2.id,
         stem="Q2",
@@ -485,24 +525,24 @@ async def test_mistakes_list_filtered_by_theme(db_session: AsyncSession):
     db_session.add(block)
 
     theme1 = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     theme2 = Theme(
-        id=uuid4(),
-        year=1,
+        id=2,
         block_id=block.id,
-        name="Theme 2",
-        order=2,
+        title="Theme 2",
+        order_no=2,
+        is_active=True,
     )
     db_session.add_all([theme1, theme2])
 
     question1 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block.id,
         theme_id=theme1.id,
         stem="Q1",
@@ -510,13 +550,43 @@ async def test_mistakes_list_filtered_by_theme(db_session: AsyncSession):
     )
     question2 = Question(
         id=uuid4(),
-        year=1,
+        year_id=1,
         block_id=block.id,
         theme_id=theme2.id,
         stem="Q2",
         status=QuestionStatus.PUBLISHED,
     )
     db_session.add_all([question1, question2])
+
+    # Create algo objects for mistakes
+    algo_version3 = AlgoVersion(
+        id=uuid4(),
+        algo_key="MISTAKES",
+        version="v0",
+        status="ACTIVE",
+    )
+    db_session.add(algo_version3)
+    await db_session.flush()
+    
+    algo_params3 = AlgoParams(
+        id=uuid4(),
+        algo_version_id=algo_version3.id,
+        params_json={},
+    )
+    db_session.add(algo_params3)
+    await db_session.flush()
+    
+    from datetime import UTC, datetime
+    algo_run3 = AlgoRun(
+        id=uuid4(),
+        algo_version_id=algo_version3.id,
+        params_id=algo_params3.id,
+        trigger="manual",
+        status="SUCCESS",
+        started_at=datetime.now(UTC),
+    )
+    db_session.add(algo_run3)
+    await db_session.flush()
 
     # Create mistakes in different themes
     mistake1 = MistakeLog(
@@ -530,9 +600,9 @@ async def test_mistakes_list_filtered_by_theme(db_session: AsyncSession):
         is_correct=False,
         mistake_type="FAST_WRONG",
         severity=1,
-        algo_version_id=algo_version.id,
-        params_id=algo_params.id,
-        run_id=algo_run.id,
+        algo_version_id=algo_version3.id,
+        params_id=algo_params3.id,
+        run_id=algo_run3.id,
     )
 
     mistake2 = MistakeLog(
@@ -546,9 +616,9 @@ async def test_mistakes_list_filtered_by_theme(db_session: AsyncSession):
         is_correct=False,
         mistake_type="KNOWLEDGE_GAP",
         severity=2,
-        algo_version_id=algo_version.id,
-        params_id=algo_params.id,
-        run_id=algo_run.id,
+        algo_version_id=algo_version3.id,
+        params_id=algo_params3.id,
+        run_id=algo_run3.id,
     )
 
     db_session.add_all([mistake1, mistake2])

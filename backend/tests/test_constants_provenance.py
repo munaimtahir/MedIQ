@@ -141,8 +141,8 @@ class TestFSRSConstants:
     """Test FSRS constants are correctly specified."""
 
     def test_fsrs_weights_count(self):
-        """FSRS-6 must have exactly 19 weights."""
-        assert len(FSRS_DEFAULT_WEIGHTS.value) == 19, "FSRS-6 requires exactly 19 parameters"
+        """FSRS-6 must have exactly 21 weights."""
+        assert len(FSRS_DEFAULT_WEIGHTS.value) == 21, "FSRS-6 requires exactly 21 parameters"
 
     def test_fsrs_weights_are_floats(self):
         """All FSRS weights must be numeric."""

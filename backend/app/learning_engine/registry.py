@@ -22,11 +22,14 @@ async def get_active_algo_version(db: AsyncSession, algo_key: str) -> AlgoVersio
 
     Returns:
         Active AlgoVersion or None if not found
+        
+    Note:
+        If multiple active versions exist, returns the most recently created one.
     """
     stmt = select(AlgoVersion).where(
         AlgoVersion.algo_key == algo_key,
         AlgoVersion.status == AlgoStatus.ACTIVE,
-    )
+    ).order_by(AlgoVersion.created_at.desc()).limit(1)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -41,11 +44,14 @@ async def get_active_params(db: AsyncSession, algo_version_id: UUID) -> AlgoPara
 
     Returns:
         Active AlgoParams or None if not found
+        
+    Note:
+        If multiple active params exist, returns the most recently created one.
     """
     stmt = select(AlgoParams).where(
         AlgoParams.algo_version_id == algo_version_id,
         AlgoParams.is_active == True,  # noqa: E712
-    )
+    ).order_by(AlgoParams.created_at.desc()).limit(1)
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 

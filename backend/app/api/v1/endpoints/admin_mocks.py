@@ -535,7 +535,7 @@ async def generate_mock(
     # Create generation run
     run = MockGenerationRun(
         blueprint_id=blueprint.id,
-        status=MockGenerationRunStatus.RUNNING,
+        status=MockGenerationRunStatus.RUNNING.value,
         seed=seed,
         config_version_id=config_version.id,
         requested_by=current_user.id,
@@ -569,7 +569,7 @@ async def generate_mock(
         db.flush()
 
         # Update run
-        run.status = MockGenerationRunStatus.DONE
+        run.status = MockGenerationRunStatus.DONE.value
         run.finished_at = datetime.now(timezone.utc)
         run.generated_question_count = len(question_ids)
         run.warnings = warnings if warnings else None
@@ -602,7 +602,7 @@ async def generate_mock(
 
     except Exception as e:
         # Mark run as failed
-        run.status = MockGenerationRunStatus.FAILED
+        run.status = MockGenerationRunStatus.FAILED.value
         run.finished_at = datetime.now(timezone.utc)
         run.errors = [{"type": "generation_error", "message": str(e)}]
         db.commit()

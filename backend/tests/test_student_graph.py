@@ -11,29 +11,15 @@ from app.models.algo_runtime import AlgoRuntimeConfig, AlgoRuntimeProfile
 class TestStudentGraphFeatureFlag:
     """Test feature flag enforcement."""
 
-    @pytest.fixture
-    def student_user(self, db):
-        """Create a student user for testing."""
-        from app.models.user import User
-        user = User(
-            email="student@test.com",
-            role="STUDENT",
-            password_hash="dummy",
-        )
-        db.add(user)
-        db.commit()
-        return user
-
-    def test_endpoints_return_404_when_feature_disabled(self, client: TestClient, student_user, db):
+    def test_endpoints_return_404_when_feature_disabled(self, client: TestClient, auth_headers_student, db):
         """Test that endpoints return 404 when feature flag is disabled."""
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", False):
-            with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                response = client.get("/v1/student/graph/neighbors?concept_id=theme_1")
-                assert response.status_code == 404
-                data = response.json()
-                assert data["detail"]["error"] == "feature_disabled"
+            response = client.get("/v1/student/graph/neighbors?concept_id=theme_1", headers=auth_headers_student)
+            assert response.status_code == 404
+            data = response.json()
+            assert data["detail"]["error"] == "feature_disabled"
 
-    def test_endpoints_work_when_feature_enabled(self, client: TestClient, student_user, db):
+    def test_endpoints_work_when_feature_enabled(self, client: TestClient, auth_headers_student, db):
         """Test that endpoints work when feature flag is enabled."""
         # Create runtime config with graph_mode=shadow
         config = AlgoRuntimeConfig(
@@ -45,83 +31,53 @@ class TestStudentGraphFeatureFlag:
 
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
             with patch.object(settings, "NEO4J_ENABLED", True):
-                with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                    with patch("app.graph.readiness.evaluate_graph_readiness") as mock_readiness:
-                        from app.graph.readiness import GraphReadiness, ReadinessCheckResult
-                        mock_readiness.return_value = GraphReadiness(
-                            ready=True,
-                            checks={},
-                            blocking_reasons=[],
-                        )
-                        with patch("app.graph.service.get_neighbors", return_value={
-                            "concept_id": "theme_1",
-                            "depth": 1,
-                            "prereqs": [],
-                            "dependents": [],
-                            "warnings": [],
-                        }):
-                            response = client.get("/v1/student/graph/neighbors?concept_id=theme_1")
-                            assert response.status_code == 200
+                with patch("app.graph.readiness.evaluate_graph_readiness") as mock_readiness:
+                    from app.graph.readiness import GraphReadiness, ReadinessCheckResult
+                    mock_readiness.return_value = GraphReadiness(
+                        ready=True,
+                        checks={},
+                        blocking_reasons=[],
+                    )
+                    with patch("app.graph.service.get_neighbors", return_value={
+                        "concept_id": "theme_1",
+                        "depth": 1,
+                        "prereqs": [],
+                        "dependents": [],
+                        "warnings": [],
+                    }):
+                        response = client.get("/v1/student/graph/neighbors?concept_id=theme_1", headers=auth_headers_student)
+                        assert response.status_code == 200
 
 
 class TestStudentGraphLimits:
     """Test student-specific hard caps."""
 
-    @pytest.fixture
-    def student_user(self, db):
-        """Create a student user for testing."""
-        from app.models.user import User
-        user = User(
-            email="student@test.com",
-            role="STUDENT",
-            password_hash="dummy",
-        )
-        db.add(user)
-        db.commit()
-        return user
-
-    def test_neighbors_depth_capped_at_1(self, client: TestClient, student_user):
+    def test_neighbors_depth_capped_at_1(self, client: TestClient, auth_headers_student):
         """Test that neighbors depth is capped at 1 for students."""
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
-            with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                # Try depth=2 (should be rejected by validation)
-                response = client.get("/v1/student/graph/neighbors?concept_id=theme_1&depth=2")
-                assert response.status_code == 422  # Validation error
+            # Try depth=2 (should be rejected by validation)
+            response = client.get("/v1/student/graph/neighbors?concept_id=theme_1&depth=2", headers=auth_headers_student)
+            assert response.status_code == 422  # Validation error
 
-    def test_prereqs_max_depth_capped_at_4(self, client: TestClient, student_user):
+    def test_prereqs_max_depth_capped_at_4(self, client: TestClient, auth_headers_student):
         """Test that prerequisites max_depth is capped at 4 for students."""
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
-            with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                # Try max_depth=5 (should be rejected by validation)
-                response = client.get("/v1/student/graph/prerequisites?concept_id=theme_1&max_depth=5")
-                assert response.status_code == 422  # Validation error
+            # Try max_depth=5 (should be rejected by validation)
+            response = client.get("/v1/student/graph/prerequisites?concept_id=theme_1&max_depth=5", headers=auth_headers_student)
+            assert response.status_code == 422  # Validation error
 
-    def test_suggestions_limit_capped_at_10(self, client: TestClient, student_user):
+    def test_suggestions_limit_capped_at_10(self, client: TestClient, auth_headers_student):
         """Test that suggestions limit is capped at 10 for students."""
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
-            with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                # Try limit=11 (should be rejected by validation)
-                response = client.get("/v1/student/graph/suggestions?target_concept_id=theme_1&limit=11")
-                assert response.status_code == 422  # Validation error
+            # Try limit=11 (should be rejected by validation)
+            response = client.get("/v1/student/graph/suggestions?target_concept_id=theme_1&limit=11", headers=auth_headers_student)
+            assert response.status_code == 422  # Validation error
 
 
 class TestStudentGraphUnavailable:
     """Test graph unavailable handling."""
 
-    @pytest.fixture
-    def student_user(self, db):
-        """Create a student user for testing."""
-        from app.models.user import User
-        user = User(
-            email="student@test.com",
-            role="STUDENT",
-            password_hash="dummy",
-        )
-        db.add(user)
-        db.commit()
-        return user
-
-    def test_returns_503_when_graph_disabled(self, client: TestClient, student_user, db):
+    def test_returns_503_when_graph_disabled(self, client: TestClient, auth_headers_student, db):
         """Test that endpoints return 503 when graph is disabled."""
         config = AlgoRuntimeConfig(
             active_profile=AlgoRuntimeProfile.V1_PRIMARY,
@@ -131,13 +87,12 @@ class TestStudentGraphUnavailable:
         db.commit()
 
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
-            with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                response = client.get("/v1/student/graph/neighbors?concept_id=theme_1")
-                assert response.status_code == 503
-                data = response.json()
-                assert data["detail"]["error"] == "graph_unavailable"
+            response = client.get("/v1/student/graph/neighbors?concept_id=theme_1", headers=auth_headers_student)
+            assert response.status_code == 503
+            data = response.json()
+            assert data["detail"]["error"] == "graph_unavailable"
 
-    def test_returns_503_when_graph_not_ready(self, client: TestClient, student_user, db):
+    def test_returns_503_when_graph_not_ready(self, client: TestClient, auth_headers_student, db):
         """Test that endpoints return 503 when graph is not ready."""
         config = AlgoRuntimeConfig(
             active_profile=AlgoRuntimeProfile.V1_PRIMARY,
@@ -148,15 +103,14 @@ class TestStudentGraphUnavailable:
 
         with patch.object(settings, "FEATURE_STUDENT_CONCEPT_EXPLORER", True):
             with patch.object(settings, "NEO4J_ENABLED", True):
-                with patch("app.core.dependencies.get_current_user", return_value=student_user):
-                    with patch("app.graph.readiness.evaluate_graph_readiness") as mock_readiness:
-                        from app.graph.readiness import GraphReadiness, ReadinessCheckResult
-                        mock_readiness.return_value = GraphReadiness(
-                            ready=False,
-                            checks={"env_enabled": ReadinessCheckResult(ok=False)},
-                            blocking_reasons=["Neo4j not enabled"],
-                        )
-                        response = client.get("/v1/student/graph/neighbors?concept_id=theme_1")
-                        assert response.status_code == 503
-                        data = response.json()
-                        assert data["detail"]["error"] == "graph_unavailable"
+                with patch("app.graph.readiness.evaluate_graph_readiness") as mock_readiness:
+                    from app.graph.readiness import GraphReadiness, ReadinessCheckResult
+                    mock_readiness.return_value = GraphReadiness(
+                        ready=False,
+                        checks={"env_enabled": ReadinessCheckResult(ok=False)},
+                        blocking_reasons=["Neo4j not enabled"],
+                    )
+                    response = client.get("/v1/student/graph/neighbors?concept_id=theme_1", headers=auth_headers_student)
+                    assert response.status_code == 503
+                    data = response.json()
+                    assert data["detail"]["error"] == "graph_unavailable"

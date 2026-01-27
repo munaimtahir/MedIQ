@@ -80,7 +80,7 @@ def sample_blueprint(db: Session, admin_user: User, sample_config: dict) -> Mock
 
 
 @pytest.fixture
-def sample_questions(db: Session, sample_blueprint: MockBlueprint) -> list[Question]:
+def sample_questions(db: Session, sample_blueprint: MockBlueprint, admin_user) -> list[Question]:
     """Create sample published questions."""
     questions = []
     for i in range(30):
@@ -98,8 +98,8 @@ def sample_questions(db: Session, sample_blueprint: MockBlueprint) -> list[Quest
             theme_id=1 if i < 15 else 2,
             difficulty="easy" if i < 10 else ("medium" if i < 20 else "hard"),
             cognitive_level="C1" if i < 5 else ("C2" if i < 20 else "C3"),
-            created_by=uuid4(),
-            updated_by=uuid4(),
+            created_by=admin_user.id,
+            updated_by=admin_user.id,
         )
         db.add(q)
         questions.append(q)

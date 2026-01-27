@@ -38,17 +38,27 @@ describe("useDashboardData", () => {
       { id: 1, year_id: 1, title: "Block 1", order_no: 1 },
     ];
     const mockOverview = {
-      total_sessions: 10,
-      accuracy: 0.85,
-      avg_time_per_question: 120,
+      sessions_completed: 10,
+      questions_answered: 100,
+      accuracy_pct: 85,
+      weakest_themes: [],
     };
-    const mockRecentSessions = [
-      {
-        session_id: "s1",
-        completed_at: "2024-01-01T00:00:00Z",
-        score: 85,
-      },
-    ];
+    const mockRecentSessions = {
+      sessions: [
+        {
+          session_id: "s1",
+          title: "Test Session",
+          status: "completed" as const,
+          score_correct: 8,
+          score_total: 10,
+          score_pct: 80,
+          block_id: 1,
+          theme_id: 1,
+          started_at: "2024-01-01T00:00:00Z",
+          submitted_at: "2024-01-01T00:00:00Z",
+        },
+      ],
+    };
 
     (syllabusAPI.getYears as any).mockResolvedValueOnce(mockYears);
     (syllabusAPI.getBlocks as any).mockResolvedValueOnce(mockBlocks);

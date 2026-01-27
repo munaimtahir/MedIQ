@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.models.question_cms import Question, QuestionStatus
@@ -336,7 +337,7 @@ async def get_session_progress(db: Session, session_id: UUID) -> dict[str, Any]:
 
 
 async def process_answer(
-    db: Session,
+    db: AsyncSession,
     session: TestSession,
     question_id: UUID,
     selected_index: int | None,
@@ -369,7 +370,7 @@ async def process_answer(
         SessionQuestion.session_id == session_id,
         SessionQuestion.question_id == question_id,
     )
-    session_question_result = db.execute(session_question_stmt)
+    session_question_result = await db.execute(session_question_stmt)
     session_question = session_question_result.scalar_one_or_none()
 
     if not session_question:
@@ -380,7 +381,7 @@ async def process_answer(
         SessionAnswer.session_id == session_id,
         SessionAnswer.question_id == question_id,
     )
-    answer_result = db.execute(answer_stmt)
+    answer_result = await db.execute(answer_stmt)
     answer = answer_result.scalar_one_or_none()
 
     if not answer:
@@ -417,14 +418,14 @@ async def process_answer(
         answer.is_correct = None
 
     try:
-        db.commit()
-        db.refresh(answer)
+        await db.commit()
+        await db.refresh(answer)
         return answer
     except IntegrityError:
-        db.rollback()
+        await db.rollback()
         # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing (idempotent).
         db.expire(answer)  # force refetch from DB, not identity map
-        refetch = db.execute(
+        refetch = await db.execute(
             select(SessionAnswer).where(
                 SessionAnswer.session_id == session_id,
                 SessionAnswer.question_id == question_id,

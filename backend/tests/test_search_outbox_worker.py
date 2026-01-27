@@ -35,14 +35,14 @@ class TestOutboxWorker:
         """Test fetching pending events with SKIP LOCKED."""
         # Create some pending events
         event1 = SearchOutbox(
-            event_type=SearchOutboxEventType.QUESTION_PUBLISHED,
+            event_type=SearchOutboxEventType.QUESTION_PUBLISHED.value,
             payload={"question_id": str(uuid4())},
-            status=SearchOutboxStatus.PENDING,
+            status=SearchOutboxStatus.PENDING.value,
         )
         event2 = SearchOutbox(
-            event_type=SearchOutboxEventType.QUESTION_UNPUBLISHED,
+            event_type=SearchOutboxEventType.QUESTION_UNPUBLISHED.value,
             payload={"question_id": str(uuid4())},
-            status=SearchOutboxStatus.PENDING,
+            status=SearchOutboxStatus.PENDING.value,
         )
         db.add(event1)
         db.add(event2)

@@ -1,6 +1,6 @@
 """Tests for Learning Engine API endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -13,7 +13,7 @@ from app.models.mistakes import MistakeLog
 from app.models.question_cms import Question
 from app.models.session import SessionAnswer, SessionQuestion, TestSession
 from app.models.syllabus import Year, Block, Theme
-from app.models.user import User
+from app.models.user import User, UserRole
 
 # ============================================================================
 # RBAC & OWNERSHIP TESTS
@@ -113,13 +113,22 @@ async def test_session_ownership_enforced_for_student(db_session: AsyncSession):
     )
     db_session.add_all([student1, student2])
 
+    # Create year, block first
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add_all([year, block])
+    await db_session.flush()
+
     # Create session owned by student2
     session = TestSession(
         id=uuid4(),
         user_id=student2.id,
         mode="TUTOR",
         status="SUBMITTED",
-        count=0,
+        year=1,
+        blocks_json=["A"],
+        total_questions=0,
+        started_at=datetime.now(UTC),
     )
     db_session.add(session)
     await db_session.flush()
@@ -157,13 +166,22 @@ async def test_admin_can_access_any_session(db_session: AsyncSession):
     )
     db_session.add_all([admin, student])
 
+    # Create year, block first
+    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
+    db_session.add_all([year, block])
+    await db_session.flush()
+
     # Create session owned by student
     session = TestSession(
         id=uuid4(),
         user_id=student.id,
         mode="TUTOR",
         status="SUBMITTED",
-        count=0,
+        year=1,
+        blocks_json=["A"],
+        total_questions=0,
+        started_at=datetime.now(UTC),
     )
     db_session.add(session)
     await db_session.flush()
@@ -200,7 +218,7 @@ async def test_difficulty_update_idempotency(db_session: AsyncSession):
         year=1,
         block_id=uuid4(),
         theme_id=uuid4(),
-        stem_text="Q1",
+        stem="Q1",
         status="PUBLISHED",
     )
     db_session.add(question)
@@ -210,7 +228,7 @@ async def test_difficulty_update_idempotency(db_session: AsyncSession):
         user_id=user.id,
         mode="TUTOR",
         status="SUBMITTED",
-        count=1,
+        total_questions=1,
         submitted_at=datetime.utcnow(),
     )
     db_session.add(session)
@@ -230,7 +248,7 @@ async def test_difficulty_update_idempotency(db_session: AsyncSession):
         question_id=question.id,
         selected_index=0,
         is_correct=True,
-        changed_count=0,
+        changed_total_questions=0,
     )
     db_session.add(answer)
 
@@ -276,7 +294,7 @@ async def test_mistakes_classify_idempotency(db_session: AsyncSession):
         year=1,
         block_id=uuid4(),
         theme_id=uuid4(),
-        stem_text="Q1",
+        stem="Q1",
         status="PUBLISHED",
     )
     db_session.add(question)
@@ -286,7 +304,7 @@ async def test_mistakes_classify_idempotency(db_session: AsyncSession):
         user_id=user.id,
         mode="TUTOR",
         status="SUBMITTED",
-        count=1,
+        total_questions=1,
         submitted_at=datetime.utcnow(),
     )
     db_session.add(session)
@@ -306,7 +324,7 @@ async def test_mistakes_classify_idempotency(db_session: AsyncSession):
         question_id=question.id,
         selected_index=1,
         is_correct=False,  # Wrong
-        changed_count=0,
+        changed_total_questions=0,
     )
     db_session.add(answer)
 
@@ -356,15 +374,15 @@ async def test_mastery_recompute_returns_run_id(db_session: AsyncSession):
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
 
     theme = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     db_session.add(theme)
 
@@ -398,7 +416,7 @@ async def test_revision_plan_returns_run_id(db_session: AsyncSession):
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
 
     await db_session.flush()
@@ -437,15 +455,15 @@ async def test_adaptive_select_returns_run_id(db_session: AsyncSession):
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
 
     theme = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     db_session.add(theme)
 
@@ -453,10 +471,10 @@ async def test_adaptive_select_returns_run_id(db_session: AsyncSession):
     for i in range(5):
         q = Question(
             id=uuid4(),
-            year=1,
+            year_id=1,
             block_id=block.id,
             theme_id=theme.id,
-            stem_text=f"Q{i}",
+            stem=f"Q{i}",
             status="PUBLISHED",
         )
         db_session.add(q)
@@ -472,7 +490,7 @@ async def test_adaptive_select_returns_run_id(db_session: AsyncSession):
         year=1,
         block_ids=[block.id],
         theme_ids=None,
-        count=3,
+        total_questions=3,
         mode="tutor",
         trigger="test",
     )
@@ -505,15 +523,15 @@ async def test_mastery_recompute_dry_run(db_session: AsyncSession):
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
 
     theme = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     db_session.add(theme)
 
@@ -549,20 +567,20 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
         is_active=True,
         email_verified=True,
     )
-    db_session.add(user)
+    db.add(user)
 
     year = Year(id=1, name="1st Year", order_no=1, is_active=True)
     db_session.add(year)
 
-    block = Block(id=uuid4(), year=1, name="Block 1", order=1)
+    block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
 
     theme = Theme(
-        id=uuid4(),
-        year=1,
+        id=1,
         block_id=block.id,
-        name="Theme 1",
-        order=1,
+        title="Theme 1",
+        order_no=1,
+        is_active=True,
     )
     db_session.add(theme)
 
@@ -570,10 +588,10 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
     for i in range(10):
         q = Question(
             id=uuid4(),
-            year=1,
+            year_id=1,
             block_id=block.id,
             theme_id=theme.id,
-            stem_text=f"Q{i}",
+            stem=f"Q{i}",
             status="PUBLISHED",
         )
         db_session.add(q)
@@ -589,7 +607,7 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
         year=1,
         block_ids=[block.id],
         theme_ids=None,
-        count=5,
+        total_questions=5,
         mode="tutor",
         trigger="test",
     )
@@ -600,7 +618,7 @@ async def test_adaptive_select_deterministic(db: AsyncSession):
         year=1,
         block_ids=[block.id],
         theme_ids=None,
-        count=5,
+        total_questions=5,
         mode="tutor",
         trigger="test",
     )
@@ -622,8 +640,8 @@ async def test_user_scope_defaults_to_current_user(db: AsyncSession):
         is_active=True,
         email_verified=True,
     )
-    db_session.add(student)
-    await db_session.flush()
+    db.add(student)
+    await db.flush()
 
     # Call with user_id=None
     from app.api.v1.endpoints.learning import assert_user_scope

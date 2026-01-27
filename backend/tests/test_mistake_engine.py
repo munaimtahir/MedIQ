@@ -41,7 +41,7 @@ async def test_compute_time_spent_by_question(db_session: AsyncSession):
     # Setup: user, session
     user = User(
         id=uuid4(),
-        email="test@example.com",
+        email=f"test_{uuid4()}@example.com",
         password_hash=hash_password("Test123!"),
         full_name="Test User",
         role=UserRole.STUDENT.value,
@@ -107,7 +107,7 @@ async def test_compute_change_count(db_session: AsyncSession):
     """Test answer change count from ANSWER_CHANGED events."""
     user = User(
         id=uuid4(),
-        email="test@example.com",
+        email=f"test_{uuid4()}@example.com",
         password_hash=hash_password("Test123!"),
         full_name="Test User",
         role=UserRole.STUDENT.value,
@@ -166,7 +166,7 @@ async def test_compute_blur_count(db_session: AsyncSession):
     """Test blur count from PAUSE_BLUR events."""
     user = User(
         id=uuid4(),
-        email="test@example.com",
+        email=f"test_{uuid4()}@example.com",
         password_hash=hash_password("Test123!"),
         full_name="Test User",
         role=UserRole.STUDENT.value,
@@ -514,7 +514,7 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
     # Setup: user, year, block, theme, question
     user = User(
         id=uuid4(),
-        email="test@example.com",
+        email=f"test_{uuid4()}@example.com",
         password_hash=hash_password("Test123!"),
         full_name="Test User",
         role=UserRole.STUDENT.value,
@@ -522,9 +522,15 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
         email_verified=True,
     )
     db_session.add(user)
+    await db_session.flush()
 
-    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
-    db_session.add(year)
+    # Check if year exists, if not create it
+    from sqlalchemy import select
+    year_result = await db_session.execute(select(Year).where(Year.id == 1))
+    year = year_result.scalar_one_or_none()
+    if not year:
+        year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+        db_session.add(year)
 
     block = Block(id=1, year_id=1, code="A", name="Block 1", order_no=1, is_active=True)
     db_session.add(block)
@@ -554,6 +560,8 @@ async def test_classify_mistakes_service_integration(db_session: AsyncSession):
         status=QuestionStatus.PUBLISHED,
         cognitive_level="UNDERSTAND",
         difficulty="MEDIUM",
+        created_by=user.id,
+        updated_by=user.id,
     )
     db_session.add(question)
 
@@ -627,7 +635,7 @@ async def test_upsert_idempotency(db_session: AsyncSession):
     # Setup minimal data
     user = User(
         id=uuid4(),
-        email="test@example.com",
+        email=f"test_{uuid4()}@example.com",
         password_hash=hash_password("Test123!"),
         full_name="Test User",
         role=UserRole.STUDENT.value,
@@ -635,10 +643,15 @@ async def test_upsert_idempotency(db_session: AsyncSession):
         email_verified=True,
     )
     db_session.add(user)
+    await db_session.flush()
 
-    # Create year, block, theme first
-    year = Year(id=1, name="1st Year", order_no=1, is_active=True)
-    db_session.add(year)
+    # Create year, block, theme first - check if year exists
+    from sqlalchemy import select
+    year_result = await db_session.execute(select(Year).where(Year.id == 1))
+    year = year_result.scalar_one_or_none()
+    if not year:
+        year = Year(id=1, name="1st Year", order_no=1, is_active=True)
+        db_session.add(year)
     block = Block(id=1, year_id=1, code="A", name="Test Block", order_no=1, is_active=True)
     db_session.add(block)
     theme = Theme(id=1, block_id=1, title="Test Theme", order_no=1, is_active=True)

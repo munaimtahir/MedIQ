@@ -40,7 +40,13 @@ async function fetcher<T = unknown>(url: string, options?: FetcherOptions): Prom
     // Try to extract from { detail }
     else if (errorData?.detail) {
       message = typeof errorData.detail === "string" ? errorData.detail : "Request failed";
-      code = response.status === 401 ? "UNAUTHORIZED" : "HTTP_ERROR";
+      if (response.status === 401) {
+        code = "UNAUTHORIZED";
+      } else if (response.status === 404) {
+        code = "NOT_FOUND";
+      } else {
+        code = "HTTP_ERROR";
+      }
     }
     // Try to extract from { message }
     else if (errorData?.message) {

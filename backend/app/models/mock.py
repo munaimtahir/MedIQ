@@ -55,12 +55,12 @@ class MockBlueprint(Base):
     total_questions = Column(Integer, nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     mode = Column(
-        ENUM(MockBlueprintMode, name="mock_blueprint_mode", create_type=False),
+        ENUM(MockBlueprintMode, name="mock_blueprint_mode", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=MockBlueprintMode.EXAM.value,
     )
     status = Column(
-        ENUM(MockBlueprintStatus, name="mock_blueprint_status", create_type=False),
+        ENUM(MockBlueprintStatus, name="mock_blueprint_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=MockBlueprintStatus.DRAFT.value,
     )
@@ -119,7 +119,7 @@ class MockGenerationRun(Base):
         nullable=False,
     )
     status = Column(
-        ENUM(MockGenerationRunStatus, name="mock_generation_run_status", create_type=False),
+        ENUM(MockGenerationRunStatus, name="mock_generation_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=MockGenerationRunStatus.QUEUED.value,
     )

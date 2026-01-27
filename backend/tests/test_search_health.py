@@ -85,50 +85,39 @@ class TestSearchHealthEndpoint:
         """Create test client."""
         return TestClient(app)
 
-    @pytest.fixture
-    def admin_user(self):
-        """Create mock admin user."""
-        from app.models.user import User
-
-        user = MagicMock(spec=User)
-        user.role = "ADMIN"
-        user.id = "test-admin-id"
-        return user
 
     def test_health_endpoint_requires_auth(self, client):
         """Test health endpoint requires authentication."""
         response = client.get("/v1/admin/search/health")
         assert response.status_code in (401, 403)
 
-    def test_health_endpoint_disabled(self, client, admin_user):
+    def test_health_endpoint_disabled(self, client, auth_headers_admin):
         """Test health endpoint when Elasticsearch is disabled."""
-        with patch("app.api.v1.endpoints.admin_search.get_current_user", return_value=admin_user):
-            with patch.object(settings, "ELASTICSEARCH_ENABLED", False):
-                with patch("app.api.v1.endpoints.admin_search.get_health_info") as mock_health:
-                    mock_health.return_value = {
-                        "enabled": False,
-                        "reachable": False,
-                        "url": "http://test:9200",
-                        "index_prefix": "test",
-                        "indices": [],
-                        "aliases": None,
-                        "last_sync_run": None,
-                        "pending_outbox": None,
-                    }
-                    response = client.get("/v1/admin/search/health")
-                    assert response.status_code == 200
-                    data = response.json()
-                    assert data["enabled"] is False
-                    assert data["reachable"] is False
-
-    def test_health_endpoint_handles_exceptions(self, client, admin_user):
-        """Test health endpoint handles exceptions gracefully."""
-        with patch("app.api.v1.endpoints.admin_search.get_current_user", return_value=admin_user):
+        with patch.object(settings, "ELASTICSEARCH_ENABLED", False):
             with patch("app.api.v1.endpoints.admin_search.get_health_info") as mock_health:
-                mock_health.side_effect = Exception("Unexpected error")
-                response = client.get("/v1/admin/search/health")
-                # Should not return 500, should return safe response
+                mock_health.return_value = {
+                    "enabled": False,
+                    "reachable": False,
+                    "url": "http://test:9200",
+                    "index_prefix": "test",
+                    "indices": [],
+                    "aliases": None,
+                    "last_sync_run": None,
+                    "pending_outbox": None,
+                }
+                response = client.get("/v1/admin/search/health", headers=auth_headers_admin)
                 assert response.status_code == 200
                 data = response.json()
                 assert data["enabled"] is False
                 assert data["reachable"] is False
+
+    def test_health_endpoint_handles_exceptions(self, client, auth_headers_admin):
+        """Test health endpoint handles exceptions gracefully."""
+        with patch("app.api.v1.endpoints.admin_search.get_health_info") as mock_health:
+            mock_health.side_effect = Exception("Unexpected error")
+            response = client.get("/v1/admin/search/health", headers=auth_headers_admin)
+            # Should not return 500, should return safe response
+            assert response.status_code == 200
+            data = response.json()
+            assert data["enabled"] is False
+            assert data["reachable"] is False

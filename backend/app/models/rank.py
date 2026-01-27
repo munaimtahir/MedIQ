@@ -54,7 +54,7 @@ class RankPredictionSnapshot(Base):
     band_low = Column(Float, nullable=True)
     band_high = Column(Float, nullable=True)
     status = Column(
-        ENUM(RankSnapshotStatus, name="rank_snapshot_status", create_type=False),
+        ENUM(RankSnapshotStatus, name="rank_snapshot_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default="ok",
     )
@@ -92,7 +92,7 @@ class RankModelRun(Base):
     dataset_spec = Column(JSONB, nullable=False, server_default="{}")
     metrics = Column(JSONB, nullable=True)
     status = Column(
-        ENUM(RankRunStatus, name="rank_run_status", create_type=False),
+        ENUM(RankRunStatus, name="rank_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default="QUEUED",
     )

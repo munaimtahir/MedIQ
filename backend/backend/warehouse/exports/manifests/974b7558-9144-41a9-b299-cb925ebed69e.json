@@ -1,0 +1,11 @@
+{
+  "run_id": "974b7558-9144-41a9-b299-cb925ebed69e",
+  "dataset": "attempts",
+  "range_start": null,
+  "range_end": "2026-01-26T23:21:06.671139+00:00",
+  "rows": 0,
+  "files": [],
+  "schema_version": "v1",
+  "generated_at": "2026-01-26T23:21:06.706269+00:00",
+  "checksums": {}
+}

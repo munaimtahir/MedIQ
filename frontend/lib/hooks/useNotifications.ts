@@ -37,14 +37,16 @@ export function useNotifications(params: {
 }
 
 /**
- * Hook to fetch unread count
+ * Hook to fetch unread count.
+ * No polling – fetch on mount, tab focus, and reconnect only.
+ * Mutations (mark read) invalidate via global mutate in useMarkRead/useMarkAllRead.
  */
 export function useUnreadCount() {
   return useSWR(`${API_BASE}/notifications/unread-count`, fetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    refreshInterval: 30000, // Refetch every 30 seconds
-    dedupingInterval: 30000,
+    refreshInterval: 0, // No polling – was 30s; reduced to stop endless refetches and excess RAM
+    dedupingInterval: 60_000, // 1 min – avoid refetch on focus if we just fetched
   });
 }
 

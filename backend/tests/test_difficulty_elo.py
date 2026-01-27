@@ -487,21 +487,48 @@ async def test_recenter_zeros_mean(db_session, test_question_async, active_diffi
     result = await db_session.execute(theme_stmt)
     theme = result.scalar_one()
 
+    # Get test_user_async for created_by/updated_by
+    from app.core.security import hash_password
+    from app.models.user import User, UserRole
+    
+    test_user_result = await db_session.execute(select(User).limit(1))
+    test_user = test_user_result.scalar_one_or_none()
+    if not test_user:
+        test_user = User(
+            id=uuid4(),
+            email=f"test_user_{uuid4()}@example.com",
+            full_name="Test User",
+            password_hash=hash_password("Test123!"),
+            role=UserRole.STUDENT.value,
+            is_active=True,
+            email_verified=True,
+            onboarding_completed=True,
+        )
+        db_session.add(test_user)
+        await db_session.flush()
+
     question_ids = []
     for i in range(5):
         from app.models.question_cms import Question as CMSQuestion
         from app.models.question_cms import QuestionStatus
 
         q = CMSQuestion(
-            year=2024,
+            year_id=1,
             block_id=theme.block_id,
             theme_id=theme.id,
             status=QuestionStatus.PUBLISHED,
             stem=f"Test question {i}",
-            options_json=["A", "B", "C", "D", "E"],
-            correct_answer="A",
-            explanation="Test",
+            option_a="A",
+            option_b="B",
+            option_c="C",
+            option_d="D",
+            option_e="E",
+            correct_index=0,
+            explanation_md="Test",
             cognitive_level="RECALL",
+            difficulty="MEDIUM",
+            created_by=test_user.id,
+            updated_by=test_user.id,
         )
         db_session.add(q)
         await db_session.flush()

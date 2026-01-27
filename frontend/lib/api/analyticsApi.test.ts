@@ -128,7 +128,7 @@ describe("analyticsApi", () => {
 
       expect(result).toEqual(mockSessions);
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/v1/analytics/recent-sessions",
+        "/api/v1/analytics/recent-sessions?limit=10",
         expect.objectContaining({
           credentials: "include",
         })

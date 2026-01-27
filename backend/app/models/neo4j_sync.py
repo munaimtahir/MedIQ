@@ -35,11 +35,11 @@ class Neo4jSyncRun(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_type = Column(
-        ENUM(Neo4jSyncRunType, name="neo4j_sync_run_type", create_type=False),
+        ENUM(Neo4jSyncRunType, name="neo4j_sync_run_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     status = Column(
-        ENUM(Neo4jSyncRunStatus, name="neo4j_sync_run_status", create_type=False),
+        ENUM(Neo4jSyncRunStatus, name="neo4j_sync_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=Neo4jSyncRunStatus.QUEUED.value,
     )

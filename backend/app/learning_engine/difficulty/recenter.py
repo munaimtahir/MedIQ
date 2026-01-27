@@ -48,18 +48,19 @@ async def recenter_question_ratings(
         raise ValueError("Difficulty algorithm not configured")
 
     # Start algo run
-    run_id = await log_run_start(
+    run = await log_run_start(
         db,
         algo_version_id=algo_version.id,
         params_id=algo_params.id,
         user_id=None,
         session_id=None,
         trigger=RunTrigger.MANUAL,
-        input_summary_json={
+        input_summary={
             "scope_type": scope_type.value,
             "scope_id": str(scope_id) if scope_id else None,
         },
     )
+    run_id = run.id
 
     try:
         # Compute mean question rating in scope
@@ -75,7 +76,7 @@ async def recenter_question_ratings(
             await log_run_success(
                 db,
                 run_id=run_id,
-                output_summary_json={"mean_adjustment": 0.0, "already_centered": True},
+                output_summary={"mean_adjustment": 0.0, "already_centered": True},
             )
             return {
                 "mean_adjustment": 0.0,
@@ -134,7 +135,7 @@ async def recenter_question_ratings(
         await log_run_success(
             db,
             run_id=run_id,
-            output_summary_json={
+            output_summary={
                 "mean_adjustment": float(mean_rating),
                 "questions_updated": n_questions,
                 "users_updated": n_users,

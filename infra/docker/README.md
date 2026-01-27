@@ -143,6 +143,30 @@ The compose file is configured for hot-reload development:
 ### Port conflicts
 If a port is already in use, update the port mapping in `docker-compose.dev.yml` or stop the conflicting service.
 
+### `localhost:5432` not working (pgAdmin, DBeaver, psql, etc.)
+
+If you connect to `localhost:5432` from your host and it fails or uses the wrong database:
+
+1. **Local PostgreSQL conflict**  
+   Windows often has PostgreSQL installed and listening on `[::1]:5432`. Your client may hit that instead of Docker.  
+   - **Option A:** Stop local PostgreSQL (Services → stop `postgresql-x64-*`, or `pg_ctl stop`). Then `localhost:5432` reaches Docker only.  
+   - **Option B:** Use **`127.0.0.1`** instead of `localhost` so the client targets Docker’s `0.0.0.0:5432` binding.  
+   - **Option C:** Map Docker Postgres to another port. In `infra/docker/compose/.env` set `POSTGRES_PORT=5433`, then `docker compose ... up -d` and connect to **`localhost:5433`**. Local Postgres keeps 5432.
+
+2. **Credentials**  
+   Use the same user/password as the backend. From `docker-compose.dev.yml` that’s typically:
+   - **Host:** `127.0.0.1` (or `localhost` if no local Postgres)
+   - **Port:** `5432` (or `5433` if you use Option C)
+   - **User:** `exam_user`
+   - **Password:** `exam_user_dev_pw` (or value of `POSTGRES_PASSWORD` in `infra/docker/compose/.env`)
+   - **Database:** `exam_platform`
+
+3. **Quick check**  
+   Use Postgres inside the container (always hits Docker DB):
+   ```bash
+   docker compose -f infra/docker/compose/docker-compose.dev.yml exec postgres psql -U exam_user -d exam_platform -c "SELECT 1;"
+   ```
+
 ### Database connection issues
 Ensure the `DATABASE_URL` in your `.env` matches the Postgres service configuration.
 

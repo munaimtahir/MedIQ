@@ -28,7 +28,7 @@ class SRSUserParams(Base):
     # FSRS configuration
     fsrs_version: Mapped[str] = mapped_column(String(20), nullable=False, default="fsrs-6")
     weights_json: Mapped[dict | None] = mapped_column(
-        JSONB, nullable=True, comment="Personalized FSRS weights (19 params for v6)"
+        JSONB, nullable=True, comment="Personalized FSRS weights (21 params for v6)"
     )
     desired_retention: Mapped[float] = mapped_column(
         Float, nullable=False, default=0.90, comment="Target retention probability"

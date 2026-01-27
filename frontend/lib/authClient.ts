@@ -62,7 +62,19 @@ async function authFetch<T>(endpoint: string, options: RequestInit = {}): Promis
     };
   }
 
-  return { data };
+  // Pass through MFA fields if present
+  const result: AuthResponse<T> = { data };
+  if (data.mfa_required !== undefined) {
+    result.mfa_required = data.mfa_required;
+  }
+  if (data.mfa_token !== undefined) {
+    result.mfa_token = data.mfa_token;
+  }
+  if (data.method !== undefined) {
+    result.method = data.method;
+  }
+
+  return result;
 }
 
 export const authClient = {

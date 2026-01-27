@@ -107,6 +107,9 @@ async def test_dataset_build_sparse_telemetry(db, test_user, test_session):
     start_date = date.today() - timedelta(days=30)
     end_date = date.today()
 
+    features = []
+    labels = []
+    confidences = []
     try:
         features, labels, confidences = await build_training_dataset(db, start_date, end_date)
         # Should not crash even with sparse data

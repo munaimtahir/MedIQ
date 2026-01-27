@@ -1,0 +1,11 @@
+{
+  "run_id": "c2945a7c-e96a-42d4-b416-00cdc0995c66",
+  "dataset": "mastery",
+  "range_start": null,
+  "range_end": "2026-01-27T00:10:59.266714+00:00",
+  "rows": 0,
+  "files": [],
+  "schema_version": "v1",
+  "generated_at": "2026-01-27T00:10:59.352043+00:00",
+  "checksums": {}
+}

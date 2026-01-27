@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -170,9 +171,75 @@ class TestSubmitIdempotent:
 class TestDuplicateAnswerIdempotent:
     """Duplicate answer insert → IntegrityError handled, return 200 with existing."""
 
-    def test_process_answer_integrity_error_returns_existing(self, db: Session, session_with_questions):
+    @pytest.mark.asyncio
+    async def test_process_answer_integrity_error_returns_existing(self, db_session: AsyncSession):
         """When commit raises IntegrityError (duplicate), we rollback, refetch, return existing (idempotent)."""
-        sess, qs = session_with_questions
+        # Create session and questions in async session
+        from app.models.user import User, UserRole
+        from app.core.security import hash_password
+        from uuid import uuid4
+        
+        # Use unique email to avoid conflicts with other fixtures
+        unique_id = uuid4()
+        student_user = User(
+            id=unique_id,
+            email=f"student_{unique_id}@test.com",
+            password_hash=hash_password("Test123!"),
+            full_name="Test Student",
+            role=UserRole.STUDENT.value,
+            is_active=True,
+            email_verified=True,
+        )
+        db_session.add(student_user)
+        await db_session.flush()
+        
+        # Create session and questions
+        sess = TestSession(
+            id=uuid4(),
+            user_id=student_user.id,
+            mode=SessionMode.TUTOR,
+            status=SessionStatus.ACTIVE,
+            year=1,
+            blocks_json=["A"],
+            total_questions=5,
+            started_at=datetime.now(UTC),
+        )
+        db_session.add(sess)
+        
+        qs = []
+        for i in range(5):
+            q = Question(
+                id=uuid4(),
+                status=QuestionStatus.PUBLISHED,
+                year_id=1,
+                block_id=1,
+                theme_id=1,
+                stem=f"Q{i+1}",
+                option_a="A",
+                option_b="B",
+                option_c="C",
+                option_d="D",
+                option_e="E",
+                correct_index=0,
+                explanation_md="X",
+                difficulty="MEDIUM",
+                cognitive_level="UNDERSTAND",
+                created_by=student_user.id,
+                updated_by=student_user.id,
+            )
+            db_session.add(q)
+            qs.append(q)
+            
+            sq = SessionQuestion(
+                session_id=sess.id,
+                question_id=q.id,
+                position=i+1,
+            )
+            db_session.add(sq)
+        
+        await db_session.commit()
+        await db_session.refresh(sess)
+        
         q = qs[0]
 
         # Pre-insert in same session so refetch can see it. We mock commit to raise;
@@ -185,16 +252,16 @@ class TestDuplicateAnswerIdempotent:
             answered_at=datetime.utcnow(),
             changed_count=0,
         )
-        db.add(existing)
-        db.commit()
-        db.refresh(existing)
+        db_session.add(existing)
+        await db_session.commit()
+        await db_session.refresh(existing)
 
         async def _run():
-            with patch.object(db, "commit", side_effect=IntegrityError("stmt", "params", None)):
-                with patch.object(db, "rollback"):  # no-op so pre-insert stays
-                    return await process_answer(db, sess, q.id, 0, False)
+            with patch.object(db_session, "commit", side_effect=IntegrityError("stmt", "params", None)):
+                with patch.object(db_session, "rollback"):  # no-op so pre-insert stays
+                    return await process_answer(db_session, sess, q.id, 0, False)
 
-        out = asyncio.run(_run())
+        out = await _run()
         assert out is not None
         assert out.session_id == sess.id and out.question_id == q.id
         assert out.selected_index == 1  # existing; our update was rolled back

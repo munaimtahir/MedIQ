@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useBlocks } from "./hooks";
+import { useThemes } from "./hooks";
 
 // Mock API
 vi.mock("@/lib/api", () => ({
@@ -12,7 +12,7 @@ vi.mock("@/lib/api", () => ({
 
 import { syllabusAPI } from "@/lib/api";
 
-describe("useBlocks", () => {
+describe("useThemes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -21,15 +21,15 @@ describe("useBlocks", () => {
     vi.restoreAllMocks();
   });
 
-  it("should load blocks successfully", async () => {
-    const mockBlocks = [
-      { id: 1, year_id: 1, title: "Block 1", order_no: 1 },
-      { id: 2, year_id: 1, title: "Block 2", order_no: 2 },
+  it("should load themes successfully", async () => {
+    const mockThemes = [
+      { id: 1, block_id: 1, title: "Theme 1", order_no: 1 },
+      { id: 2, block_id: 1, title: "Theme 2", order_no: 2 },
     ];
 
-    (syllabusAPI.getBlocks as any).mockResolvedValueOnce(mockBlocks);
+    (syllabusAPI.getThemes as any).mockResolvedValueOnce(mockThemes);
 
-    const { result } = renderHook(() => useBlocks(1));
+    const { result } = renderHook(() => useThemes(1));
 
     expect(result.current.loading).toBe(true);
 
@@ -37,16 +37,16 @@ describe("useBlocks", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.blocks).toEqual(mockBlocks);
+    expect(result.current.themes).toEqual(mockThemes);
     expect(result.current.error).toBeNull();
   });
 
   it("should handle errors", async () => {
-    (syllabusAPI.getBlocks as any).mockRejectedValueOnce(
+    (syllabusAPI.getThemes as any).mockRejectedValueOnce(
       new Error("Failed to load")
     );
 
-    const { result } = renderHook(() => useBlocks(1));
+    const { result } = renderHook(() => useThemes(1));
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

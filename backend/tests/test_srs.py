@@ -1,6 +1,6 @@
 """Tests for SRS (Spaced Repetition System) implementation."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -126,13 +126,13 @@ class TestFSRSAdapter:
         params = get_default_parameters("fsrs-6")
         assert "weights" in params
         assert "desired_retention" in params
-        assert len(params["weights"]) == 19  # FSRS-6 has 19 weights
+        assert len(params["weights"]) == 21  # FSRS-6 has 21 weights
         assert 0.0 <= params["desired_retention"] <= 1.0
 
     def test_validate_weights(self):
         """Test weight validation."""
-        # Valid weights (19 parameters)
-        valid_weights = [0.5] * 19
+        # Valid weights (21 parameters)
+        valid_weights = [0.5] * 21
         is_valid, msg = validate_weights(valid_weights)
         assert is_valid
         assert msg == ""
@@ -140,23 +140,23 @@ class TestFSRSAdapter:
         # Wrong number of weights
         is_valid, msg = validate_weights([0.5] * 10)
         assert not is_valid
-        assert "19 weights" in msg
+        assert "21 weights" in msg
 
         # Inf weights
-        invalid_weights = [float("inf")] + [0.5] * 18
+        invalid_weights = [float("inf")] + [0.5] * 20
         is_valid, msg = validate_weights(invalid_weights)
         assert not is_valid
         assert "not finite" in msg
 
         # Out of range weights
-        invalid_weights = [200.0] + [0.5] * 18
+        invalid_weights = [200.0] + [0.5] * 20
         is_valid, msg = validate_weights(invalid_weights)
         assert not is_valid
         assert "reasonable range" in msg
 
     def test_compute_next_state_first_review(self):
         """Test FSRS state computation for first review."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         # First review (stability=None, difficulty=None)
@@ -178,7 +178,7 @@ class TestFSRSAdapter:
 
     def test_compute_next_state_subsequent_review(self):
         """Test FSRS state computation for subsequent review."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         # Subsequent review
@@ -200,7 +200,7 @@ class TestFSRSAdapter:
 
     def test_rating_affects_stability(self):
         """Test that rating affects stability."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         # Rating 1 (Again) should give lower stability than rating 4 (Easy)
@@ -229,7 +229,7 @@ class TestFSRSAdapter:
 
     def test_due_date_always_in_future(self):
         """Test that due_at is always in the future."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         for rating in [1, 2, 3, 4]:
@@ -246,7 +246,7 @@ class TestFSRSAdapter:
 
     def test_invalid_rating_raises_error(self):
         """Test that invalid rating raises error."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         with pytest.raises(ValueError, match="Invalid FSRS rating"):
@@ -294,7 +294,7 @@ class TestSRSInvariants:
 
     def test_stability_always_positive(self):
         """Test that stability is always positive."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         for _ in range(20):
@@ -312,7 +312,7 @@ class TestSRSInvariants:
 
     def test_difficulty_in_range(self):
         """Test that difficulty is always in [0, 10]."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         for _ in range(20):
@@ -330,7 +330,7 @@ class TestSRSInvariants:
 
     def test_retrievability_in_range(self):
         """Test that retrievability is always in [0, 1]."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         weights = get_default_parameters()["weights"]
 
         for _ in range(20):

@@ -143,11 +143,29 @@ class TestReadinessChecks:
 
                     with patch("app.search.readiness.get_current_questions_index", return_value="test_index"):
                         # Create some published questions in DB
+                        # Need a user for created_by field
+                        from app.models.user import User, UserRole
+                        from app.core.security import hash_password
+                        admin_user = db.query(User).filter(User.role == UserRole.ADMIN.value).first()
+                        if not admin_user:
+                            admin_user = User(
+                                id=uuid4(),
+                                email=f"admin_{uuid4()}@test.com",
+                                full_name="Test Admin",
+                                password_hash=hash_password("Test123!"),
+                                role=UserRole.ADMIN.value,
+                                is_active=True,
+                                email_verified=True,
+                                onboarding_completed=True,
+                            )
+                            db.add(admin_user)
+                            db.flush()
                         for i in range(1000):
                             question = Question(
                                 id=uuid4(),
                                 stem=f"Question {i}",
                                 status=QuestionStatus.PUBLISHED,
+                                created_by=admin_user.id,
                             )
                             db.add(question)
                         db.commit()
@@ -188,8 +206,8 @@ class TestReadinessChecks:
                 # Create a recent successful nightly run
                 recent_run = SearchSyncRun(
                     id=uuid4(),
-                    run_type=SearchSyncRunType.NIGHTLY,
-                    status=SearchSyncRunStatus.DONE,
+                    run_type=SearchSyncRunType.NIGHTLY.value,
+                    status=SearchSyncRunStatus.DONE.value,
                     finished_at=datetime.now(UTC) - timedelta(hours=1),  # 1 hour ago
                     indexed_count=1000,
                 )
@@ -207,8 +225,8 @@ class TestReadinessChecks:
                 # Create a stale successful nightly run
                 stale_run = SearchSyncRun(
                     id=uuid4(),
-                    run_type=SearchSyncRunType.NIGHTLY,
-                    status=SearchSyncRunStatus.DONE,
+                    run_type=SearchSyncRunType.NIGHTLY.value,
+                    status=SearchSyncRunStatus.DONE.value,
                     finished_at=datetime.now(UTC) - timedelta(hours=48),  # 48 hours ago
                     indexed_count=1000,
                 )
@@ -226,8 +244,8 @@ class TestReadinessChecks:
                 for i in range(3):
                     run = SearchSyncRun(
                         id=uuid4(),
-                        run_type=SearchSyncRunType.NIGHTLY,
-                        status=SearchSyncRunStatus.DONE,
+                        run_type=SearchSyncRunType.NIGHTLY.value,
+                        status=SearchSyncRunStatus.DONE.value,
                         finished_at=datetime.now(UTC) - timedelta(hours=i),
                         indexed_count=1000,
                     )
@@ -246,8 +264,8 @@ class TestReadinessChecks:
                 for i in range(3):
                     run = SearchSyncRun(
                         id=uuid4(),
-                        run_type=SearchSyncRunType.NIGHTLY,
-                        status=SearchSyncRunStatus.FAILED if i == 0 else SearchSyncRunStatus.DONE,
+                        run_type=SearchSyncRunType.NIGHTLY.value,
+                        status=(SearchSyncRunStatus.FAILED if i == 0 else SearchSyncRunStatus.DONE).value,
                         finished_at=datetime.now(UTC) - timedelta(hours=i),
                         indexed_count=1000,
                     )
@@ -293,19 +311,37 @@ class TestReadinessEvaluation:
                     with patch("app.search.readiness.get_questions_read_alias", return_value="test_alias"):
                         with patch("app.search.readiness.get_current_questions_index", return_value="test_index"):
                             # Create published questions
+                            # Need a user for created_by field
+                            from app.models.user import User, UserRole
+                            from app.core.security import hash_password
+                            admin_user = db.query(User).filter(User.role == UserRole.ADMIN.value).first()
+                            if not admin_user:
+                                admin_user = User(
+                                    id=uuid4(),
+                                    email=f"admin_{uuid4()}@test.com",
+                                    full_name="Test Admin",
+                                    password_hash=hash_password("Test123!"),
+                                    role=UserRole.ADMIN.value,
+                                    is_active=True,
+                                    email_verified=True,
+                                    onboarding_completed=True,
+                                )
+                                db.add(admin_user)
+                                db.flush()
                             for i in range(1000):
                                 question = Question(
                                     id=uuid4(),
                                     stem=f"Question {i}",
                                     status=QuestionStatus.PUBLISHED,
+                                    created_by=admin_user.id,
                                 )
                                 db.add(question)
 
                             # Create recent successful sync
                             recent_run = SearchSyncRun(
                                 id=uuid4(),
-                                run_type=SearchSyncRunType.NIGHTLY,
-                                status=SearchSyncRunStatus.DONE,
+                                run_type=SearchSyncRunType.NIGHTLY.value,
+                                status=SearchSyncRunStatus.DONE.value,
                                 finished_at=datetime.now(UTC) - timedelta(hours=1),
                                 indexed_count=1000,
                             )
@@ -394,8 +430,8 @@ class TestReadinessEvaluation:
                                 # Create stale sync
                                 stale_run = SearchSyncRun(
                                     id=uuid4(),
-                                    run_type=SearchSyncRunType.NIGHTLY,
-                                    status=SearchSyncRunStatus.DONE,
+                                    run_type=SearchSyncRunType.NIGHTLY.value,
+                                    status=SearchSyncRunStatus.DONE.value,
                                     finished_at=datetime.now(UTC) - timedelta(hours=48),
                                     indexed_count=1000,
                                 )

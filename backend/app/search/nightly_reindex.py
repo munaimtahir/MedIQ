@@ -62,7 +62,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
     try:
         # Check if ES is enabled
         if not settings.ELASTICSEARCH_ENABLED:
-            run.status = SearchSyncRunStatus.DISABLED
+            run.status = SearchSyncRunStatus.DISABLED.value
             run.details = {"reason": "Elasticsearch disabled"}
             run.finished_at = datetime.now(UTC)
             db.commit()
@@ -71,7 +71,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
 
         # Check freeze_updates
         if check_freeze_updates(db):
-            run.status = SearchSyncRunStatus.BLOCKED_FROZEN
+            run.status = SearchSyncRunStatus.BLOCKED_FROZEN.value
             run.details = {"reason": "freeze_updates is enabled"}
             run.finished_at = datetime.now(UTC)
             db.commit()
@@ -79,7 +79,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
             return run
 
         # Start run
-        run.status = SearchSyncRunStatus.RUNNING
+        run.status = SearchSyncRunStatus.RUNNING.value
         run.started_at = datetime.now(UTC)
         db.commit()
 
@@ -179,7 +179,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
         except Exception as e:
             logger.error(f"Verification failed: {e}")
             # Don't swap aliases if verification fails
-            run.status = SearchSyncRunStatus.FAILED
+            run.status = SearchSyncRunStatus.FAILED.value
             run.finished_at = datetime.now(UTC)
             run.indexed_count = indexed_count
             run.failed_count = failed_count
@@ -202,7 +202,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
                 raise ValueError("Sample query returned no results but expected documents exist")
         except Exception as e:
             logger.error(f"Sample query failed: {e}")
-            run.status = SearchSyncRunStatus.FAILED
+            run.status = SearchSyncRunStatus.FAILED.value
             run.finished_at = datetime.now(UTC)
             run.indexed_count = indexed_count
             run.failed_count = failed_count
@@ -219,7 +219,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
             logger.info(f"Swapped aliases to {new_index_name}")
         except Exception as e:
             logger.error(f"Alias swap failed: {e}")
-            run.status = SearchSyncRunStatus.FAILED
+            run.status = SearchSyncRunStatus.FAILED.value
             run.finished_at = datetime.now(UTC)
             run.indexed_count = indexed_count
             run.failed_count = failed_count
@@ -251,7 +251,7 @@ def run_nightly_reindex(db: Session) -> SearchSyncRun:
             # Don't fail the run for cleanup errors
 
         # Mark as done
-        run.status = SearchSyncRunStatus.DONE
+        run.status = SearchSyncRunStatus.DONE.value
         run.finished_at = datetime.now(UTC)
         run.indexed_count = indexed_count
         run.deleted_count = deleted_count

@@ -93,8 +93,8 @@ class TestSyncExecution:
                                         # Create a previous successful run
                                         previous_run = Neo4jSyncRun(
                                             id=uuid4(),
-                                            run_type=Neo4jSyncRunType.INCREMENTAL,
-                                            status=Neo4jSyncRunStatus.DONE,
+                                            run_type=Neo4jSyncRunType.INCREMENTAL.value,
+                                            status=Neo4jSyncRunStatus.DONE.value,
                                             finished_at=datetime.now(UTC) - timedelta(hours=1),
                                         )
                                         db.add(previous_run)

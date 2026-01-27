@@ -39,33 +39,35 @@ class SourcedValue:
 # =============================================================================
 
 # FSRS-6 Default Weights
-# Source: py-fsrs library v4.x default parameters
+# Source: py-fsrs library v6.3.0 default parameters
 # Reference: https://github.com/open-spaced-repetition/py-fsrs
 # These are the population-level defaults trained on large datasets
 FSRS_DEFAULT_WEIGHTS = SourcedValue(
     value=[
-        0.4072,
-        1.1829,
-        3.1262,
-        15.4722,
-        7.2102,
-        0.5316,
-        1.0651,
-        0.0234,
-        1.616,
-        0.1544,
-        1.0824,
-        1.9813,
-        0.0953,
-        0.2975,
-        2.2042,
-        0.2407,
-        2.9466,
-        0.5034,
-        0.6567,
+        0.212,
+        1.2931,
+        2.3065,
+        8.2956,
+        6.4133,
+        0.8334,
+        3.0194,
+        0.001,
+        1.8722,
+        0.1666,
+        0.796,
+        1.4835,
+        0.0614,
+        0.2629,
+        1.6483,
+        0.6014,
+        1.8729,
+        0.5425,
+        0.0912,
+        0.0658,
+        0.1542,
     ],
-    source="py-fsrs v4.x default parameters (https://github.com/open-spaced-repetition/py-fsrs)",
-    notes="19 parameters for FSRS-6 algorithm. These are population-level defaults. "
+    source="py-fsrs v6.3.0 default parameters (https://github.com/open-spaced-repetition/py-fsrs)",
+    notes="21 parameters for FSRS-6 algorithm. These are population-level defaults. "
     "Per-user tuning can improve performance but requires 300+ review logs.",
     validated=True,
 )
@@ -370,10 +372,10 @@ def validate_all_constants():
     """
     errors = []
 
-    # FSRS weights must be 19 parameters
-    if len(FSRS_DEFAULT_WEIGHTS.value) != 19:
+    # FSRS weights must be 21 parameters
+    if len(FSRS_DEFAULT_WEIGHTS.value) != 21:
         errors.append(
-            f"FSRS weights must have 19 parameters, got {len(FSRS_DEFAULT_WEIGHTS.value)}"
+            f"FSRS weights must have 21 parameters, got {len(FSRS_DEFAULT_WEIGHTS.value)}"
         )
 
     # All FSRS weights must be finite

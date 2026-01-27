@@ -74,14 +74,14 @@ def fetch_pending_events(db: Session, limit: int = 100) -> list[SearchOutbox]:
 
 def mark_event_processing(db: Session, event: SearchOutbox) -> None:
     """Mark event as processing."""
-    event.status = SearchOutboxStatus.PROCESSING
+    event.status = SearchOutboxStatus.PROCESSING.value
     event.updated_at = datetime.now(UTC)
     db.commit()
 
 
 def mark_event_done(db: Session, event: SearchOutbox) -> None:
     """Mark event as done."""
-    event.status = SearchOutboxStatus.DONE
+    event.status = SearchOutboxStatus.DONE.value
     event.updated_at = datetime.now(UTC)
     db.commit()
 
@@ -101,13 +101,13 @@ def mark_event_failed(
         error: Error message
         retry: Whether to schedule a retry
     """
-    event.status = SearchOutboxStatus.FAILED
+    event.status = SearchOutboxStatus.FAILED.value
     event.last_error = error[:1000]  # Truncate to 1000 chars
     event.retry_count += 1
     event.updated_at = datetime.now(UTC)
 
     if retry and event.retry_count < 10:  # Max 10 retries
-        event.status = SearchOutboxStatus.PENDING
+        event.status = SearchOutboxStatus.PENDING.value
         event.next_attempt_at = calculate_next_attempt(event.retry_count)
         logger.warning(
             f"Scheduling retry {event.retry_count} for event {event.id} at {event.next_attempt_at}"

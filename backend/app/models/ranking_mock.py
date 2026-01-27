@@ -87,7 +87,7 @@ class RankingRun(Base):
     )
     cohort_id = Column(Text, nullable=False)
     status = Column(
-        ENUM(RankingRunStatus, name="ranking_run_status", create_type=False),
+        ENUM(RankingRunStatus, name="ranking_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         server_default=RankingRunStatus.QUEUED.value,
     )

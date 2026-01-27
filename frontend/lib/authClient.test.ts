@@ -24,7 +24,7 @@ describe("authClient", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: { user: mockUser } }),
+        json: async () => ({ user: mockUser }),
       });
 
       const result = await authClient.login({
@@ -32,7 +32,8 @@ describe("authClient", () => {
         password: "password123",
       });
 
-      expect(result.data?.user).toEqual(mockUser);
+      expect(result.data).toBeDefined();
+      expect((result.data as any)?.user).toEqual(mockUser);
       expect(result.error).toBeUndefined();
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/auth/login",
@@ -66,7 +67,7 @@ describe("authClient", () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: { user: null },
+          user: null,
           mfa_required: true,
           mfa_token: "mfa-token-123",
         }),
@@ -97,7 +98,7 @@ describe("authClient", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: { user: mockUser } }),
+        json: async () => ({ user: mockUser }),
       });
 
       const result = await authClient.signup({
@@ -145,7 +146,7 @@ describe("authClient", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ data: { user: mockUser } }),
+        json: async () => ({ user: mockUser }),
       });
 
       const result = await authClient.me();

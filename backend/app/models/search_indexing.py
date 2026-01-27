@@ -55,14 +55,14 @@ class SearchOutbox(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type = Column(
-        ENUM(SearchOutboxEventType, name="search_outbox_event_type", create_type=False),
+        ENUM(SearchOutboxEventType, name="search_outbox_event_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     payload = Column(JSONB, nullable=False)  # {question_id, version_id}
     status = Column(
-        ENUM(SearchOutboxStatus, name="search_outbox_status", create_type=False),
+        ENUM(SearchOutboxStatus, name="search_outbox_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=SearchOutboxStatus.PENDING,
+        default=SearchOutboxStatus.PENDING.value,
     )
     retry_count = Column(Integer, nullable=False, default=0)
     last_error = Column(Text, nullable=True)
@@ -83,13 +83,13 @@ class SearchSyncRun(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_type = Column(
-        ENUM(SearchSyncRunType, name="search_sync_run_type", create_type=False),
+        ENUM(SearchSyncRunType, name="search_sync_run_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     status = Column(
-        ENUM(SearchSyncRunStatus, name="search_sync_run_status", create_type=False),
+        ENUM(SearchSyncRunStatus, name="search_sync_run_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
-        default=SearchSyncRunStatus.QUEUED,
+        default=SearchSyncRunStatus.QUEUED.value,
     )
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)

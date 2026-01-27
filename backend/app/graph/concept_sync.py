@@ -181,8 +181,8 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
     # Create sync run record
     sync_run = Neo4jSyncRun(
         id=uuid4(),
-        run_type=Neo4jSyncRunType.INCREMENTAL,
-        status=Neo4jSyncRunStatus.QUEUED,
+        run_type=Neo4jSyncRunType.INCREMENTAL.value,
+        status=Neo4jSyncRunStatus.QUEUED.value,
     )
     db.add(sync_run)
     db.commit()
@@ -192,7 +192,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
 
     # Check if Neo4j is enabled
     if not settings.NEO4J_ENABLED:
-        sync_run.status = Neo4jSyncRunStatus.DISABLED
+        sync_run.status = Neo4jSyncRunStatus.DISABLED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = "Neo4j is disabled"
         db.commit()
@@ -201,7 +201,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
 
     # Check freeze_updates
     if _check_freeze_updates(db):
-        sync_run.status = Neo4jSyncRunStatus.BLOCKED_FROZEN
+        sync_run.status = Neo4jSyncRunStatus.BLOCKED_FROZEN.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = "Updates frozen (freeze_updates=true)"
         db.commit()
@@ -211,7 +211,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
     # Check Neo4j reachability
     is_reachable, _, ping_details = ping()
     if not is_reachable:
-        sync_run.status = Neo4jSyncRunStatus.FAILED
+        sync_run.status = Neo4jSyncRunStatus.FAILED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = f"Neo4j unreachable: {ping_details.get('error', 'unknown')}"
         db.commit()
@@ -219,7 +219,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
         return run_id
 
     # Start sync
-    sync_run.status = Neo4jSyncRunStatus.RUNNING
+    sync_run.status = Neo4jSyncRunStatus.RUNNING.value
     sync_run.started_at = datetime.now(UTC)
     db.commit()
 
@@ -286,7 +286,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Update sync run
-        sync_run.status = Neo4jSyncRunStatus.DONE
+        sync_run.status = Neo4jSyncRunStatus.DONE.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.nodes_upserted = nodes_upserted
         sync_run.edges_upserted = edges_upserted
@@ -310,7 +310,7 @@ def run_incremental_sync(db: Session, actor_user_id: UUID | None = None) -> UUID
 
     except Exception as e:
         logger.error(f"Neo4j incremental sync failed: {e}", exc_info=True)
-        sync_run.status = Neo4jSyncRunStatus.FAILED
+        sync_run.status = Neo4jSyncRunStatus.FAILED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = str(e)
         db.commit()
@@ -340,8 +340,8 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
     # Create sync run record
     sync_run = Neo4jSyncRun(
         id=uuid4(),
-        run_type=Neo4jSyncRunType.FULL,
-        status=Neo4jSyncRunStatus.QUEUED,
+        run_type=Neo4jSyncRunType.FULL.value,
+        status=Neo4jSyncRunStatus.QUEUED.value,
     )
     db.add(sync_run)
     db.commit()
@@ -351,7 +351,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
 
     # Check if Neo4j is enabled
     if not settings.NEO4J_ENABLED:
-        sync_run.status = Neo4jSyncRunStatus.DISABLED
+        sync_run.status = Neo4jSyncRunStatus.DISABLED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = "Neo4j is disabled"
         db.commit()
@@ -360,7 +360,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
 
     # Check freeze_updates
     if _check_freeze_updates(db):
-        sync_run.status = Neo4jSyncRunStatus.BLOCKED_FROZEN
+        sync_run.status = Neo4jSyncRunStatus.BLOCKED_FROZEN.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = "Updates frozen (freeze_updates=true)"
         db.commit()
@@ -370,7 +370,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
     # Check Neo4j reachability
     is_reachable, _, ping_details = ping()
     if not is_reachable:
-        sync_run.status = Neo4jSyncRunStatus.FAILED
+        sync_run.status = Neo4jSyncRunStatus.FAILED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = f"Neo4j unreachable: {ping_details.get('error', 'unknown')}"
         db.commit()
@@ -378,7 +378,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
         return run_id
 
     # Start sync
-    sync_run.status = Neo4jSyncRunStatus.RUNNING
+    sync_run.status = Neo4jSyncRunStatus.RUNNING.value
     sync_run.started_at = datetime.now(UTC)
     db.commit()
 
@@ -431,7 +431,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
         duration_ms = int((time.time() - start_time) * 1000)
 
         # Update sync run
-        sync_run.status = Neo4jSyncRunStatus.DONE
+        sync_run.status = Neo4jSyncRunStatus.DONE.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.nodes_upserted = nodes_upserted
         sync_run.edges_upserted = edges_upserted
@@ -454,7 +454,7 @@ def run_full_rebuild(db: Session, actor_user_id: UUID | None = None) -> UUID:
 
     except Exception as e:
         logger.error(f"Neo4j full rebuild failed: {e}", exc_info=True)
-        sync_run.status = Neo4jSyncRunStatus.FAILED
+        sync_run.status = Neo4jSyncRunStatus.FAILED.value
         sync_run.finished_at = datetime.now(UTC)
         sync_run.last_error = str(e)
         db.commit()
