@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   Table,
   TableBody,
@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { adminMocksAPI, type MockGenerationRun } from "@/lib/api/adminMocks";
@@ -74,8 +75,8 @@ export function RunsTab() {
               {runs.map((run) => {
                 const isExpanded = expandedRows.has(run.id);
                 return (
-                  <>
-                    <TableRow key={run.id}>
+                  <Fragment key={run.id}>
+                    <TableRow>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -138,7 +139,7 @@ export function RunsTab() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </TableBody>

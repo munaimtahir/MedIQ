@@ -228,6 +228,18 @@ export default function QuestionsPage() {
     };
   }, [searchParams]);
 
+  // Display data (use previous if loading, current if available)
+  const displayResult = loading && previousSearchResult ? previousSearchResult : searchResult;
+
+  // Handle question open (save to sessionStorage)
+  const handleQuestionOpen = useCallback(
+    (questionId: string) => {
+      saveLastOpenedQuestion(searchParams, questionId);
+      router.push(`/admin/questions/${questionId}`);
+    },
+    [router, searchParams],
+  );
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -275,9 +287,6 @@ export default function QuestionsPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [displayResult, selectedRowIndex, handleQuestionOpen]);
-
-  // Display data (use previous if loading, current if available)
-  const displayResult = loading && previousSearchResult ? previousSearchResult : searchResult;
 
   // Reset selected row when results change
   useEffect(() => {
@@ -345,15 +354,6 @@ export default function QuestionsPage() {
   const canIncludeUnpublished = useMemo(() => {
     return user?.role === "ADMIN" || user?.role === "REVIEWER";
   }, [user]);
-
-  // Handle question open (save to sessionStorage)
-  const handleQuestionOpen = useCallback(
-    (questionId: string) => {
-      saveLastOpenedQuestion(searchParams, questionId);
-      router.push(`/admin/questions/${questionId}`);
-    },
-    [router, searchParams],
-  );
 
   // Handle row selection
   const handleRowSelect = useCallback((index: number) => {

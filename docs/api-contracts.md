@@ -7,9 +7,12 @@
 
 ## Authentication
 
-**Temporary**: Use `X-User-Id` header
-- Student: `X-User-Id: student-1`
-- Admin: `X-User-Id: admin-1`
+Authentication is performed using JWT (JSON Web Tokens) provided in the `Authorization` header as a Bearer token.
+
+- **Student**: Access token for student-level endpoints.
+- **Admin**: Access token for admin-level endpoints.
+
+Example: `Authorization: Bearer <your_jwt_token>`
 
 ## Endpoints
 
@@ -59,15 +62,8 @@ Get all themes, optionally filtered by block.
 
 List all questions (admin only).
 
-**Query Parameters:**
-- `skip` (default: 0): Pagination offset
-- `limit` (default: 100): Page size
-- `published` (optional): Filter by published status (true/false)
-
 **Headers:**
-- `X-User-Id`: Must be admin user
-
-**Response:**
+- `Authorization`: Bearer token (Admin role required)
 ```json
 [
   {
@@ -86,14 +82,8 @@ List all questions (admin only).
 ]
 ```
 
-#### POST /admin/questions
-
-Create a new question (admin only).
-
 **Headers:**
-- `X-User-Id`: Must be admin user
-
-**Request Body:**
+- `Authorization`: Bearer token (Admin role required)
 ```json
 {
   "theme_id": 1,
@@ -1031,7 +1021,7 @@ All errors follow this format:
 - `201`: Created
 - `204`: No Content
 - `400`: Bad Request (validation error)
-- `401`: Unauthorized (missing/invalid X-User-Id)
+- `401`: Unauthorized (missing/invalid JWT)
 - `403`: Forbidden (insufficient permissions)
 - `404`: Not Found
 - `500`: Internal Server Error

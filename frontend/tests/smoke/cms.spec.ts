@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('CMS Workflow', () => {
   test('should create, update, and publish a question as admin', async ({ page }) => {
-    const adminEmail = process.env.ADMIN_USER || 'admin-1@example.com';
-    const adminPassword = process.env.ADMIN_PASS || 'AdminPass123!';
+    const adminEmail = process.env.ADMIN_USER || 'admin@example.com';
+    const adminPassword = process.env.ADMIN_PASS || 'Admin123!';
     
     // Login as admin
     await page.goto('/login');

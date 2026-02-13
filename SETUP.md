@@ -57,17 +57,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/v1
 pnpm run dev
 ```
 
-## Demo Users
+## Login
 
-The database is seeded with:
-
-- **Student**: `student-1`
-- **Admin**: `admin-1`
-
-To login:
-1. Go to http://localhost:3000
-2. Click "Continue as Student" or "Continue as Admin"
-3. The app will automatically set the `X-User-Id` header
+Login to the application using the standard login flow, which uses JWT (JSON Web Tokens) for authentication.
 
 ## Testing the Flow
 

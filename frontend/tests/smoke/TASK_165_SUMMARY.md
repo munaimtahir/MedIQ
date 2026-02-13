@@ -147,10 +147,10 @@ pnpm test:e2e
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `FRONTEND_BASE_URL` | Base URL for frontend | `http://localhost:3000` |
-| `ADMIN_USER` | Admin email for testing | `admin-1@example.com` |
-| `ADMIN_PASS` | Admin password | `AdminPass123!` |
-| `STUDENT_USER` | Student email for testing | `student-1@example.com` |
-| `STUDENT_PASS` | Student password | `StudentPass123!` |
+| `ADMIN_USER` | Admin email for testing | `admin@example.com` |
+| `ADMIN_PASS` | Admin password | `Admin123!` |
+| `STUDENT_USER` | Student email for testing | `student@example.com` |
+| `STUDENT_PASS` | Student password | `Student123!` |
 
 ## Test Reports
 

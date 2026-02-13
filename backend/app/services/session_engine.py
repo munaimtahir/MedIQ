@@ -64,52 +64,52 @@ async def select_questions(
                     span.set_attribute("question_selection.cognitive_count", len(filters.cognitive))
 
             # Build query for eligible PUBLISHED questions
-    query = select(Question.id).where(
-        Question.status == QuestionStatus.PUBLISHED,
-        Question.year_id == filters.year,
-    )
+            query = select(Question.id).where(
+                Question.status == QuestionStatus.PUBLISHED,
+                Question.year_id == filters.year,
+            )
 
-    # Filter by blocks
-    if filters.blocks:
-        from app.models.syllabus import Block
+            # Filter by blocks
+            if filters.blocks:
+                from app.models.syllabus import Block
 
-        block_stmt = select(Block.id).where(Block.code.in_(filters.blocks))
-        block_result = db.execute(block_stmt)
-        block_ids = [row[0] for row in block_result.all()]
-        query = query.where(Question.block_id.in_(block_ids))
+                block_stmt = select(Block.id).where(Block.code.in_(filters.blocks))
+                block_result = db.execute(block_stmt)
+                block_ids = [row[0] for row in block_result.all()]
+                query = query.where(Question.block_id.in_(block_ids))
 
-    # Filter by themes (if provided)
-    if filters.themes:
-        query = query.where(Question.theme_id.in_(filters.themes))
+            # Filter by themes (if provided)
+            if filters.themes:
+                query = query.where(Question.theme_id.in_(filters.themes))
 
-    # Filter by difficulty (if provided)
-    if filters.difficulty:
-        query = query.where(Question.difficulty.in_(filters.difficulty))
+            # Filter by difficulty (if provided)
+            if filters.difficulty:
+                query = query.where(Question.difficulty.in_(filters.difficulty))
 
-    # Filter by cognitive level (if provided)
-    if filters.cognitive:
-        query = query.where(Question.cognitive_level.in_(filters.cognitive))
+            # Filter by cognitive level (if provided)
+            if filters.cognitive:
+                query = query.where(Question.cognitive_level.in_(filters.cognitive))
 
-    # Execute query to get eligible IDs
-    result = db.execute(query)
-    eligible_ids = [row[0] for row in result.all()]
+            # Execute query to get eligible IDs
+            result = db.execute(query)
+            eligible_ids = [row[0] for row in result.all()]
 
-    # Check if enough questions available
-    if len(eligible_ids) < filters.count:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "NOT_ENOUGH_QUESTIONS",
-                "message": f"Only {len(eligible_ids)} questions available, but {filters.count} requested",
-                "available_count": len(eligible_ids),
-                "requested_count": filters.count,
-            },
-        )
+            # Check if enough questions available
+            if len(eligible_ids) < filters.count:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "NOT_ENOUGH_QUESTIONS",
+                        "message": f"Only {len(eligible_ids)} questions available, but {filters.count} requested",
+                        "available_count": len(eligible_ids),
+                        "requested_count": filters.count,
+                    },
+                )
 
-    # Deterministic shuffle using seed
-    rng = random.Random(session_seed)
-    shuffled_ids = eligible_ids.copy()
-    rng.shuffle(shuffled_ids)
+            # Deterministic shuffle using seed
+            rng = random.Random(session_seed)
+            shuffled_ids = eligible_ids.copy()
+            rng.shuffle(shuffled_ids)
 
             # Take first N questions
             selected_ids = shuffled_ids[: filters.count]
@@ -467,7 +467,7 @@ async def process_answer(
             session = await check_and_expire_session(db, session)
             if session.status != SessionStatus.ACTIVE:
                 raise HTTPException(status_code=400, detail="Session is not active")
-                    session_id = session.id  # capture before any rollback (session may be expired after)
+            session_id = session.id
 
             # Verify question belongs to session
             session_question_stmt = select(SessionQuestion).where(
@@ -476,7 +476,6 @@ async def process_answer(
             )
             session_question_result = await db.execute(session_question_stmt)
             session_question = session_question_result.scalar_one_or_none()
-
             if not session_question:
                 raise HTTPException(status_code=404, detail="Question not in session")
 
@@ -487,7 +486,6 @@ async def process_answer(
             )
             answer_result = await db.execute(answer_stmt)
             answer = answer_result.scalar_one_or_none()
-
             if not answer:
                 answer = SessionAnswer(
                     session_id=session_id,
@@ -516,35 +514,37 @@ async def process_answer(
                     session_question.question_version_id,
                     session_question.snapshot_json,
                 )
-            correct_index = frozen_content.get("correct_index")
-            answer.is_correct = selected_index == correct_index
-        else:
-            answer.is_correct = None
+                correct_index = frozen_content.get("correct_index")
+                answer.is_correct = selected_index == correct_index
+            else:
+                answer.is_correct = None
 
-        try:
-            await db.commit()
-            await db.refresh(answer)
-            
-            # Set final attributes on span
-            if span.is_recording():
-                span.set_attribute("answer.is_correct", answer.is_correct if answer.is_correct is not None else False)
-                span.set_attribute("answer.changed_count", answer.changed_count)
-            
-            return answer
-        except IntegrityError:
-            await db.rollback()
-            # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing (idempotent).
-            db.expire(answer)  # force refetch from DB, not identity map
-            refetch = await db.execute(
-                select(SessionAnswer).where(
-                    SessionAnswer.session_id == session_id,
-                    SessionAnswer.question_id == question_id,
+            try:
+                await db.commit()
+                await db.refresh(answer)
+
+                if span.is_recording():
+                    span.set_attribute(
+                        "answer.is_correct",
+                        answer.is_correct if answer.is_correct is not None else False,
+                    )
+                    span.set_attribute("answer.changed_count", answer.changed_count)
+
+                return answer
+            except IntegrityError:
+                await db.rollback()
+                # Duplicate (session_id, question_id): concurrent insert. Refetch and return existing.
+                db.expire(answer)
+                refetch = await db.execute(
+                    select(SessionAnswer).where(
+                        SessionAnswer.session_id == session_id,
+                        SessionAnswer.question_id == question_id,
+                    )
                 )
-            )
-            existing = refetch.scalar_one_or_none()
-            if existing is None:
-                raise
-            return existing
+                existing = refetch.scalar_one_or_none()
+                if existing is None:
+                    raise
+                return existing
         except Exception as e:
             # Record exception on span
             set_span_error(span, e, getattr(e, "code", None) if hasattr(e, "code") else None)

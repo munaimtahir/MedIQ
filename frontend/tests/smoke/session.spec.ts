@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Session Creation and Question Answering', () => {
   test('should create a session and answer questions as student', async ({ page }) => {
-    const studentEmail = process.env.STUDENT_USER || 'student-1@example.com';
-    const studentPassword = process.env.STUDENT_PASS || 'StudentPass123!';
+    const studentEmail = process.env.STUDENT_USER || 'student@example.com';
+    const studentPassword = process.env.STUDENT_PASS || 'Student123!';
     
     // Login as student
     await page.goto('/login');

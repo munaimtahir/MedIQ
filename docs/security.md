@@ -11,18 +11,15 @@ This document outlines the security architecture, policies, and practices for th
 **Status:** Temporary / Development Only
 
 **Current Implementation:**
-- Header-based authentication: `X-User-Id`
-- No password verification
-- No token validation
-- Demo credentials hardcoded in frontend
+- JWT token-based authentication is strictly enforced.
+- Temporary header-based authentication methods have been removed.
 
 **Security Level:** ⚠️ **NOT PRODUCTION READY**
 
 **Risks:**
-- Anyone can impersonate any user by setting header
-- No session management
-- No CSRF protection
-- Credentials visible in client code
+- Validate JWT key rotation and revocation policy in production.
+- Enforce strict CSRF/cookie settings for browser sessions.
+- Ensure secrets are not embedded in client code or logs.
 
 ---
 
@@ -1038,4 +1035,3 @@ async def endpoint(...):
 - ⏳ SOC 2 certification
 - ⏳ Advanced threat detection
 - ⏳ Security monitoring dashboard
-

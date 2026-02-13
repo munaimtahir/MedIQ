@@ -65,7 +65,7 @@ export default function SessionPlayerPage() {
     mutate: mutateState,
   } = useSWR<SessionStateThin>(
     sessionId ? [getStateKey(sessionId), sessionId] : null,
-    ([, sid]) => getSessionStateThin(sid),
+    ([, sid]: [string, string]) => getSessionStateThin(sid),
     {
       refreshInterval: (data) => {
         // Only poll if exam mode and timer is active
@@ -97,7 +97,7 @@ export default function SessionPlayerPage() {
     mutate: mutateQuestion,
   } = useSWR<QuestionWithAnswerState>(
     sessionId && currentPosition ? [getQuestionKey(sessionId, currentPosition), sessionId, currentPosition] : null,
-    ([, sid, idx]) => getSessionQuestion(sid, idx),
+    ([, sid, idx]: [string, string, number]) => getSessionQuestion(sid, idx),
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
@@ -268,7 +268,7 @@ export default function SessionPlayerPage() {
           false,
         );
 
-        track("MARK_FOR_REVIEW", { question_id: questionId, marked });
+        track("MARK_FOR_REVIEW_TOGGLED", { question_id: questionId, marked });
       } catch (err) {
         console.error("Failed to update mark for review:", err);
         notify.error("Failed to update", "Please try again");

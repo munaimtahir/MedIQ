@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Student Flow', () => {
   test('should login as student and verify student dashboard loads', async ({ page }) => {
-    const studentEmail = process.env.STUDENT_USER || 'student-1@example.com';
-    const studentPassword = process.env.STUDENT_PASS || 'StudentPass123!';
+    const studentEmail = process.env.STUDENT_USER || 'student@example.com';
+    const studentPassword = process.env.STUDENT_PASS || 'Student123!';
     
     // Navigate to login
     await page.goto('/login');
@@ -28,8 +28,8 @@ test.describe('Student Flow', () => {
   });
 
   test('should open revision page and verify question cards render', async ({ page }) => {
-    const studentEmail = process.env.STUDENT_USER || 'student-1@example.com';
-    const studentPassword = process.env.STUDENT_PASS || 'StudentPass123!';
+    const studentEmail = process.env.STUDENT_USER || 'student@example.com';
+    const studentPassword = process.env.STUDENT_PASS || 'Student123!';
     
     // Login first
     await page.goto('/login');

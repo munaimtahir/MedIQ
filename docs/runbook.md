@@ -2615,7 +2615,7 @@ SELECT COUNT(*) FROM themes;
 **Diagnosis:**
 ```bash
 # Check if user exists
-curl -H "X-User-Id: student-1" http://localhost:8000/sessions
+curl -H "Authorization: Bearer <your_jwt_token>" http://localhost:8000/v1/sessions
 
 # Check backend logs
 docker-compose logs backend | grep -i "user"

@@ -1,0 +1,31 @@
+# Copy this site block into:
+# /home/munaim/srv/proxy/caddy/Caddyfile
+
+example.com {
+    encode zstd gzip
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        -Server
+    }
+
+    # Backend API via /api/* -> backend localhost service
+    # /api/v1/... becomes /v1/... to backend
+    # /api/health becomes /health
+    handle_path /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Optional direct health passthrough
+    handle /health {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Frontend app
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
+}

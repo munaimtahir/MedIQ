@@ -6,13 +6,14 @@ import { backendFetch } from "@/lib/server/backendClient";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await context.params;
     const cookies = request.headers.get("cookie") || "";
 
     const { data } = await backendFetch<unknown>(
-      `/admin/notifications/recent/${params.id}`,
+      `/admin/notifications/recent/${id}`,
       {
         method: "GET",
         cookies,

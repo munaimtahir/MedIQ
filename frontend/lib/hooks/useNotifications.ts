@@ -5,6 +5,12 @@
 import useSWR, { mutate } from "swr";
 import useSWRMutation from "swr/mutation";
 import fetcher from "@/lib/fetcher";
+import type {
+  MarkAllReadResponse,
+  MarkReadResponse,
+  NotificationsListResponse,
+  UnreadCountResponse,
+} from "@/lib/api/notificationsApi";
 
 const API_BASE = "/api/v1";
 
@@ -29,7 +35,7 @@ export function useNotifications(params: {
 
   const key = `${API_BASE}/notifications?${searchParams.toString()}`;
 
-  return useSWR(key, fetcher, {
+  return useSWR<NotificationsListResponse>(key, fetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     dedupingInterval: 30000, // 30 seconds
@@ -42,7 +48,7 @@ export function useNotifications(params: {
  * Mutations (mark read) invalidate via global mutate in useMarkRead/useMarkAllRead.
  */
 export function useUnreadCount() {
-  return useSWR(`${API_BASE}/notifications/unread-count`, fetcher, {
+  return useSWR<UnreadCountResponse>(`${API_BASE}/notifications/unread-count`, fetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     refreshInterval: 0, // No polling – was 30s; reduced to stop endless refetches and excess RAM
@@ -55,8 +61,9 @@ export function useUnreadCount() {
  */
 export function useMarkRead() {
   return useSWRMutation(
-    (id: string) => `${API_BASE}/notifications/${id}/read`,
-    async (url: string) => {
+    `${API_BASE}/notifications/read`,
+    async (_key: string, { arg }: { arg: string }): Promise<MarkReadResponse> => {
+      const url = `${API_BASE}/notifications/${arg}/read`;
       const response = await fetch(url, {
         method: "POST",
         credentials: "include",
@@ -81,7 +88,7 @@ export function useMarkRead() {
 export function useMarkAllRead() {
   return useSWRMutation(
     () => `${API_BASE}/notifications/read-all`,
-    async (url: string) => {
+    async (url: string): Promise<MarkAllReadResponse> => {
       const response = await fetch(url, {
         method: "POST",
         credentials: "include",

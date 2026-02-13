@@ -7,9 +7,10 @@ import { backendFetch } from "@/lib/server/backendClient";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await context.params;
     const cookieStore = await cookies();
     const cookieHeader = Array.from(cookieStore.getAll())
       .map((cookie) => `${cookie.name}=${cookie.value}`)
@@ -18,7 +19,7 @@ export async function POST(
     const body = await request.json();
 
     const { data } = await backendFetch<unknown>(
-      `/admin/mocks/blueprints/${params.id}/activate`,
+      `/admin/mocks/blueprints/${id}/activate`,
       {
         method: "POST",
         cookies: cookieHeader,

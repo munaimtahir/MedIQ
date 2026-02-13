@@ -7,9 +7,10 @@ import { backendFetch } from "@/lib/server/backendClient";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  context: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const { requestId } = await context.params;
     const cookieStore = await cookies();
     const cookieHeader = Array.from(cookieStore.getAll())
       .map((cookie) => `${cookie.name}=${cookie.value}`)
@@ -18,7 +19,7 @@ export async function POST(
     const body = await request.json();
 
     const { data } = await backendFetch<unknown>(
-      `/admin/runtime/approvals/${params.requestId}/approve`,
+      `/admin/runtime/approvals/${requestId}/approve`,
       {
         method: "POST",
         cookies: cookieHeader,

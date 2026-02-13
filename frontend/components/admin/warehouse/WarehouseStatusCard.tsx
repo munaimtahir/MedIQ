@@ -43,6 +43,7 @@ export function WarehouseStatusCard({ data, loading, onSwitchMode }: WarehouseSt
 
   const requestedMode = data?.requested_mode || "disabled";
   const effectiveMode = data?.effective_mode || "disabled";
+  const currentMode = effectiveMode;
   const isFrozen = data?.warehouse_freeze || false;
   const readiness = data?.readiness;
   const isReady = readiness?.ready || false;

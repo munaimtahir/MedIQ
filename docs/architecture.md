@@ -125,11 +125,9 @@ backend/
 
 ### API Design
 
-#### Authentication (Temporary)
+#### Authentication
 
-- Uses `X-User-Id` header
-- No real authentication yet
-- Demo users: `student-1`, `admin-1`
+- Handled by JWT (JSON Web Tokens).
 
 #### REST Endpoints
 

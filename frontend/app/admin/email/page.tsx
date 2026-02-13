@@ -38,7 +38,12 @@ import { SkeletonTable } from "@/components/status/SkeletonTable";
 import { EmptyState } from "@/components/status/EmptyState";
 import { ErrorState } from "@/components/status/ErrorState";
 import { PoliceConfirmModal } from "@/components/admin/learningOps/PoliceConfirmModal";
-import { adminEmailApi, type EmailRuntimeResponse, type EmailOutboxItem } from "@/lib/api/adminEmail";
+import {
+  adminEmailApi,
+  type EmailRuntimeResponse,
+  type EmailOutboxItem,
+  type EmailOutboxListResponse,
+} from "@/lib/api/adminEmail";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -151,7 +156,7 @@ export default function AdminEmailPage() {
     data: runtime,
     isLoading: runtimeLoading,
     mutate: refetchRuntime,
-  } = useSWR("/api/v1/admin/email/runtime", fetcher, {
+  } = useSWR<EmailRuntimeResponse>("/api/v1/admin/email/runtime", fetcher, {
     refreshInterval: 30000, // Refetch every 30s
   });
 
@@ -166,7 +171,7 @@ export default function AdminEmailPage() {
     isLoading: outboxLoading,
     error: outboxError,
     mutate: refetchOutbox,
-  } = useSWR(outboxKey, fetcher, {
+  } = useSWR<EmailOutboxListResponse>(outboxKey, fetcher, {
     revalidateOnFocus: true,
   });
 
@@ -243,24 +248,6 @@ export default function AdminEmailPage() {
         variant: "destructive",
       });
     }
-  };
-
-  const handleSwitchMode = () => {
-    const modeConfig = EMAIL_MODES.find((m) => m.value === switchMode);
-    if (!modeConfig) return;
-    switchModeMutation({
-      mode: switchMode,
-      reason: switchReason,
-      phrase: modeConfig.phrase,
-    });
-  };
-
-  const handleDrain = () => {
-    drainMutation({
-      limit: drainLimit,
-      reason: drainReason,
-      phrase: "DRAIN EMAIL OUTBOX",
-    });
   };
 
   const canSwitchToActive =

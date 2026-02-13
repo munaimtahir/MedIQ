@@ -34,7 +34,8 @@ export function SearchOpsCard({ status, isFrozen, loading, onRefresh }: SearchOp
   const readiness = status?.readiness;
 
   const isDegraded = requestedMode === "elasticsearch" && effectiveEngine === "postgres";
-  const isNotReady = requestedMode === "elasticsearch" && readiness && !readiness.ready;
+  const isNotReady = requestedMode === "elasticsearch" && !!readiness && !readiness.ready;
+  const esNotReady = !!readiness && !readiness.ready;
 
   const handleSwitchToPostgres = async () => {
     setIsSubmitting(true);
@@ -201,9 +202,9 @@ export function SearchOpsCard({ status, isFrozen, loading, onRefresh }: SearchOp
               <Button
                 variant="outline"
                 onClick={() => setShowSwitchToElasticsearch(true)}
-                disabled={isFrozen || loading || !esEnabled || (readiness && !readiness.ready)}
+                disabled={isFrozen || loading || !esEnabled || esNotReady}
                 title={
-                  readiness && !readiness.ready
+                  esNotReady
                     ? `Elasticsearch not ready: ${readiness.blocking_reasons.join("; ")}`
                     : undefined
                 }

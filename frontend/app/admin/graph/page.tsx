@@ -67,7 +67,8 @@ export default function GraphViewerPage() {
 
   // Sync mutations
   const incrementalSyncMutation = useMutation({
-    mutationFn: adminGraphAPI.runGraphSyncIncremental,
+    mutationFn: (reason?: string) =>
+      adminGraphAPI.runGraphSyncIncremental(reason, "RUN GRAPH SYNC"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["graphRuntime"] });
       notify.success("Incremental sync started");
@@ -80,7 +81,8 @@ export default function GraphViewerPage() {
   });
 
   const fullSyncMutation = useMutation({
-    mutationFn: adminGraphAPI.runGraphSyncFull,
+    mutationFn: (reason: string) =>
+      adminGraphAPI.runGraphSyncFull(reason, "RUN GRAPH FULL REBUILD"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["graphRuntime"] });
       notify.success("Full rebuild started");
@@ -132,9 +134,9 @@ export default function GraphViewerPage() {
 
   const handleConfirmSync = async () => {
     if (syncType === "incremental") {
-      await incrementalSyncMutation.mutateAsync(syncReason, "RUN GRAPH SYNC");
+      await incrementalSyncMutation.mutateAsync(syncReason);
     } else {
-      await fullSyncMutation.mutateAsync(syncReason, "RUN GRAPH FULL REBUILD");
+      await fullSyncMutation.mutateAsync(syncReason);
     }
   };
 

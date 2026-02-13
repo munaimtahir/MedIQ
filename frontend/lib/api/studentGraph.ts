@@ -76,3 +76,9 @@ export async function getStudentSuggestions(
     )}&limit=${limit}`
   );
 }
+
+export const studentGraphAPI = {
+  getStudentNeighbors,
+  getStudentPrereqs,
+  getStudentSuggestions,
+};

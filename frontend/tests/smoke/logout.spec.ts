@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Logout Flow', () => {
   test('should logout successfully', async ({ page }) => {
-    const studentEmail = process.env.STUDENT_USER || 'student-1@example.com';
-    const studentPassword = process.env.STUDENT_PASS || 'StudentPass123!';
+    const studentEmail = process.env.STUDENT_USER || 'student@example.com';
+    const studentPassword = process.env.STUDENT_PASS || 'Student123!';
     
     // Login first
     await page.goto('/login');

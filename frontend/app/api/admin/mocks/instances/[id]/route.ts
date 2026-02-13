@@ -7,16 +7,17 @@ import { backendFetch } from "@/lib/server/backendClient";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await context.params;
     const cookieStore = await cookies();
     const cookieHeader = Array.from(cookieStore.getAll())
       .map((cookie) => `${cookie.name}=${cookie.value}`)
       .join("; ");
 
     const { data } = await backendFetch<unknown>(
-      `/admin/mocks/instances/${params.id}`,
+      `/admin/mocks/instances/${id}`,
       {
         method: "GET",
         cookies: cookieHeader,

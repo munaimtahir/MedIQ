@@ -20,6 +20,10 @@ export interface ApprovalRequest {
 export interface ApprovalResponse {
   request_id: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
+  requested_action?: {
+    reason?: string | null;
+    [key: string]: unknown;
+  } | null;
   requested_by: {
     id: string;
     email: string | null;

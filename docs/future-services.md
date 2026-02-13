@@ -12,7 +12,7 @@
 
 ### Implementation Notes
 
-- Replace `X-User-Id` header with JWT tokens
+- Integrate robust token-based authentication system
 - Add refresh token mechanism
 - Implement middleware for role checking
 - Add user registration flow

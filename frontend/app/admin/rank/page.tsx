@@ -251,7 +251,7 @@ export default function RankOpsPage() {
                   <span className="text-sm text-muted-foreground">Coverage:</span>
                   <p className="text-lg font-semibold">
                     {status.latest_run?.coverage !== null
-                      ? `${(status.latest_run.coverage * 100).toFixed(1)}%`
+                      ? `${((status.latest_run?.coverage ?? 0) * 100).toFixed(1)}%`
                       : "N/A"}
                   </p>
                 </div>
@@ -259,7 +259,7 @@ export default function RankOpsPage() {
                   <span className="text-sm text-muted-foreground">Stability:</span>
                   <p className="text-lg font-semibold">
                     {status.latest_run?.stability !== null
-                      ? status.latest_run.stability.toFixed(3)
+                      ? (status.latest_run?.stability ?? 0).toFixed(3)
                       : "N/A"}
                   </p>
                 </div>
