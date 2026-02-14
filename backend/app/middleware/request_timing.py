@@ -75,7 +75,7 @@ class RequestTimingMiddleware:
             request_id=request_id,
             method=scope.get("method"),
             path=scope.get("path"),
-            route=scope.get("route", {}).get("path") if scope.get("route") else None,
+            route=getattr(scope.get("route"), "path", None),
         )
 
         status_code: int | None = None
@@ -131,11 +131,10 @@ class RequestTimingMiddleware:
             # Log request lifecycle: request.end (with sampling for high-volume endpoints)
             if random.random() < sample_rate:
                 log_data: dict[str, Any] = {
-                    "event": "request.end",
                     "request_id": request_id,
                     "method": scope.get("method"),
                     "path": scope.get("path"),
-                    "route": scope.get("route", {}).get("path") if scope.get("route") else None,
+                    "route": getattr(scope.get("route"), "path", None),
                     "status_code": status_code,
                     "duration_ms": total_ms,
                     "db_query_count": db_queries,
@@ -246,4 +245,3 @@ def _write_perf_request_log_sync(
             db.close()
     except Exception:
         return
-

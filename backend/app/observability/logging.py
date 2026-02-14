@@ -153,8 +153,9 @@ def audit_log(
     logger = get_audit_logger()
     
     # Build audit log data
+    # NOTE: structlog's bound logger uses the first positional argument as the
+    # event name; do not also pass an `event=` kwarg.
     audit_data: dict[str, Any] = {
-        "event": event,
         "audit": True,
     }
     
